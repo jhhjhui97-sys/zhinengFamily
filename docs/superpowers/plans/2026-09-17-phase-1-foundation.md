@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-17-smart-home-mvp-design.md`
 
-状态：评审稿；下列复选框均未执行。先审阅设计，随后按任务执行，不能把本文当作通过测试的证据。
+状态：用户已授权恢复实施。实现进度、TDD 证据和阻塞事项见 [执行记录](2026-09-17-phase-1-progress.md)。下列清单保留原验收要求；不能把代码已写入或部分测试通过当作任务完整验收。
 
 ## Global Constraints
 
@@ -294,4 +294,4 @@ docker compose build api
 
 ## 执行记录要求
 
-每完成一个任务记录红灯原因、绿灯命令与结果、commit SHA。当前没有执行记录；设计稿提交不等于实现提交。完成前使用 verification-before-completion 和 requesting-code-review 工作流，再决定推送及集成方式。
+每完成一个任务记录红灯原因、绿灯命令与结果、commit SHA。实际进度与红绿灯证据见 [执行记录](2026-09-17-phase-1-progress.md)；本计划的原始步骤保留供核对，设计稿提交不等于实现提交。完成前使用 verification-before-completion 和 requesting-code-review 工作流，再决定推送及集成方式。
