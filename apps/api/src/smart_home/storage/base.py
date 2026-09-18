@@ -1,0 +1,9 @@
+from typing import Protocol
+
+
+class ObjectStorageProvider(Protocol):
+    def put(self, key: str, data: bytes, content_type: str) -> None: ...
+
+    def read(self, key: str) -> bytes: ...
+
+    def delete(self, key: str) -> None: ...
