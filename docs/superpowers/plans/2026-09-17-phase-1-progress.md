@@ -123,3 +123,22 @@
 协议检查首次在旧开发虚拟环境中直接执行时因未安装 scene_schema 返回 ModuleNotFoundError；随后在已完成项目安装的干净 verify-venv 中执行成功。没有修改导出检查或依赖测试的 PYTHONPATH 隐藏安装错误。
 
 本地代码与测试已就绪，但在 Docker/Linux CI 实际通过前不声明 Phase 1 全部验收完成。尚未实现 Phase 2/3。
+
+## 已保存的模块提交
+
+| 提交 | 内容 |
+| --- | --- |
+| `8b8c239` | 设计与 Phase 1 计划（原始基线，master） |
+| `1e0afa1` | FastAPI 工具链与 health |
+| `bfe7f90` | SceneModel、JSON Schema、示例与协议测试 |
+| `623cf9b` | PostgreSQL 五个实体、固定迁移与数据库测试 |
+| `651bd6b` | 商家初始化、认证与用户管理 |
+| `4664672` | 客户 API 与租户隔离 |
+| `7a0147e` | 商品目录 API |
+| `aae0671` | 设计项目 API 与隔离回归 |
+| `45d88cb` | 本地对象存储 |
+| `0704025` | OpenAPI、Docker/CI、README、架构文档与最终回归 |
+
+分组暂存时遇到 Windows 管道 CRLF 和两份文档末尾空行，均由 git diff --cached --check 拦截；修正暂存脚本及空行后提交成功，没有跳过检查，也没有改动已验证业务代码。
+
+功能分支 `codex/phase-1-foundation`，本地基线分支 `master`。最终只读 ls-remote 再次确认远端没有 refs；受限网络失败后通过获批的联网只读命令验证成功。尚未推送或合并；创建 PR 时需先发布原始基线与功能分支，再实际验证 CI。
