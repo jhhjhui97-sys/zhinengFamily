@@ -7,6 +7,7 @@ from smart_home.db import session_factory
 from smart_home.errors import ErrorResponse, install_error_handlers
 from smart_home.modules.auth.router import router as auth_router
 from smart_home.modules.customers.router import router as customers_router
+from smart_home.modules.products.router import router as products_router
 from smart_home.modules.users.router import router as users_router
 
 
@@ -21,6 +22,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(users_router)
     app.include_router(customers_router)
+    app.include_router(products_router)
 
     @app.get("/health")
     def health() -> dict[str, str]:
