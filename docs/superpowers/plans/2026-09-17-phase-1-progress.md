@@ -9,7 +9,7 @@
 - 恢复时 Git status 的两个文档修改标记无对应内容差异；保留原文件。
 - 在当前目录开发，使用 `codex/phase-1-foundation` 分支；按用户继续当前仓库的意图，不另建工作树。
 - origin 已指向已有 `jhhjhui97-sys/zhinengFamily`，没有创建 GitHub 仓库。
-- 当前 Git 的 HTTPS helper 实际存在于 bundled Git 的 mingw64/bin；设置进程 GIT_EXEC_PATH 后 ls-remote 成功，远端无 refs。
+- 恢复时 Git 的 HTTPS helper 实际存在于 bundled Git 的 mingw64/bin；设置进程 GIT_EXEC_PATH 后 ls-remote 成功，当时远端为空。
 - Python 3.12.14 位于 Codex bundled runtime；WindowsApps 别名不是可用开发解释器。
 - 首次 venv ensurepip 因沙箱临时目录写权限失败；使用项目 .local/tmp 并批准联网安装解决。业务 TDD 红灯不能以依赖安装失败替代。
 
@@ -24,10 +24,10 @@
 | 5 客户 CRUD | 已实现并复审 | 真实数据库、租户隔离、PATCH 语义检查通过 |
 | 6 商品 CRUD | 已实现并复审 | Numeric 金额、尺寸、SKU、JSON 元数据检查通过 |
 | 7 项目 CRUD | 已实现并复审 | 客户/销售同租户绑定、查询和更新检查通过 |
-| 8 本地存储 | Windows 验证通过 | 实际磁盘往返与越界拒绝；3 个 symlink 用例待 Linux |
-| 9 Docker/CI/验收 | 部分完成 | 原生 HTTP smoke、干净安装通过；Docker/Linux CI 未运行 |
+| 8 本地存储 | Linux CI 验证通过 | 实际磁盘往返、越界拒绝与符号链接用例全部通过 |
+| 9 Docker/CI/验收 | 已通过 | Linux 全量测试、Ruff、迁移、契约和 Docker build 全部通过 |
 
-本文件持续追加执行证据；未完成项不代表已验收。
+Phase 1 已通过复审；最新全量验收以本文 Linux CI 结果为准。下方任务级红绿灯计数属于开发过程证据。
 
 ## Task 1
 
@@ -63,66 +63,30 @@
 - 完整测试首次暴露 tests/scene/conftest.py 与 tests/conftest.py 的导入名冲突。辅助函数移到 tests/db_support.py 后，在同时收集两处测试的 170 项检查中通过。
 - 已写 README、Compose PostgreSQL/API、Dockerfile、GitHub Actions、数据字典及生成契约；没有创建空前端/Unity/微服务目录。
 
-## 历史检查：额度耗尽前（已由恢复后的验证取代）
+## 最新 Linux CI 验收
 
-| 检查 | 结果 |
-| --- | --- |
-| `python -m pytest -q --tb=line` | **222 passed, 48 errors, 4 warnings，退出 1** |
-| 48 个 setup errors | 46 个存储测试 + 2 个 Scene Schema 文件输出测试，均为 pytest 临时目录 WinError 5 |
-| 业务断言失败 | 修复测试辅助模块冲突后，本次最终运行没有 assertion failure；环境错误仍使全量检查失败 |
-| `python -m ruff check .` | All checks passed |
-| `python -m ruff format --check .` | 66 files already formatted |
-| `python -m scene_schema.export --check` | 退出 0 |
-| `python packages/api-contracts/export.py --check` | 退出 0，无数据库连接需求 |
-| 开发库 migration | upgrade head 退出 0 |
-| 实际 Uvicorn HTTP smoke | /health、/ready、/docs、/openapi.json 全部 200；health=ok，ready=ready |
-| Docker build / Compose runtime | 未运行；当前 PATH 无 docker |
-| 全新环境 editable 安装 | 未完成；当前测试使用项目虚拟环境和 src 路径 |
-| GitHub CI | 未推送，未运行 |
-| 独立代码复审 | Task 1 通过；后续复审被代理额度限制中断，不能称已通过 |
-
-保留的警告：两条上游 Starlette/AnyIO 弃用警告及 pytest cache 权限警告；没有通过过滤警告或删除测试掩盖问题。
-
-## 历史权限阻塞（额度恢复后已解除）
-
-自动审批返回：`Automatic approval review failed: You've hit your usage limit ... try again at 2:50 AM`。随后两个子代理也因额度限制终止。不是已确认的代码危险行为，但不能绕过审批。
-
-审批被拒绝的是带权限提升的存储测试/格式命令。安全替代是在当前沙箱执行允许的数据库、API、纯协议与只读检查；需要临时目录写权限的测试仍被阻止。本地 `.git` 也属于只读保护范围，因此后续暂存/提交需要恢复审批能力。
-
-已提交：`8b8c239`（设计）、`1e0afa1`（FastAPI 基础）。其余实现保留在当前工作区，**未提交、未推送**。不要用当前未提交规模推断它已完成验收。
-
-## 恢复计划
-
-1. 恢复本任务必要的执行/审批权限，重跑完整 pytest；修复任何真实失败，不降低测试要求。
-2. 验证干净 Python 环境的依赖和 editable 安装；有 Docker 的环境执行 Compose config/build/start 及 README 启动流程。
-3. 完成 SceneModel 和后端独立代码复审，修复重要问题并运行对应回归测试。
-4. 按协议、数据库、认证、各 CRUD、存储、交付配置分组保存小步提交；检查提交只包含项目文件，不包含 .local/.env。
-5. 推送功能分支并核实真实 CI 结果。不得把配置文件存在称为 CI 已通过。
-6. 全部验收完成之后再讨论下一阶段；当前不实现 Phase 2/3。
-
-## 额度恢复后的检查
-
-- 自动审批恢复，提升权限后完整 pytest 实际运行：**267 passed, 3 skipped, 2 warnings**，退出 0（18.88 秒）。旧的 48 个临时目录 setup errors 已解除。
-- 3 个 skip 仅为 Windows 符号链接权限，仍需要 Linux CI；保留两条上游 Starlette/AnyIO 弃用警告。
-- 独立 `.local/verify-venv` 从 requirements.lock 安装，再执行 `pip install --no-deps -e .`；`pip check` 无依赖冲突，API 和 scene_schema 导入及 OpenAPI 生成通过。
-- 非 editable wheel 构建成功，并检查归档确实包含 smart_home/main.py 和 scene_schema/scene.py；不将此证据等同 Docker 构建。
-- 独立复审发现两个 P2：NUL 文本/JSON 写入 PostgreSQL 会返回 500；极端有限坐标在归一化后边坍缩会导致除零。其他租户隔离、认证、迁移、协议与范围未发现阻塞项。
-- 两项修复先增加回归测试，确认 **20 项失败**，再修改输入边界与几何校验；修复后 113 项相关测试通过；68 项几何/导出/OpenAPI 检查通过。独立复审确认两项 P2 均已解决，无新增阻塞项。
-
-### 最终本地验证（复审修复后）
+2026-09-19 核实 [GitHub Actions run 35332531674](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35332531674) 已完成且结论为 success，对应提交 `be0c552b09ff090ed63ebf69da4425e1cc4cf3ed`。
 
 | 检查 | 实际结果 |
 | --- | --- |
-| 完整 pytest / 真实 PostgreSQL | **287 passed, 3 skipped, 2 warnings**，26.23 秒，退出 0 |
-| Ruff check / format --check | 通过，67 个 Python 文件格式正确 |
-| Scene Schema / OpenAPI --check | 干净安装的 verify-venv 中两者退出 0，生成产物一致 |
-| git diff --check | 通过（仅 Windows LF/CRLF 提示） |
-| 独立最终复审 | 两项 P2 已解决，无新增可操作问题 |
-| Docker / Linux CI | 本机无 Docker，尚未执行；3 项符号链接测试仍待 Linux |
+| 完整 pytest / 真实 PostgreSQL | **290 passed, 2 warnings**；无跳过用例 |
+| Ruff lint / format | 通过 |
+| Alembic migration | 通过 |
+| SceneModel / OpenAPI contract checks | 通过 |
+| Docker build | 通过 |
+| 独立复审 | 通过，两项 P2 已修复并添加回归测试 |
 
-协议检查首次在旧开发虚拟环境中直接执行时因未安装 scene_schema 返回 ModuleNotFoundError；随后在已完成项目安装的干净 verify-venv 中执行成功。没有修改导出检查或依赖测试的 PYTHONPATH 隐藏安装错误。
+保留的两条警告来自上游 Starlette/AnyIO 弃用提示，未过滤。此前 Windows 因权限跳过的符号链接用例已在 Linux CI 实际通过。
 
-本地代码与测试已就绪，但在 Docker/Linux CI 实际通过前不声明 Phase 1 全部验收完成。尚未实现 Phase 2/3。
+## 已解决的历史问题
+
+- 早期全量运行因 pytest 临时目录权限发生 setup errors；额度与执行权限恢复后重跑成功。没有删除用例或降低测试要求，旧全量计数已由上方 Linux CI 结果取代。
+- 独立干净虚拟环境按 requirements.lock 安装并完成 editable 安装，pip check 无冲突；非 editable wheel 构建与内容检查通过。
+- 旧开发虚拟环境未安装 scene_schema 时曾出现 ModuleNotFoundError；在完成项目安装的干净环境执行导出检查成功，未改写检查以掩盖安装问题。
+- 独立复审发现 NUL 文本/JSON 写入 PostgreSQL 可能返回 500，以及极端有限坐标归一化后边坍缩可能导致除零。增加 20 项回归先确认失败，再修复；相关测试与独立复审均通过。
+- 分组提交曾受额度审批和暂存换行问题影响；均已解决，所有 Phase 1 代码已提交并推送。
+
+本轮仅更新验收文档；未开始 Phase 2。
 
 ## 已保存的模块提交
 
@@ -141,4 +105,4 @@
 
 分组暂存时遇到 Windows 管道 CRLF 和两份文档末尾空行，均由 git diff --cached --check 拦截；修正暂存脚本及空行后提交成功，没有跳过检查，也没有改动已验证业务代码。
 
-功能分支 `codex/phase-1-foundation`，本地基线分支 `master`。最终只读 ls-remote 再次确认远端没有 refs；受限网络失败后通过获批的联网只读命令验证成功。尚未推送或合并；创建 PR 时需先发布原始基线与功能分支，再实际验证 CI。
+功能分支 `codex/phase-1-foundation` 已推送到 GitHub；原始设计提交作为远端 `main` 基线。[PR #1](https://github.com/jhhjhui97-sys/zhinengFamily/pull/1) 目标为 `main`。本次文档收尾继续提交到该功能分支，不执行合并。

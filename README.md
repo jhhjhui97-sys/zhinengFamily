@@ -2,7 +2,7 @@
 
 面向家具/家电门店的 AI + 3D 设计与销售系统。本次开发范围为 Phase 1：业务后端和统一 SceneModel 协议。
 
-当前代码包含五个核心数据库实体、登录认证、客户/商品/项目 CRUD、SceneModel、Local 存储接口及交付配置。本地全量验证为 **287 passed、3 skipped**（Windows 符号链接权限），独立复审已通过；**Phase 1 仍待 Linux CI / Docker 验证**。详细证据见 [执行记录](docs/superpowers/plans/2026-09-17-phase-1-progress.md)。没有 Unity、户型解析、AI 摆放或渲染实现。
+当前代码包含五个核心数据库实体、登录认证、客户/商品/项目 CRUD、SceneModel、Local 存储接口及交付配置。Linux CI 全量验证为 **290 passed, 2 warnings**；Ruff、Alembic migration、SceneModel/OpenAPI 契约检查和 Docker build 均通过，Phase 1 已通过复审。详细证据见 [执行记录](docs/superpowers/plans/2026-09-17-phase-1-progress.md)。没有 Unity、户型解析、AI 摆放或渲染实现。
 
 ## 环境要求
 
