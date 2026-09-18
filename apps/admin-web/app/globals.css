@@ -79,7 +79,7 @@ h1,h2,h3,p{margin-top:0}
 .empty-symbol{display:grid;place-items:center;width:72px;height:72px;border-radius:22px;background:#eff4ec;color:#7a9c82;font-size:35px;margin-bottom:22px}
 .empty-state h2{font-size:19px;margin-bottom:10px}
 .empty-state p{font-size:13px;color:var(--muted);max-width:340px;margin-bottom:8px}
-.empty-caption{font-size:12px;color:#89988c}
+.empty-caption{font-size:12px;color:var(--muted)}
 .menu-button{display:none;border:1px solid var(--border);background:#fff;border-radius:7px;min-width:44px;min-height:44px;font-size:20px;cursor:pointer}
 .skip-link{position:fixed;top:-100px;left:20px;z-index:5;padding:12px;background:var(--green);color:#fff;border-radius:6px}
 .skip-link:focus{top:12px}
