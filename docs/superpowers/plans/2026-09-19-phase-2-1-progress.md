@@ -39,3 +39,9 @@
 - 登录是明确预览，不采集密码，不发 API 请求，不保存 token；后台没有真实授权保护。退出为禁用占位，列表无数据。
 - 本机浏览器使用 Edge Chromium；iPad 为宽度验证，未使用实体 iPad/Safari。Linux Chromium 由独立前端 CI 验证。
 - 不创建 Phase 2 PR，不开发后续功能。
+- Next.js 的 next-env.d.ts 在 dev/build 时生成不同路径，作为生成文件忽略并保留本地副本；next typegen/dev/build 在干净环境自动生成，不手动维护。
+
+## 交付
+
+- 模块提交：`707bb49`（设计/计划）、`f31aaa7`（工具链/登录入口）、`37f81c9`（布局/列表）、`6e13bfc`（复审改进）、`616e278`（CI/文档）。
+- 已推送 `codex/phase-2-admin-scene`，未创建 PR；本地开发服务可在 http://localhost:3000 查看。
