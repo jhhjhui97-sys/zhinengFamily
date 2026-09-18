@@ -1,0 +1,12 @@
+.git
+.venv
+.local
+.superpowers
+.env
+.env.*
+**/__pycache__
+**/*.pyc
+**/*.egg-info
+pytest-cache-files-*
+tests
+docs

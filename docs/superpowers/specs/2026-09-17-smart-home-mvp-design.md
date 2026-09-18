@@ -2,7 +2,7 @@
 
 日期：2026-09-17。目标仓库：`jhhjhui97-sys/zhinengFamily`。
 
-状态：设计评审稿，尚未实现。最新附件明确本次只执行 Phase 1，覆盖此前笼统的 Phase 1 → Phase 3 请求。
+状态：用户已授权继续，Phase 1 实施中；实时进度见 ../plans/2026-09-17-phase-1-progress.md。最新附件明确本次只执行 Phase 1，覆盖此前笼统的 Phase 1 → Phase 3 请求。下文仓库检查描述的是初始基线。
 
 ## 1. 仓库检查
 
