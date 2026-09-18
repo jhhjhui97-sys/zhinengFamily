@@ -6,6 +6,8 @@
 
 ## 环境要求
 
+后台前端骨架位于 [`apps/admin-web`](apps/admin-web/README.md)。在该目录运行 `npm install` 和 `npm run dev`，打开 http://localhost:3000。当前仅提供中文页面与后台布局预览，尚未接入认证和业务 API；下文为 Phase 1 后端启动说明。
+
 - Python 3.12（Windows、Linux 或 macOS）。Windows 安装可执行的 Python，而不是 WindowsApps 商店别名。
 - PostgreSQL 16；推荐 Docker Desktop/Engine 和 Compose v2 启动数据库。
 - Git。默认 API 端口 8000，开发 PostgreSQL 端口 5432。
