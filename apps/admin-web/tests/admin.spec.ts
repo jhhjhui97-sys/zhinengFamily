@@ -1,7 +1,15 @@
 import { expect, test } from '@playwright/test';
+import { login, credentials } from './auth-helper';
+
+test('all admin pages redirect anonymous users', async ({ page }) => {
+  for (const path of ['/dashboard', '/customers', '/products', '/projects']) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/login$/);
+  }
+});
 
 test('sidebar routes to empty resource pages and marks current destination', async ({ page }) => {
-  await page.goto('/dashboard');
+  await login(page);
   for (const [label, path, empty] of [
     ['客户管理', '/customers', '暂无客户'],
     ['商品管理', '/products', '暂无商品'],
@@ -14,17 +22,16 @@ test('sidebar routes to empty resource pages and marks current destination', asy
   }
 });
 
-test('top bar states preview identity and offers honest disabled logout', async ({ page }) => {
-  await page.goto('/dashboard');
-  await expect(page.getByText('预览用户', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '退出（暂未接入）' })).toBeDisabled();
-  await page.getByRole('link', { name: '返回登录页' }).click();
-  await expect(page).toHaveURL(/\/login$/);
+test('top bar shows authenticated identity', async ({ page }) => {
+  await login(page);
+  await expect(page.getByText(credentials.email)).toBeVisible();
+  await expect(page.getByRole('button', { name: '退出登录' })).toBeEnabled();
 });
 
 for (const width of [768, 820, 1024, 1440]) {
   test(`navigation and content fit viewport ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1180 });
+    await login(page);
     await page.goto('/customers');
     await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '暂无客户', exact: true })).toBeVisible();
@@ -37,6 +44,7 @@ for (const width of [768, 820, 1024, 1440]) {
 
 test('narrow layout opens menu, Escape closes it and returns focus', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await login(page);
   await page.goto('/dashboard');
   const button = page.getByRole('button', { name: '打开导航菜单' });
   await expect(button).toHaveAttribute('aria-expanded', 'false');
@@ -61,6 +69,7 @@ test('narrow layout opens menu, Escape closes it and returns focus', async ({ pa
 });
 
 test('resource pages are directly accessible on reload', async ({ page }) => {
+  await login(page);
   for (const [path, heading] of [['/customers', '客户管理'], ['/products', '商品管理'], ['/projects', '设计项目']]) {
     await page.goto(path);
     await page.reload();

@@ -22,6 +22,13 @@ h1,h2,h3,p{margin-top:0}
 .login-panel{display:flex;align-items:center;justify-content:center;flex-direction:column;padding:48px 32px;background:#fff}
 .login-card{width:100%;max-width:390px;margin:auto 0}
 .login-card h2{font-size:26px;line-height:1.4;margin:24px 0 12px}
+.login-form{display:flex;flex-direction:column;gap:8px;margin-top:28px}
+.login-form label{font-size:13px;font-weight:600;margin-top:10px}
+.login-form input{width:100%;min-height:46px;border:1px solid #bdcfc3;border-radius:8px;padding:10px 12px;font:inherit;background:#fff;color:var(--ink)}
+.login-form input:focus-visible{outline:3px solid #d39a36;outline-offset:2px}
+.login-form button{border:0;cursor:pointer;margin-top:16px}
+.login-form button:disabled{opacity:.65;cursor:wait}
+.form-error{color:#a12626;background:#fff1f0;border:1px solid #edc8c4;border-radius:8px;padding:10px 12px;font-size:13px;margin:10px 0 0}
 .preview-notice{padding:22px;background:var(--paper);border:1px solid var(--border);border-radius:12px;margin:32px 0 24px}
 .preview-notice strong{font-size:14px}
 .preview-notice p{color:var(--muted);font-size:13px;margin:8px 0 0}
@@ -50,7 +57,7 @@ h1,h2,h3,p{margin-top:0}
 .avatar{background:#edf2e9;color:var(--green);border-radius:50%;width:36px;height:36px;display:grid;place-items:center;font-size:13px}
 .user-area strong{font-size:12px;font-weight:600;display:block}
 .user-area small{color:var(--muted);font-size:10px;display:block}
-.logout-button{border:1px solid var(--border);color:#86918a;background:#fafbf9;font-size:12px;border-radius:7px;padding:8px 10px;margin-left:6px;cursor:not-allowed}
+.logout-button{border:1px solid var(--border);color:var(--green);background:#fafbf9;font-size:12px;border-radius:7px;padding:8px 10px;margin-left:6px;cursor:pointer}
 .main-content{padding:38px 40px;max-width:1360px;width:100%;margin:0 auto;flex:1}
 .page-heading{margin-bottom:28px}
 .page-heading h1{font-size:30px;letter-spacing:-.5px;margin:7px 0 8px;line-height:1.35}

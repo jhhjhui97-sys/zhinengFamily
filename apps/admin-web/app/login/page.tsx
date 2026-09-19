@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import { LoginForm } from '@/components/login-form';
 
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ expired?: string; service?: string }> }) {
+  const query = await searchParams;
   return (
     <main className="login-page">
       <section className="login-story" aria-label="门店工作台介绍">
@@ -18,13 +20,9 @@ export default function LoginPage() {
           <span className="pill">门店管理后台</span>
           <h2 id="login-title">欢迎回到门店工作台</h2>
           <p className="muted">集中管理客户、商品与设计项目。</p>
-          <div className="preview-notice">
-            <strong>后台骨架预览</strong>
-            <p>当前为界面预览，尚未接入登录认证。</p>
-            <p>无需输入账号或密码。后台页面暂不连接业务数据。</p>
-          </div>
-          <Link className="primary-button" href="/dashboard">进入后台预览<span aria-hidden="true">→</span></Link>
-          <p className="login-hint">此入口仅用于查看页面布局，不代表已登录。</p>
+          {query.expired === '1' && <p className="form-error" role="alert">登录信息已失效，请重新登录</p>}
+          {query.service === '1' && <p className="form-error" role="alert">服务暂时不可用，请稍后重试</p>}
+          <LoginForm />
         </div>
         <footer className="login-footer">智能家居 · 门店工作台</footer>
       </section>
