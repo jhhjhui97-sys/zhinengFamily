@@ -1,39 +1,11 @@
-# 智能家居后台 Web · Phase 2-1
+# 智能家居后台 Web · Phase 2-2
 
-独立 Next.js App Router 项目，中文界面，TypeScript strict。要求 Node.js 24+ 与 npm。
+Next.js App Router、TypeScript strict、中文门店后台。要求 Node.js 24+ 与 npm。
 
-在本目录执行：
+在 `apps/admin-web` 创建 `.env.local`，配置服务端使用的 `API_BASE_URL=http://localhost:8000`，然后运行 `npm install`、`npm run dev`，打开 http://localhost:3000。先启动 Phase 1 FastAPI 和 PostgreSQL，并按仓库根 README 初始化真实 Merchant/User。登录表单需要该商家的 UUID、邮箱和密码。
 
-```text
-npm install
-npm run dev
-```
+浏览器只向同源 `/api/auth/login` 发送凭据。Next.js BFF 向 FastAPI `/auth/login` 请求 JWT，将它写入 `HttpOnly`、`SameSite=Strict`、`Path=/` Cookie；生产模式启用 `Secure`，Cookie `maxAge` 使用 FastAPI 返回的 `expires_in`。浏览器 JavaScript 无法读取 JWT，密码与 token 均不写入 localStorage 或 sessionStorage。受保护页面每次服务端渲染通过 `/auth/me` 校验 Cookie 对应的 JWT；上游 401 清除 Cookie 并转至登录页。退出经同源 POST 清除 Cookie。POST 路由校验 Origin。统一服务端 API Client 位于 `lib/api`，集中处理服务端 API 地址、Bearer、JSON、8 秒超时和中文错误。保留旧 `NEXT_PUBLIC_API_BASE_URL` 作为迁移期兼容回退；部署优先配置不暴露于浏览器的 `API_BASE_URL`，不在公共变量中存放密钥。
 
-打开 http://localhost:3000，自动进入 `/login`；点击“进入后台预览”进入 `/dashboard`。四个导航通往 `/dashboard`、`/customers`、`/products`、`/projects`，PC 和 iPad 使用侧栏，窄屏通过导航菜单按钮访问。
+后台 `/dashboard`、`/customers`、`/products`、`/projects` 要求登录。顶部显示 `/auth/me` 返回的邮箱及角色。客户、商品、设计项目仍为静态空状态，本期没有 CRUD 或 SceneModel 持久化。登录页遇网络故障会给出中文服务不可用提示。
 
-当前只是前端骨架：没有真实登录或路由授权保护；不收集/提交密码，不保存 token。用户和退出按钮为明确的占位。列表为空，尚未接 API，页面不提供数据写入。后台可直接访问，不能作为已认证管理端部署使用。
-
-可复制 `.env.example` 为 `.env.local`，其中 `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000` 为后续 API 集成预留，本次尚未使用。`NEXT_PUBLIC_` 变量会公开到浏览器，不得存放密钥。
-
-验证：
-
-```text
-npm run lint
-npm run typecheck
-npm run build
-npx playwright install chromium
-npm test
-```
-
-`npm test` / `npm run test:e2e` 均使用真实 Next.js 服务和 Chromium，不依赖后端。测试涵盖入口、中文页面、导航高亮、空状态、顶部占位、iPad 无横向溢出及窄屏键盘菜单。默认自动启动 dev 服务；生产构建验证在 Bash 使用 `PLAYWRIGHT_PRODUCTION=1 npm test`，PowerShell 使用 `$env:PLAYWRIGHT_PRODUCTION='1'; npm test`。关闭其他 3000 端口服务后运行，以确保测的是当前构建。
-
-Windows 可使用已安装 Edge：`$env:PLAYWRIGHT_CHANNEL='msedge'; npm test`；CI 默认使用 Playwright Chromium。
-
-生产服务：
-
-```text
-npm run build
-npm run start
-```
-
-`app/` 管理路由，`components/` 为共享布局与空状态，`lib/` 保存导航配置，`types/` 定义导航类型，`tests/` 为浏览器测试。npm lockfile 用于 CI 的 `npm ci`。没有 SceneModel 持久化、Unity、CAD、VR 实现。
+运行 `npm test`、`npm run lint`、`npm run typecheck`、`npm run build` 验证。Playwright 启动本地模拟 FastAPI 和独立 Next.js 服务，不使用真实密码；Windows 可设置 `$env:PLAYWRIGHT_CHANNEL='msedge'` 使用已安装 Edge。真实后端联调需另行启动 FastAPI/PostgreSQL，模拟测试不能替代联调。不要在 `.env.local` 或测试里提交真实账号、token、密钥。
