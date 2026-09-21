@@ -23,5 +23,7 @@ export function errorMessage(status: number, details?: unknown): string {
 
 export function publicError(error: unknown): Response {
   const status = error instanceof ApiError ? error.status : 503;
-  return Response.json({ error: error instanceof ApiError ? error.message : errorMessage(status) }, { status });
+  const response = Response.json({ error: error instanceof ApiError ? error.message : errorMessage(status) }, { status });
+  if (status === 401) response.headers.append('Set-Cookie', 'admin_access_token=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict');
+  return response;
 }

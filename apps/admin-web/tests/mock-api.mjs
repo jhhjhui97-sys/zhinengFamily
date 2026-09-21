@@ -1,6 +1,12 @@
 import { createServer } from 'node:http';
 
 const user = { id: '11111111-1111-4111-8111-111111111111', merchant_id: '22222222-2222-4222-8222-222222222222', email: 'owner@example.test', role: 'owner', is_active: true, created_at: '2026-09-19T00:00:00Z' };
+const now = '2026-09-20T08:30:00Z';
+const customers = [
+  { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', merchant_id: user.merchant_id, owner_user_id: user.id, name: '张先生', phone: '13800000000', wechat: 'zhang-home', source: '门店到访', address: '上海市浦东新区', budget: '80000.00', status: 'following', notes: '偏好原木风', last_follow_up_at: now, created_at: now, updated_at: now },
+  { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', merchant_id: user.merchant_id, owner_user_id: user.id, name: '李女士', phone: null, wechat: null, source: null, address: null, budget: null, status: 'new', notes: null, last_follow_up_at: null, created_at: now, updated_at: now },
+  { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3', merchant_id: user.merchant_id, owner_user_id: user.id, name: '王先生', phone: '13900000000', wechat: 'wang-home', source: '转介绍', address: '杭州市', budget: '120000.00', status: 'won', notes: '已成交', last_follow_up_at: now, created_at: now, updated_at: now },
+];
 const error = (code, message, details = []) => ({ error: { code, message, details } });
 createServer(async (req, res) => {
   const chunks = [];
@@ -21,6 +27,35 @@ createServer(async (req, res) => {
   } else if (req.url === '/auth/me' && req.method === 'GET') {
     if (req.headers.authorization !== 'Bearer mock-valid-token') { status = 401; data = error('unauthorized', 'Invalid or expired token'); }
     else data = user;
+  } else if (req.url?.startsWith('/customers') && req.headers.authorization !== 'Bearer mock-valid-token') {
+    status = 401; data = error('unauthorized', 'Invalid or expired token');
+  } else if (req.url?.startsWith('/customers') && req.method === 'GET') {
+    const url = new URL(req.url, 'http://mock');
+    const id = url.pathname.split('/')[2];
+    if (id) {
+      const customer = customers.find(item => item.id === id);
+      if (!customer || id === 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb') { status = 404; data = error('not_found', 'Record not found'); }
+      else data = customer;
+    } else {
+      const search = (url.searchParams.get('search') ?? '').toLowerCase();
+      const filtered = customers.filter(item => [item.name, item.phone, item.wechat].some(value => value?.toLowerCase().includes(search)));
+      const limit = Number(url.searchParams.get('limit') ?? 20);
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      data = { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset };
+    }
+  } else if (req.url === '/customers' && req.method === 'POST') {
+    if (!input.name?.trim()) { status = 422; data = error('validation_error', 'Invalid request', [{ loc: ['body', 'name'], message: 'Field required' }]); }
+    else if (input.name === '冲突客户') { status = 409; data = error('conflict', 'Conflict'); }
+    else {
+      const customer = { id: `cccccccc-cccc-4ccc-8ccc-${String(customers.length + 1).padStart(12, '0')}`, merchant_id: user.merchant_id, owner_user_id: user.id, phone: null, wechat: null, source: null, address: null, budget: null, status: 'new', notes: null, last_follow_up_at: null, created_at: now, updated_at: now, ...input };
+      customers.push(customer); status = 201; data = customer;
+    }
+  } else if (req.url?.startsWith('/customers/') && req.method === 'PATCH') {
+    const id = req.url.split('/')[2];
+    const customer = customers.find(item => item.id === id);
+    if (!customer) { status = 404; data = error('not_found', 'Record not found'); }
+    else if (input.name === '') { status = 422; data = error('validation_error', 'Invalid request', [{ loc: ['body', 'name'], message: 'String should have at least 1 character' }]); }
+    else { Object.assign(customer, input, { updated_at: now }); data = customer; }
   } else { status = 404; data = error('missing', 'Missing'); }
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
