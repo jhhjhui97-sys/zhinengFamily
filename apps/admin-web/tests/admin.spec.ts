@@ -8,10 +8,10 @@ test('all admin pages redirect anonymous users', async ({ page }) => {
   }
 });
 
-test('sidebar routes to empty resource pages and marks current destination', async ({ page }) => {
+test('sidebar routes to resource pages and marks current destination', async ({ page }) => {
   await login(page);
   for (const [label, path, empty] of [
-    ['客户管理', '/customers', '暂无客户'],
+    ['客户管理', '/customers', '客户列表'],
     ['商品管理', '/products', '暂无商品'],
     ['设计项目', '/projects', '暂无设计项目'],
   ]) {
@@ -34,7 +34,7 @@ for (const width of [768, 820, 1024, 1440]) {
     await login(page);
     await page.goto('/customers');
     await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '暂无客户', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: '张先生' })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     if (width === 820 || width === 1440) {
       await page.screenshot({ path: `test-results/customers-${width}.png`, fullPage: true });

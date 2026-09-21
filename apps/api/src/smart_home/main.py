@@ -1,3 +1,5 @@
+from importlib import import_module
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -11,6 +13,8 @@ from smart_home.modules.customers.router import router as customers_router
 from smart_home.modules.products.router import router as products_router
 from smart_home.modules.projects.router import router as projects_router
 from smart_home.modules.users.router import router as users_router
+
+_registered_models = import_module("smart_home.models")
 
 
 def create_app() -> FastAPI:
