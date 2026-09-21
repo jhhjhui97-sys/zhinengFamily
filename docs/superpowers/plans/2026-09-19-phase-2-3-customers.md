@@ -17,6 +17,6 @@
 
 - TDD red: customer search initially returned all three local customers instead of two matches; the initial customer browser test could not find the real list entry. Both passed after implementation.
 - Frontend: `npm test` 26 passed; lint, typecheck, and production build passed.
-- Backend on isolated PostgreSQL: full pytest 288 passed, 3 Windows platform skips, 2 dependency deprecation warnings; Ruff and OpenAPI drift checks passed.
+- Backend on isolated PostgreSQL: full pytest 289 passed, 3 Windows platform skips, 2 dependency deprecation warnings; Ruff and OpenAPI drift checks passed.
 - Real integration: started PostgreSQL, migrated the development database, provisioned a temporary merchant/owner, and used Edge through the real Next.js BFF and FastAPI to log in, create 张先生, find the customer in the list, open details, change budget from ¥80,000 to ¥98,000, log out, and confirm `/dashboard` redirects to login.
 - Real integration exposed a startup-only SQLAlchemy model registration defect hidden by test fixtures. A subprocess regression test now verifies that importing the application registers all five database models.
