@@ -9,6 +9,11 @@ const customers = [
   { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', merchant_id: user.merchant_id, owner_user_id: user.id, name: '赵女士', phone: null, wechat: null, source: null, address: null, budget: '12345.67', status: 'new', notes: null, last_follow_up_at: null, created_at: now, updated_at: now },
   ...Array.from({ length: 17 }, (_, index) => ({ id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(index + 5).padStart(12, '0')}`, merchant_id: user.merchant_id, owner_user_id: user.id, name: `分页客户${index + 1}`, phone: null, wechat: null, source: null, address: null, budget: null, status: 'new', notes: null, last_follow_up_at: null, created_at: now, updated_at: now })),
 ];
+const products = [
+  { id: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1', merchant_id: user.merchant_id, category: 'sofa', brand: '示例品牌', name: '三人沙发', sku: 'SOFA-001', price: '6800.50', width_mm: 2400, depth_mm: 950, height_mm: 850, thumbnail: 'https://example.test/sofa.jpg', model_url: 'https://example.test/sofa.glb', metadata: { color: '浅灰', material: '科技布' }, created_at: now, updated_at: now },
+  { id: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2', merchant_id: user.merchant_id, category: 'table', brand: '木作', name: '餐桌', sku: 'TABLE-001', price: '3999.90', width_mm: 1800, depth_mm: 900, height_mm: 760, thumbnail: null, model_url: null, metadata: {}, created_at: now, updated_at: now },
+  ...Array.from({ length: 19 }, (_, index) => ({ id: `dddddddd-dddd-4ddd-8ddd-${String(index + 3).padStart(12, '0')}`, merchant_id: user.merchant_id, category: index % 2 ? 'sofa' : 'appliance', brand: '分页品牌', name: `分页商品${index + 1}`, sku: `PAGE-${index + 1}`, price: '80000.00', width_mm: 1000, depth_mm: 500, height_mm: 700, thumbnail: null, model_url: null, metadata: {}, created_at: now, updated_at: now })),
+];
 const error = (code, message, details = []) => ({ error: { code, message, details } });
 createServer(async (req, res) => {
   const chunks = [];
@@ -29,7 +34,7 @@ createServer(async (req, res) => {
   } else if (req.url === '/auth/me' && req.method === 'GET') {
     if (req.headers.authorization !== 'Bearer mock-valid-token') { status = 401; data = error('unauthorized', 'Invalid or expired token'); }
     else data = user;
-  } else if (req.url?.startsWith('/customers') && req.headers.authorization !== 'Bearer mock-valid-token') {
+  } else if ((req.url?.startsWith('/customers') || req.url?.startsWith('/products')) && req.headers.authorization !== 'Bearer mock-valid-token') {
     status = 401; data = error('unauthorized', 'Invalid or expired token');
   } else if (req.url?.startsWith('/customers') && req.method === 'GET') {
     const url = new URL(req.url, 'http://mock');
@@ -58,6 +63,30 @@ createServer(async (req, res) => {
     if (!customer) { status = 404; data = error('not_found', 'Record not found'); }
     else if (input.name === '') { status = 422; data = error('validation_error', 'Invalid request', [{ loc: ['body', 'name'], message: 'String should have at least 1 character' }]); }
     else { Object.assign(customer, input, { updated_at: now }); data = customer; }
+  } else if (req.url?.startsWith('/products') && req.method === 'GET') {
+    const url = new URL(req.url, 'http://mock');
+    const id = url.pathname.split('/')[2];
+    if (id) {
+      const product = products.find(item => item.id === id);
+      if (!product || id === 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee') { status = 404; data = error('not_found', 'Record not found'); }
+      else data = product;
+    } else {
+      const search = (url.searchParams.get('search') ?? '').toLowerCase();
+      const category = url.searchParams.get('category') ?? '';
+      const filtered = products.filter(item => [item.name, item.sku, item.brand].some(value => value.toLowerCase().includes(search)) && (!category || item.category === category));
+      const limit = Number(url.searchParams.get('limit') ?? 20);
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      data = { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset };
+    }
+  } else if (req.url === '/products' && req.method === 'POST') {
+    if (!input.name || !input.sku || !input.category || !input.brand || !input.price || !input.width_mm || !input.depth_mm || !input.height_mm) { status = 422; data = error('validation_error', 'Invalid request'); }
+    else if (products.some(item => item.sku === input.sku)) { status = 409; data = error('conflict', 'SKU already exists'); }
+    else { const product = { id: `ffffffff-ffff-4fff-8fff-${String(products.length + 1).padStart(12, '0')}`, merchant_id: user.merchant_id, thumbnail: null, model_url: null, metadata: {}, created_at: now, updated_at: now, ...input }; products.push(product); status = 201; data = product; }
+  } else if (req.url?.startsWith('/products/') && req.method === 'PATCH') {
+    const id = req.url.split('/')[2]; const product = products.find(item => item.id === id);
+    if (!product) { status = 404; data = error('not_found', 'Record not found'); }
+    else if (products.some(item => item.id !== id && item.sku === input.sku)) { status = 409; data = error('conflict', 'SKU already exists'); }
+    else { Object.assign(product, input, { updated_at: now }); data = product; }
   } else { status = 404; data = error('missing', 'Missing'); }
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
