@@ -5,7 +5,7 @@ import { listCustomers } from '@/lib/api/customers';
 import { ApiError } from '@/lib/api/errors';
 import { customerStatuses, dateTime, display, money } from '@/lib/customers';
 
-const pageSize = 2;
+const pageSize = 20;
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ search?: string; offset?: string }> }) {
   const query = await searchParams;
   const search = query.search?.trim().slice(0, 100) ?? '';

@@ -6,13 +6,15 @@ test.beforeEach(async ({ page }) => { await login(page); });
 test('customer list shows real data, null placeholders, money and pagination', async ({ page }) => {
   await page.goto('/customers');
   await expect(page.getByRole('link', { name: '张先生' })).toBeVisible();
-  await expect(page.getByText('¥80,000')).toBeVisible();
+  await expect(page.getByRole('cell', { name: '¥80,000', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: '¥80,000.50', exact: true })).toBeVisible();
+  await expect(page.getByRole('cell', { name: '¥12,345.67', exact: true })).toBeVisible();
   await expect(page.getByText('跟进中')).toBeVisible();
   const li = page.getByRole('row', { name: /李女士/ });
   await expect(li.getByText('—')).toHaveCount(6);
-  await expect(page.getByText('显示 1–2 / 共 3 位客户')).toBeVisible();
+  await expect(page.getByText('显示 1–20 / 共 21 位客户')).toBeVisible();
   await page.getByRole('link', { name: '下一页' }).click();
-  await expect(page.getByRole('link', { name: '王先生' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '分页客户17' })).toBeVisible();
 });
 
 test('search filters customers and preserves server pagination', async ({ page }) => {

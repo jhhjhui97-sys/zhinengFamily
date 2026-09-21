@@ -5,7 +5,9 @@ const now = '2026-09-20T08:30:00Z';
 const customers = [
   { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', merchant_id: user.merchant_id, owner_user_id: user.id, name: '张先生', phone: '13800000000', wechat: 'zhang-home', source: '门店到访', address: '上海市浦东新区', budget: '80000.00', status: 'following', notes: '偏好原木风', last_follow_up_at: now, created_at: now, updated_at: now },
   { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', merchant_id: user.merchant_id, owner_user_id: user.id, name: '李女士', phone: null, wechat: null, source: null, address: null, budget: null, status: 'new', notes: null, last_follow_up_at: null, created_at: now, updated_at: now },
-  { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3', merchant_id: user.merchant_id, owner_user_id: user.id, name: '王先生', phone: '13900000000', wechat: 'wang-home', source: '转介绍', address: '杭州市', budget: '120000.00', status: 'won', notes: '已成交', last_follow_up_at: now, created_at: now, updated_at: now },
+  { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3', merchant_id: user.merchant_id, owner_user_id: user.id, name: '王先生', phone: '13900000000', wechat: 'wang-home', source: '转介绍', address: '杭州市', budget: '80000.50', status: 'won', notes: '已成交', last_follow_up_at: now, created_at: now, updated_at: now },
+  { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', merchant_id: user.merchant_id, owner_user_id: user.id, name: '赵女士', phone: null, wechat: null, source: null, address: null, budget: '12345.67', status: 'new', notes: null, last_follow_up_at: null, created_at: now, updated_at: now },
+  ...Array.from({ length: 17 }, (_, index) => ({ id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(index + 5).padStart(12, '0')}`, merchant_id: user.merchant_id, owner_user_id: user.id, name: `分页客户${index + 1}`, phone: null, wechat: null, source: null, address: null, budget: null, status: 'new', notes: null, last_follow_up_at: null, created_at: now, updated_at: now })),
 ];
 const error = (code, message, details = []) => ({ error: { code, message, details } });
 createServer(async (req, res) => {
