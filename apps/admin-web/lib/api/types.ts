@@ -11,3 +11,11 @@ export type Customer = {
 };
 export type CustomerInput = Pick<Customer, 'name' | 'phone' | 'wechat' | 'source' | 'address' | 'budget' | 'status' | 'notes'>;
 export type PageResult<T> = { items: T[]; total: number; limit: number; offset: number };
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+export type Product = {
+  id: string; merchant_id: string; category: string; brand: string; name: string; sku: string;
+  price: string; width_mm: number; depth_mm: number; height_mm: number;
+  thumbnail: string | null; model_url: string | null; metadata: Record<string, JsonValue>;
+  created_at: string; updated_at: string;
+};
+export type ProductInput = Pick<Product, 'category' | 'brand' | 'name' | 'sku' | 'price' | 'width_mm' | 'depth_mm' | 'height_mm' | 'thumbnail' | 'model_url' | 'metadata'>;
