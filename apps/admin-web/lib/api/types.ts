@@ -19,3 +19,10 @@ export type Product = {
   created_at: string; updated_at: string;
 };
 export type ProductInput = Pick<Product, 'category' | 'brand' | 'name' | 'sku' | 'price' | 'width_mm' | 'depth_mm' | 'height_mm' | 'thumbnail' | 'model_url' | 'metadata'>;
+export type ProjectStatus = 'draft' | 'active' | 'archived';
+export type DesignProject = {
+  id: string; merchant_id: string; customer_id: string; sales_user_id: string;
+  name: string; address: string | null; status: ProjectStatus;
+  created_at: string; updated_at: string;
+};
+export type ProjectInput = Pick<DesignProject, 'customer_id' | 'name' | 'address' | 'status'> & { sales_user_id?: string };
