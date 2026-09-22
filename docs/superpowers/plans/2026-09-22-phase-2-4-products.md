@@ -11,8 +11,17 @@
 
 ## Verification evidence
 
-- Frontend Playwright: 33 passed, including all prior authentication and customer tests.
-- ESLint, TypeScript strict typecheck, and Next.js production build: passed.
-- Backend pytest against PostgreSQL: 295 passed, 3 skipped, 2 dependency warnings.
-- Ruff and generated OpenAPI contract check: passed.
-- Real browser integration against FastAPI and PostgreSQL: logged in through the BFF, created `三人沙发` (`SOFA-001`) at `6800.50`, observed `¥6,800.50` in the list and detail, updated the price to `6999.90`, reloaded the detail page, and observed persisted `¥6,999.90`.
+### Original Phase 2-4 baseline
+
+- Reviewed SHA: `ee578b415ba084f4f943f90268abc59688ff2348`.
+- GitHub Actions reported 33 frontend tests and 298 backend tests with 2 warnings.
+- The earlier 295 passed / 3 skipped count below came from the local Windows environment and was not the GitHub Actions result.
+- Real browser integration against local FastAPI and PostgreSQL logged in through the BFF, created `三人沙发` (`SOFA-001`) at `6800.50`, observed `¥6,800.50`, updated it to `6999.90`, and confirmed persisted `¥6,999.90` after reload.
+
+### Acceptance fixes
+
+- Fix SHA: `73c60b0d8656a622fd1a2bb987cc2d987380ab9a`.
+- Local verification: 41 Playwright tests passed; ESLint, TypeScript strict typecheck, and Next.js production build passed.
+- GitHub Actions frontend: 41 passed — [run 35685149065](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35685149065).
+- GitHub Actions backend: 298 passed, 2 warnings; Ruff, migrations, generated OpenAPI/Scene contracts, and Docker build passed — [run 35685149084](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35685149084).
+- The fixes reject non-finite Metadata recursively in the form and BFF, support arbitrary category text with suggestions, preserve search/category during pagination, keep the original product after an edit SKU conflict, clear an invalid auth cookie, and verify JWT absence from browser storage and product BFF responses.
