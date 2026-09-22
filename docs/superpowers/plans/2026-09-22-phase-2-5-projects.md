@@ -33,7 +33,7 @@ Verified implementation SHA: `63c83e00c79cce509ebae4f9004a421ce59a3559`.
 - Tests cover 401 after successfully opening both new/edit project pages (real BFF cookie clearing against mock upstream), 403/503/network failures with Chinese retry feedback, no stale selectable results, empty-success distinction, and out-of-order completion without overwriting current loading/results. Existing customer/product/project regressions remain in the full suite.
 - Browser tests use mock FastAPI and deliberate browser network faults; they do not constitute a new real PostgreSQL integration run. The earlier real integration evidence above remains scoped to its original implementation. No Python backend or API contract changed in this follow-up.
 - Root and admin READMEs now describe implemented customer/product/project management and the remaining SceneModel persistence/version limitations.
-- New-commit Actions are pending push and must be verified separately; the baseline green workflows above are not evidence for this component change.
+- Verified follow-up SHA: `0f485f965d6d142577d44363217c88ba1ae8f092`. [Frontend Actions](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35713156751) succeeded with **57 passed**, lint/typecheck/build passed. [Backend Actions](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35713156963) succeeded. These runs verify the new customer-picker implementation, separately from the baseline. The subsequent evidence-only documentation commit is checked again before handoff.
 
 ## Scope and limitations
 
