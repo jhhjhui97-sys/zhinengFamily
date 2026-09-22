@@ -13,7 +13,7 @@ test('sidebar routes to resource pages and marks current destination', async ({ 
   for (const [label, path, empty] of [
     ['客户管理', '/customers', '客户列表'],
     ['商品管理', '/products', '商品列表'],
-    ['设计项目', '/projects', '暂无设计项目'],
+    ['设计项目', '/projects', '项目列表'],
   ]) {
     await page.getByRole('navigation', { name: '主导航' }).getByRole('link', { name: label }).click();
     await expect(page).toHaveURL(new RegExp(`${path}$`));

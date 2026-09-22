@@ -14,6 +14,10 @@ const products = [
   { id: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2', merchant_id: user.merchant_id, category: 'bed', brand: '木作', name: '实木床', sku: 'BED-001', price: '3999.90', width_mm: 1800, depth_mm: 2000, height_mm: 1000, thumbnail: null, model_url: null, metadata: {}, created_at: now, updated_at: now },
   ...Array.from({ length: 21 }, (_, index) => ({ id: `dddddddd-dddd-4ddd-8ddd-${String(index + 3).padStart(12, '0')}`, merchant_id: user.merchant_id, category: 'bed', brand: '分页品牌', name: `分页商品${index + 1}`, sku: `PAGE-${index + 1}`, price: '80000.00', width_mm: 1000, depth_mm: 500, height_mm: 700, thumbnail: null, model_url: null, metadata: {}, created_at: now, updated_at: now })),
 ];
+const projects = [
+  { id: '12121212-1212-4121-8121-121212121211', merchant_id: user.merchant_id, customer_id: customers[0].id, sales_user_id: user.id, name: '张先生全屋设计', address: '龙湖小区', status: 'active', created_at: now, updated_at: now },
+  ...Array.from({ length: 20 }, (_, index) => ({ id: `12121212-1212-4121-8121-${String(index + 12).padStart(12, '0')}`, merchant_id: user.merchant_id, customer_id: customers[index + 1].id, sales_user_id: user.id, name: `分页项目${index + 1}`, address: index % 2 ? null : `测试地址${index + 1}`, status: index % 3 === 0 ? 'draft' : index % 3 === 1 ? 'active' : 'archived', created_at: now, updated_at: now })),
+];
 const error = (code, message, details = []) => ({ error: { code, message, details } });
 createServer(async (req, res) => {
   const chunks = [];
@@ -34,7 +38,7 @@ createServer(async (req, res) => {
   } else if (req.url === '/auth/me' && req.method === 'GET') {
     if (req.headers.authorization !== 'Bearer mock-valid-token') { status = 401; data = error('unauthorized', 'Invalid or expired token'); }
     else data = user;
-  } else if ((req.url?.startsWith('/customers') || req.url?.startsWith('/products')) && req.headers.authorization !== 'Bearer mock-valid-token') {
+  } else if ((req.url?.startsWith('/customers') || req.url?.startsWith('/products') || req.url?.startsWith('/projects')) && req.headers.authorization !== 'Bearer mock-valid-token') {
     status = 401; data = error('unauthorized', 'Invalid or expired token');
   } else if (req.url?.startsWith('/customers') && req.method === 'GET') {
     const url = new URL(req.url, 'http://mock');
@@ -87,6 +91,21 @@ createServer(async (req, res) => {
     if (!product) { status = 404; data = error('not_found', 'Record not found'); }
     else if (products.some(item => item.id !== id && item.sku === input.sku)) { status = 409; data = error('conflict', 'SKU already exists'); }
     else { Object.assign(product, input, { updated_at: now }); data = product; }
+  } else if (req.url?.startsWith('/projects') && req.method === 'GET') {
+    const url = new URL(req.url, 'http://mock'); const id = url.pathname.split('/')[2];
+    if (id) { const project = projects.find(item => item.id === id); if (!project || id === '13131313-1313-4131-8131-131313131313') { status = 404; data = error('not_found', 'Record not found'); } else data = project; }
+    else { const limit = Number(url.searchParams.get('limit') ?? 20); const offset = Number(url.searchParams.get('offset') ?? 0); data = { items: projects.slice(offset, offset + limit), total: projects.length, limit, offset }; }
+  } else if (req.url === '/projects' && req.method === 'POST') {
+    if (!input.name?.trim() || !input.customer_id) { status = 422; data = error('validation_error', 'Invalid request'); }
+    else if (input.name === '冲突项目') { status = 409; data = error('conflict', 'Conflict'); }
+    else if (!customers.some(customer => customer.id === input.customer_id)) { status = 404; data = error('not_found', 'Record not found'); }
+    else { const project = { id: `14141414-1414-4141-8141-${String(projects.length + 1).padStart(12, '0')}`, merchant_id: user.merchant_id, sales_user_id: user.id, address: null, status: 'draft', created_at: now, updated_at: now, ...input }; projects.push(project); status = 201; data = project; }
+  } else if (req.url?.startsWith('/projects/') && req.method === 'PATCH') {
+    const id = req.url.split('/')[2]; const project = projects.find(item => item.id === id);
+    if (!project) { status = 404; data = error('not_found', 'Record not found'); }
+    else if (input.name === '冲突项目') { status = 409; data = error('conflict', 'Conflict'); }
+    else if (input.customer_id && !customers.some(customer => customer.id === input.customer_id)) { status = 404; data = error('not_found', 'Record not found'); }
+    else { Object.assign(project, input, { updated_at: now }); data = project; }
   } else { status = 404; data = error('missing', 'Missing'); }
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));

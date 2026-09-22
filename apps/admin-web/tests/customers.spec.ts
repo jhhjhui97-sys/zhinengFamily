@@ -47,12 +47,12 @@ test('create validation and API error are shown in Chinese', async ({ page }) =>
   await expect(page.locator('.form-error')).toContainText('数据状态已发生变化');
 });
 
-test('customer detail shows complete existing fields and disabled project action', async ({ page }) => {
+test('customer detail shows complete existing fields and project action', async ({ page }) => {
   await page.goto('/customers/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1');
   await expect(page.getByRole('heading', { name: '张先生' })).toBeVisible();
   await expect(page.getByText('偏好原木风')).toBeVisible();
   await expect(page.getByText('11111111-1111-4111-8111-111111111111')).toBeVisible();
-  await expect(page.getByRole('button', { name: '创建设计方案（下一阶段开放）' })).toBeDisabled();
+  await expect(page.getByRole('link', { name: '创建设计方案' })).toHaveAttribute('href', '/projects/new?customer_id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1');
 });
 
 test('missing or cross-merchant customer shows Chinese 404', async ({ page }) => {
