@@ -20,4 +20,14 @@
 
 ## GitHub Actions
 
-GitHub Actions evidence will be recorded only after the implementation commits are pushed and both workflows finish for the exact pushed SHA.
+Verified implementation SHA: `63c83e00c79cce509ebae4f9004a421ce59a3559`.
+
+- [Admin Web Actions](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35691273046): success; job log confirms **49 passed**. Lint, typecheck, and production build passed.
+- [Backend Actions](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35691273050): success; job log confirms **299 passed, 2 warnings**. Ruff, formatting, Alembic migration, generated OpenAPI/Scene contracts, and Docker build passed.
+- These are actual Linux CI results, separate from the Windows local results above. This evidence-only documentation update is also subject to both workflows after push; its final status is reported in the task handoff.
+
+## Scope and limitations
+
+- The project API and backend business behavior are unchanged; backend changes add permission and pagination regression tests.
+- Sales assignment defaults to the authenticated user. The UI preserves the existing assignee on edit and displays the returned user ID; no user directory or transfer selector was added. Existing owner/sales transfer permissions are covered by PostgreSQL tests.
+- SceneModel, version history, and product lists remain placeholders, and the 3D entry is disabled as required for this phase.
