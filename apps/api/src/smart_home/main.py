@@ -6,12 +6,14 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from smart_home.contracts import include_scene_contract
+
 from smart_home.db import session_factory
 from smart_home.errors import ErrorResponse, install_error_handlers
 from smart_home.modules.auth.router import router as auth_router
 from smart_home.modules.customers.router import router as customers_router
 from smart_home.modules.products.router import router as products_router
 from smart_home.modules.projects.router import router as projects_router
+from smart_home.modules.scenes.router import router as scenes_router
 from smart_home.modules.users.router import router as users_router
 
 _registered_models = import_module("smart_home.models")
@@ -30,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(customers_router)
     app.include_router(products_router)
     app.include_router(projects_router)
+    app.include_router(scenes_router)
     include_scene_contract(app)
 
     @app.get("/health")

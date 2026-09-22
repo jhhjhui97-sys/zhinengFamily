@@ -13,7 +13,7 @@
             "type": "string"
           },
           "height_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Height Mm",
             "type": "number"
           },
@@ -33,7 +33,7 @@
             "$ref": "#/components/schemas/Point3"
           },
           "width_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Width Mm",
             "type": "number"
           }
@@ -53,7 +53,7 @@
         "additionalProperties": false,
         "properties": {
           "depth_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Depth Mm",
             "type": "number"
           },
@@ -63,7 +63,7 @@
             "type": "string"
           },
           "height_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Height Mm",
             "type": "number"
           },
@@ -83,13 +83,13 @@
             "$ref": "#/components/schemas/Point3"
           },
           "rotation_deg": {
-            "exclusiveMaximum": 360,
-            "minimum": 0,
+            "exclusiveMaximum": 360.0,
+            "minimum": 0.0,
             "title": "Rotation Deg",
             "type": "number"
           },
           "width_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Width Mm",
             "type": "number"
           }
@@ -519,7 +519,7 @@
             "type": "string"
           },
           "height_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Height Mm",
             "type": "number"
           },
@@ -544,7 +544,7 @@
             "type": "object"
           },
           "offset_mm": {
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Offset Mm",
             "type": "number"
           },
@@ -557,7 +557,7 @@
             "type": "string"
           },
           "sill_height_mm": {
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Sill Height Mm",
             "type": "number"
           },
@@ -567,7 +567,7 @@
             "type": "string"
           },
           "width_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Width Mm",
             "type": "number"
           }
@@ -629,7 +629,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Wall Id"
           }
         },
@@ -688,7 +687,7 @@
             "type": "number"
           },
           "height_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Height Mm",
             "type": "number"
           },
@@ -731,11 +730,10 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Asset Id"
           },
           "depth_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Depth Mm",
             "type": "number"
           },
@@ -745,7 +743,7 @@
             "type": "string"
           },
           "height_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Height Mm",
             "type": "number"
           },
@@ -779,17 +777,16 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Room Id"
           },
           "rotation_deg": {
-            "exclusiveMaximum": 360,
-            "minimum": 0,
+            "exclusiveMaximum": 360.0,
+            "minimum": 0.0,
             "title": "Rotation Deg",
             "type": "number"
           },
           "width_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Width Mm",
             "type": "number"
           }
@@ -931,6 +928,37 @@
         "title": "Page[ProjectRead]",
         "type": "object"
       },
+      "Page_SceneVersionRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SceneVersionRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[SceneVersionRead]",
+        "type": "object"
+      },
       "PlumbingPoint": {
         "additionalProperties": false,
         "properties": {
@@ -975,7 +1003,6 @@
                 "type": "null"
               }
             ],
-            "default": null,
             "title": "Wall Id"
           }
         },
@@ -1632,14 +1659,14 @@
         "properties": {
           "beams": {
             "items": {
-              "$ref": "#/components/schemas/Beam"
+              "$ref": "#/components/schemas/SceneProtocolBeam"
             },
             "title": "Beams",
             "type": "array"
           },
           "columns": {
             "items": {
-              "$ref": "#/components/schemas/Column"
+              "$ref": "#/components/schemas/SceneProtocolColumn"
             },
             "title": "Columns",
             "type": "array"
@@ -1651,21 +1678,21 @@
           },
           "doors": {
             "items": {
-              "$ref": "#/components/schemas/Door"
+              "$ref": "#/components/schemas/SceneProtocolDoor"
             },
             "title": "Doors",
             "type": "array"
           },
           "electrical_points": {
             "items": {
-              "$ref": "#/components/schemas/ElectricalPoint"
+              "$ref": "#/components/schemas/SceneProtocolElectricalPoint"
             },
             "title": "Electrical Points",
             "type": "array"
           },
           "floors": {
             "items": {
-              "$ref": "#/components/schemas/Floor"
+              "$ref": "#/components/schemas/SceneProtocolFloor"
             },
             "minItems": 1,
             "title": "Floors",
@@ -1673,28 +1700,28 @@
           },
           "furniture_instances": {
             "items": {
-              "$ref": "#/components/schemas/FurnitureInstance"
+              "$ref": "#/components/schemas/SceneProtocolFurnitureInstance"
             },
             "title": "Furniture Instances",
             "type": "array"
           },
           "metadata": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
+              "$ref": "#/components/schemas/SceneProtocolJsonValue"
             },
             "title": "Metadata",
             "type": "object"
           },
           "plumbing_points": {
             "items": {
-              "$ref": "#/components/schemas/PlumbingPoint"
+              "$ref": "#/components/schemas/SceneProtocolPlumbingPoint"
             },
             "title": "Plumbing Points",
             "type": "array"
           },
           "rooms": {
             "items": {
-              "$ref": "#/components/schemas/Room"
+              "$ref": "#/components/schemas/SceneProtocolRoom"
             },
             "title": "Rooms",
             "type": "array"
@@ -1716,14 +1743,14 @@
           },
           "walls": {
             "items": {
-              "$ref": "#/components/schemas/Wall"
+              "$ref": "#/components/schemas/SceneProtocolWall"
             },
             "title": "Walls",
             "type": "array"
           },
           "windows": {
             "items": {
-              "$ref": "#/components/schemas/Window"
+              "$ref": "#/components/schemas/SceneProtocolWindow"
             },
             "title": "Windows",
             "type": "array"
@@ -1737,6 +1764,702 @@
           "floors"
         ],
         "title": "SceneModel",
+        "type": "object"
+      },
+      "SceneProtocolBeam": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "$ref": "#/components/schemas/SceneProtocolPoint3"
+          },
+          "floor_id": {
+            "format": "uuid",
+            "title": "Floor Id",
+            "type": "string"
+          },
+          "height_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Height Mm",
+            "type": "number"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SceneProtocolJsonValue"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "start": {
+            "$ref": "#/components/schemas/SceneProtocolPoint3"
+          },
+          "width_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Width Mm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "floor_id",
+          "start",
+          "end",
+          "width_mm",
+          "height_mm"
+        ],
+        "title": "Beam",
+        "type": "object"
+      },
+      "SceneProtocolColumn": {
+        "additionalProperties": false,
+        "properties": {
+          "depth_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Depth Mm",
+            "type": "number"
+          },
+          "floor_id": {
+            "format": "uuid",
+            "title": "Floor Id",
+            "type": "string"
+          },
+          "height_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Height Mm",
+            "type": "number"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SceneProtocolJsonValue"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "position": {
+            "$ref": "#/components/schemas/SceneProtocolPoint3"
+          },
+          "rotation_deg": {
+            "exclusiveMaximum": 360,
+            "minimum": 0,
+            "title": "Rotation Deg",
+            "type": "number"
+          },
+          "width_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Width Mm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "floor_id",
+          "position",
+          "width_mm",
+          "depth_mm",
+          "height_mm",
+          "rotation_deg"
+        ],
+        "title": "Column",
+        "type": "object"
+      },
+      "SceneProtocolDoor": {
+        "additionalProperties": false,
+        "properties": {
+          "floor_id": {
+            "format": "uuid",
+            "title": "Floor Id",
+            "type": "string"
+          },
+          "height_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Height Mm",
+            "type": "number"
+          },
+          "hinge": {
+            "enum": [
+              "start",
+              "end"
+            ],
+            "title": "Hinge",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SceneProtocolJsonValue"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "offset_mm": {
+            "minimum": 0,
+            "title": "Offset Mm",
+            "type": "number"
+          },
+          "opens_to": {
+            "enum": [
+              "left",
+              "right"
+            ],
+            "title": "Opens To",
+            "type": "string"
+          },
+          "sill_height_mm": {
+            "minimum": 0,
+            "title": "Sill Height Mm",
+            "type": "number"
+          },
+          "wall_id": {
+            "format": "uuid",
+            "title": "Wall Id",
+            "type": "string"
+          },
+          "width_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Width Mm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "floor_id",
+          "wall_id",
+          "offset_mm",
+          "width_mm",
+          "height_mm",
+          "sill_height_mm",
+          "hinge",
+          "opens_to"
+        ],
+        "title": "Door",
+        "type": "object"
+      },
+      "SceneProtocolElectricalPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "floor_id": {
+            "format": "uuid",
+            "title": "Floor Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "power",
+              "data",
+              "switch",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SceneProtocolJsonValue"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "position": {
+            "$ref": "#/components/schemas/SceneProtocolPoint3"
+          },
+          "wall_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Wall Id"
+          }
+        },
+        "required": [
+          "id",
+          "floor_id",
+          "position",
+          "kind"
+        ],
+        "title": "ElectricalPoint",
+        "type": "object"
+      },
+      "SceneProtocolFloor": {
+        "additionalProperties": false,
+        "properties": {
+          "elevation_mm": {
+            "title": "Elevation Mm",
+            "type": "number"
+          },
+          "height_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Height Mm",
+            "type": "number"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SceneProtocolJsonValue"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "elevation_mm",
+          "height_mm"
+        ],
+        "title": "Floor",
+        "type": "object"
+      },
+      "SceneProtocolFurnitureInstance": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Asset Id"
+          },
+          "depth_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Depth Mm",
+            "type": "number"
+          },
+          "floor_id": {
+            "format": "uuid",
+            "title": "Floor Id",
+            "type": "string"
+          },
+          "height_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Height Mm",
+            "type": "number"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SceneProtocolJsonValue"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "position": {
+            "$ref": "#/components/schemas/SceneProtocolPoint3"
+          },
+          "product_id": {
+            "format": "uuid",
+            "title": "Product Id",
+            "type": "string"
+          },
+          "room_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Room Id"
+          },
+          "rotation_deg": {
+            "exclusiveMaximum": 360,
+            "minimum": 0,
+            "title": "Rotation Deg",
+            "type": "number"
+          },
+          "width_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Width Mm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "floor_id",
+          "position",
+          "width_mm",
+          "depth_mm",
+          "height_mm",
+          "rotation_deg",
+          "product_id"
+        ],
+        "title": "FurnitureInstance",
+        "type": "object"
+      },
+      "SceneProtocolJsonValue": {},
+      "SceneProtocolPlumbingPoint": {
+        "additionalProperties": false,
+        "properties": {
+          "floor_id": {
+            "format": "uuid",
+            "title": "Floor Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "cold_water",
+              "hot_water",
+              "drain",
+              "gas",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SceneProtocolJsonValue"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "position": {
+            "$ref": "#/components/schemas/SceneProtocolPoint3"
+          },
+          "wall_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Wall Id"
+          }
+        },
+        "required": [
+          "id",
+          "floor_id",
+          "position",
+          "kind"
+        ],
+        "title": "PlumbingPoint",
+        "type": "object"
+      },
+      "SceneProtocolPoint2": {
+        "additionalProperties": false,
+        "properties": {
+          "x": {
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "title": "Y",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y"
+        ],
+        "title": "Point2",
+        "type": "object"
+      },
+      "SceneProtocolPoint3": {
+        "additionalProperties": false,
+        "properties": {
+          "x": {
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "title": "Y",
+            "type": "number"
+          },
+          "z": {
+            "title": "Z",
+            "type": "number"
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "z"
+        ],
+        "title": "Point3",
+        "type": "object"
+      },
+      "SceneProtocolRoom": {
+        "additionalProperties": false,
+        "properties": {
+          "boundary": {
+            "items": {
+              "$ref": "#/components/schemas/SceneProtocolPoint2"
+            },
+            "minItems": 3,
+            "title": "Boundary",
+            "type": "array"
+          },
+          "floor_id": {
+            "format": "uuid",
+            "title": "Floor Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SceneProtocolJsonValue"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "floor_id",
+          "name",
+          "boundary"
+        ],
+        "title": "Room",
+        "type": "object"
+      },
+      "SceneProtocolWall": {
+        "additionalProperties": false,
+        "properties": {
+          "end": {
+            "$ref": "#/components/schemas/SceneProtocolPoint2"
+          },
+          "floor_id": {
+            "format": "uuid",
+            "title": "Floor Id",
+            "type": "string"
+          },
+          "height_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Height Mm",
+            "type": "number"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SceneProtocolJsonValue"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "start": {
+            "$ref": "#/components/schemas/SceneProtocolPoint2"
+          },
+          "thickness_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Thickness Mm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "floor_id",
+          "start",
+          "end",
+          "thickness_mm",
+          "height_mm"
+        ],
+        "title": "Wall",
+        "type": "object"
+      },
+      "SceneProtocolWindow": {
+        "additionalProperties": false,
+        "properties": {
+          "floor_id": {
+            "format": "uuid",
+            "title": "Floor Id",
+            "type": "string"
+          },
+          "height_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Height Mm",
+            "type": "number"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SceneProtocolJsonValue"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "offset_mm": {
+            "minimum": 0,
+            "title": "Offset Mm",
+            "type": "number"
+          },
+          "sill_height_mm": {
+            "minimum": 0,
+            "title": "Sill Height Mm",
+            "type": "number"
+          },
+          "wall_id": {
+            "format": "uuid",
+            "title": "Wall Id",
+            "type": "string"
+          },
+          "width_mm": {
+            "exclusiveMinimum": 0,
+            "title": "Width Mm",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "floor_id",
+          "wall_id",
+          "offset_mm",
+          "width_mm",
+          "height_mm",
+          "sill_height_mm"
+        ],
+        "title": "Window",
+        "type": "object"
+      },
+      "SceneRestore": {
+        "additionalProperties": false,
+        "properties": {
+          "base_version": {
+            "maximum": 2147483646.0,
+            "minimum": 0.0,
+            "title": "Base Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "base_version"
+        ],
+        "title": "SceneRestore",
+        "type": "object"
+      },
+      "SceneSave": {
+        "additionalProperties": false,
+        "properties": {
+          "base_version": {
+            "maximum": 2147483646.0,
+            "minimum": 0.0,
+            "title": "Base Version",
+            "type": "integer"
+          },
+          "scene_data": {
+            "$ref": "#/components/schemas/SceneModel"
+          }
+        },
+        "required": [
+          "base_version",
+          "scene_data"
+        ],
+        "title": "SceneSave",
+        "type": "object"
+      },
+      "SceneVersionRead": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "title": "Created By",
+            "type": "string"
+          },
+          "design_project_id": {
+            "format": "uuid",
+            "title": "Design Project Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "merchant_id": {
+            "format": "uuid",
+            "title": "Merchant Id",
+            "type": "string"
+          },
+          "scene_data": {
+            "$ref": "#/components/schemas/SceneModel"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "merchant_id",
+          "design_project_id",
+          "version",
+          "scene_data",
+          "created_by",
+          "created_at"
+        ],
+        "title": "SceneVersionRead",
         "type": "object"
       },
       "Token": {
@@ -1848,7 +2571,7 @@
             "type": "string"
           },
           "height_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Height Mm",
             "type": "number"
           },
@@ -1868,7 +2591,7 @@
             "$ref": "#/components/schemas/Point2"
           },
           "thickness_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Thickness Mm",
             "type": "number"
           }
@@ -1893,7 +2616,7 @@
             "type": "string"
           },
           "height_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Height Mm",
             "type": "number"
           },
@@ -1910,12 +2633,12 @@
             "type": "object"
           },
           "offset_mm": {
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Offset Mm",
             "type": "number"
           },
           "sill_height_mm": {
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Sill Height Mm",
             "type": "number"
           },
@@ -1925,7 +2648,7 @@
             "type": "string"
           },
           "width_mm": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Width Mm",
             "type": "number"
           }
@@ -3493,6 +4216,567 @@
         "summary": "Update",
         "tags": [
           "Projects"
+        ]
+      }
+    },
+    "/projects/{project_id}/scene": {
+      "get": {
+        "operationId": "current_projects__project_id__scene_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SceneVersionRead"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Current Projects  Project Id  Scene Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Current",
+        "tags": [
+          "Scenes"
+        ]
+      },
+      "put": {
+        "operationId": "save_projects__project_id__scene_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneSave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SceneVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Save",
+        "tags": [
+          "Scenes"
+        ]
+      }
+    },
+    "/projects/{project_id}/scene/versions": {
+      "get": {
+        "operationId": "versions_projects__project_id__scene_versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SceneVersionRead_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Versions",
+        "tags": [
+          "Scenes"
+        ]
+      }
+    },
+    "/projects/{project_id}/scene/versions/{version}": {
+      "get": {
+        "operationId": "detail_projects__project_id__scene_versions__version__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SceneVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Detail",
+        "tags": [
+          "Scenes"
+        ]
+      }
+    },
+    "/projects/{project_id}/scene/versions/{version}/restore": {
+      "post": {
+        "operationId": "restore_projects__project_id__scene_versions__version__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneRestore"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SceneVersionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Restore",
+        "tags": [
+          "Scenes"
         ]
       }
     },
