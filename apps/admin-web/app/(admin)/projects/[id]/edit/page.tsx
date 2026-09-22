@@ -9,6 +9,8 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
   let project;
   try { project = await getProject((await params).id); }
   catch (error) { if (error instanceof ApiError && error.status === 404) notFound(); if (error instanceof ApiError && error.status === 401) redirect('/api/auth/expired'); throw error; }
-  const customer = await getCustomer(project.customer_id);
+  let customer;
+  try { customer = await getCustomer(project.customer_id); }
+  catch (error) { if (error instanceof ApiError && error.status === 401) redirect('/api/auth/expired'); throw error; }
   return <><PageHeading title="编辑设计项目" description={`更新 ${project.name} 的基础资料。`} /><section className="form-panel"><ProjectForm project={project} initialCustomer={customer} /></section></>;
 }
