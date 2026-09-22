@@ -26,6 +26,15 @@ Verified implementation SHA: `63c83e00c79cce509ebae4f9004a421ce59a3559`.
 - [Backend Actions](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35691273050): success; job log confirms **299 passed, 2 warnings**. Ruff, formatting, Alembic migration, generated OpenAPI/Scene contracts, and Docker build passed.
 - These are actual Linux CI results, separate from the Windows local results above. This evidence-only documentation update is also subject to both workflows after push; its final status is reported in the task handoff.
 
+## Customer picker acceptance follow-up
+
+- Review baseline: `63c83e00c79cce509ebae4f9004a421ce59a3559`; remote SHA verified through the GitHub API before committing this follow-up. Preserved local evidence commit `683e4000cc8f1afe653ac08aa7503979cbf49986`.
+- TDD: added eight regression scenarios, observed all eight fail before the component fix. After the fix, the full local Windows/Edge suite passed: **57 passed**. `npm run lint`, `npm run typecheck`, and `npm run build` passed.
+- Tests cover 401 after successfully opening both new/edit project pages (real BFF cookie clearing against mock upstream), 403/503/network failures with Chinese retry feedback, no stale selectable results, empty-success distinction, and out-of-order completion without overwriting current loading/results. Existing customer/product/project regressions remain in the full suite.
+- Browser tests use mock FastAPI and deliberate browser network faults; they do not constitute a new real PostgreSQL integration run. The earlier real integration evidence above remains scoped to its original implementation. No Python backend or API contract changed in this follow-up.
+- Root and admin READMEs now describe implemented customer/product/project management and the remaining SceneModel persistence/version limitations.
+- New-commit Actions are pending push and must be verified separately; the baseline green workflows above are not evidence for this component change.
+
 ## Scope and limitations
 
 - The project API and backend business behavior are unchanged; backend changes add permission and pagination regression tests.

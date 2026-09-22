@@ -1,12 +1,14 @@
 # zhinengFamily 智能家居
 
-面向家具/家电门店的 AI + 3D 设计与销售系统。本次开发范围为 Phase 1：业务后端和统一 SceneModel 协议。
+面向家具/家电门店的 AI + 3D 设计与销售系统。当前已实现 Phase 1 业务后端、统一 SceneModel 协议，以及 Phase 2-5 中文后台客户、商品和设计项目管理。
 
 当前代码包含五个核心数据库实体、登录认证、客户/商品/项目 CRUD、SceneModel、Local 存储接口及交付配置。Linux CI 全量验证为 **290 passed, 2 warnings**；Ruff、Alembic migration、SceneModel/OpenAPI 契约检查和 Docker build 均通过，Phase 1 已通过复审。详细证据见 [执行记录](docs/superpowers/plans/2026-09-17-phase-1-progress.md)。没有 Unity、户型解析、AI 摆放或渲染实现。
 
 ## 环境要求
 
-后台 Web 位于 [`apps/admin-web`](apps/admin-web/README.md)。在该目录运行 `npm install` 和 `npm run dev`，打开 http://localhost:3000。Phase 2-3 已接入真实登录、HttpOnly Cookie、后台路由保护，以及客户列表、搜索、新建、详情和编辑；商品与项目页面仍为空状态。下文为 Phase 1 后端启动说明。
+后台 Web 位于 [`apps/admin-web`](apps/admin-web/README.md)。在该目录运行 `npm install` 和 `npm run dev`，打开 http://localhost:3000。已接入真实登录、HttpOnly Cookie、后台路由保护，以及客户、商品和设计项目的列表、新建、详情和编辑（当前 API 不提供删除）。商品支持搜索和任意分类筛选，项目可从客户详情创建并自动关联客户。SceneModel 持久化及版本管理仍未实现，3D 入口禁用。下文为 Phase 1 后端启动说明。
+
+Phase 2-5 已核实的 CI 基线 `63c83e00c79cce509ebae4f9004a421ce59a3559`：[前端 49 passed](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35691273046)、[后端 299 passed、2 warnings](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35691273050)。客户搜索验收修复的本地 Windows/Edge Playwright 为 57 passed（模拟上游 FastAPI），lint/typecheck/build 通过；这些本地结果不代表新提交 CI 已通过。先前真实 FastAPI/PostgreSQL 项目创建、编辑、刷新持久化联调已完成；本次搜索故障回归使用模拟上游及浏览器网络故障注入。最新证据见 [Phase 2-5 验证记录](docs/superpowers/plans/2026-09-22-phase-2-5-projects.md)。
 
 - Python 3.12（Windows、Linux 或 macOS）。Windows 安装可执行的 Python，而不是 WindowsApps 商店别名。
 - PostgreSQL 16；推荐 Docker Desktop/Engine 和 Compose v2 启动数据库。
