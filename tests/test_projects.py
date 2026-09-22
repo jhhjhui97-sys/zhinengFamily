@@ -60,7 +60,9 @@ def test_project_assignment_permissions_and_pagination(client, accounts):
         },
     ).json()["access_token"]
     sales = {"Authorization": f"Bearer {sales_token}"}
-    customer = client.post("/customers", headers=sales, json={"name": "销售客户"}).json()
+    customer = client.post(
+        "/customers", headers=sales, json={"name": "销售客户"}
+    ).json()
     created = []
     for index in range(21):
         response = client.post(
