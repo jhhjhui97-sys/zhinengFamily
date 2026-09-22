@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import type { Product, ProductInput } from '@/lib/api/types';
+import { parseMetadata } from '@/lib/product-metadata';
 
 type Errors = Partial<Record<'name' | 'required' | 'price' | 'dimensions' | 'metadata', string>>;
 const moneyPattern = /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
@@ -17,12 +18,11 @@ export function ProductForm({ product }: { product?: Product }) {
     if (!category || !brand || !sku) next.required = '请填写分类、品牌和 SKU';
     if (!moneyPattern.test(price)) next.price = '请输入有效价格，最多保留两位小数';
     if ([width, depth, height].some(item => !item || !Number.isFinite(Number(item)) || Number(item) <= 0)) next.dimensions = '尺寸必须大于 0';
-    let metadata: ProductInput['metadata'] = {};
-    try { const parsed: unknown = JSON.parse(value('metadata') || '{}'); if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') throw new Error(); metadata = parsed as ProductInput['metadata']; }
-    catch { next.metadata = 'Metadata 必须是合法 JSON 对象'; }
+    const parsedMetadata = parseMetadata(value('metadata'));
+    if (parsedMetadata.error) next.metadata = parsedMetadata.error;
     setErrors(next); if (Object.keys(next).length) return;
     const nullable = (key: string) => value(key) || null;
-    const input: ProductInput = { category, brand, name, sku, price, width_mm: Number(width), depth_mm: Number(depth), height_mm: Number(height), thumbnail: nullable('thumbnail'), model_url: nullable('model_url'), metadata };
+    const input: ProductInput = { category, brand, name, sku, price, width_mm: Number(width), depth_mm: Number(depth), height_mm: Number(height), thumbnail: nullable('thumbnail'), model_url: nullable('model_url'), metadata: parsedMetadata.value ?? {} };
     setBusy(true);
     try {
       const response = await fetch(product ? `/api/products/${product.id}` : '/api/products', { method: product ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }); const body = await response.json();

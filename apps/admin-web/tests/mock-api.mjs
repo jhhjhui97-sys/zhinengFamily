@@ -11,8 +11,8 @@ const customers = [
 ];
 const products = [
   { id: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1', merchant_id: user.merchant_id, category: 'sofa', brand: '示例品牌', name: '三人沙发', sku: 'SOFA-001', price: '6800.50', width_mm: 2400, depth_mm: 950, height_mm: 850, thumbnail: 'https://example.test/sofa.jpg', model_url: 'https://example.test/sofa.glb', metadata: { color: '浅灰', material: '科技布' }, created_at: now, updated_at: now },
-  { id: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2', merchant_id: user.merchant_id, category: 'table', brand: '木作', name: '餐桌', sku: 'TABLE-001', price: '3999.90', width_mm: 1800, depth_mm: 900, height_mm: 760, thumbnail: null, model_url: null, metadata: {}, created_at: now, updated_at: now },
-  ...Array.from({ length: 19 }, (_, index) => ({ id: `dddddddd-dddd-4ddd-8ddd-${String(index + 3).padStart(12, '0')}`, merchant_id: user.merchant_id, category: index % 2 ? 'sofa' : 'appliance', brand: '分页品牌', name: `分页商品${index + 1}`, sku: `PAGE-${index + 1}`, price: '80000.00', width_mm: 1000, depth_mm: 500, height_mm: 700, thumbnail: null, model_url: null, metadata: {}, created_at: now, updated_at: now })),
+  { id: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2', merchant_id: user.merchant_id, category: 'bed', brand: '木作', name: '实木床', sku: 'BED-001', price: '3999.90', width_mm: 1800, depth_mm: 2000, height_mm: 1000, thumbnail: null, model_url: null, metadata: {}, created_at: now, updated_at: now },
+  ...Array.from({ length: 21 }, (_, index) => ({ id: `dddddddd-dddd-4ddd-8ddd-${String(index + 3).padStart(12, '0')}`, merchant_id: user.merchant_id, category: 'bed', brand: '分页品牌', name: `分页商品${index + 1}`, sku: `PAGE-${index + 1}`, price: '80000.00', width_mm: 1000, depth_mm: 500, height_mm: 700, thumbnail: null, model_url: null, metadata: {}, created_at: now, updated_at: now })),
 ];
 const error = (code, message, details = []) => ({ error: { code, message, details } });
 createServer(async (req, res) => {

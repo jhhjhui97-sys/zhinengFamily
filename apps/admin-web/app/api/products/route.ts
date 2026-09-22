@@ -2,6 +2,7 @@ import { createProduct, listProducts } from '@/lib/api/products';
 import { ApiError, publicError } from '@/lib/api/errors';
 import { sameOrigin } from '@/lib/api/origin';
 import type { ProductInput } from '@/lib/api/types';
+import { validateMetadata } from '@/lib/product-metadata';
 
 export async function GET(request: Request) {
   try {
@@ -16,6 +17,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!sameOrigin(request)) return publicError(new ApiError(403, '你没有权限执行此操作'));
-  try { return Response.json(await createProduct(await request.json() as ProductInput), { status: 201 }); }
+  try {
+    const input = await request.json() as ProductInput;
+    const metadataError = validateMetadata(input.metadata);
+    if (metadataError) throw new ApiError(422, metadataError);
+    return Response.json(await createProduct(input), { status: 201 });
+  }
   catch (error) { return publicError(error); }
 }
