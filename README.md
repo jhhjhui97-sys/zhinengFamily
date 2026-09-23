@@ -1,12 +1,12 @@
 # zhinengFamily 智能家居
 
-面向家具/家电门店的 AI + 3D 设计与销售系统。当前已实现 Phase 1 业务后端、统一 SceneModel 协议，以及 Phase 2-5 中文后台客户、商品和设计项目管理。
+面向家具/家电门店的 AI + 3D 设计与销售系统。当前已实现 Phase 1 业务后端、统一 SceneModel 协议，以及 Phase 2 中文后台的客户、商品、设计项目和场景版本管理。
 
 当前代码包含五个核心数据库实体、登录认证、客户/商品/项目 CRUD、SceneModel、Local 存储接口及交付配置。Linux CI 全量验证为 **290 passed, 2 warnings**；Ruff、Alembic migration、SceneModel/OpenAPI 契约检查和 Docker build 均通过，Phase 1 已通过复审。详细证据见 [执行记录](docs/superpowers/plans/2026-09-17-phase-1-progress.md)。没有 Unity、户型解析、AI 摆放或渲染实现。
 
 ## 环境要求
 
-后台 Web 位于 [`apps/admin-web`](apps/admin-web/README.md)。在该目录运行 `npm install` 和 `npm run dev`，打开 http://localhost:3000。已接入真实登录、HttpOnly Cookie、后台路由保护，以及客户、商品和设计项目的列表、新建、详情和编辑（当前 API 不提供删除）。商品支持搜索和任意分类筛选，项目可从客户详情创建并自动关联客户。SceneModel 持久化及版本管理仍未实现，3D 入口禁用。下文为 Phase 1 后端启动说明。
+后台 Web 位于 [`apps/admin-web`](apps/admin-web/README.md)。在该目录运行 `npm install` 和 `npm run dev`，打开 http://localhost:3000。已接入真实登录、HttpOnly Cookie、后台路由保护，以及客户、商品和设计项目的列表、新建、详情和编辑（当前 API 不提供删除）。商品支持搜索和任意分类筛选，项目可从客户详情创建并自动关联客户。项目详情可以编辑、保存、查看及恢复 SceneModel 版本；恢复会生成新版本并保留历史。3D 入口仍禁用。
 
 Phase 2-5 已核实的 CI 基线 `63c83e00c79cce509ebae4f9004a421ce59a3559`：[前端 49 passed](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35691273046)、[后端 299 passed、2 warnings](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35691273050)。客户搜索验收修复的本地 Windows/Edge Playwright 为 57 passed（模拟上游 FastAPI），lint/typecheck/build 通过；修复 SHA `0f485f965d6d142577d44363217c88ba1ae8f092` 的 [前端 CI 57 passed](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35713156751)、[后端 CI 299 passed、2 warnings](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35713156963) 已分别核实成功。先前真实 FastAPI/PostgreSQL 项目创建、编辑、刷新持久化联调已完成；本次搜索故障回归使用模拟上游及浏览器网络故障注入。最新证据见 [Phase 2-5 验证记录](docs/superpowers/plans/2026-09-22-phase-2-5-projects.md)。
 
@@ -66,7 +66,7 @@ python -m alembic -c apps/api/alembic.ini upgrade head
 
 若使用原生 PostgreSQL，自行创建专用登录角色及其拥有的 `smart_home_dev`、`smart_home_test` 两个数据库，填写相应 URL，然后执行同一个迁移命令。生产服务不需要数据库超级用户权限。
 
-迁移只创建 Merchant、User、Customer、Product、DesignProject 对应五张业务表；不使用 create_all，也不会在 API 启动时自动修改数据库。
+迁移创建 Merchant、User、Customer、Product、DesignProject，以及场景当前指针和不可变版本快照表；不使用 create_all，也不会在 API 启动时自动修改数据库。
 
 ## 创建商家与账号
 
@@ -111,6 +111,8 @@ POST /projects
 ```
 
 三种资源均提供 POST 创建、GET 列表、GET /{id} 详情、PATCH /{id} 更新。列表可传 `limit=20&offset=0`，limit 最大 100。PATCH 未提供字段保持不变；可空字段支持显式 null，必填字段拒绝 null。暂时不提供删除。
+
+项目场景提供 `GET/PUT /projects/{id}/scene`、`GET /projects/{id}/scene/versions`、`GET /projects/{id}/scene/versions/{version}` 和 `POST /projects/{id}/scene/versions/{version}/restore`。未创建场景时当前读取返回 `null`。首次保存携带 `base_version: 0` 并生成 v1；后续保存和恢复必须携带当前版本。过期版本返回 409，不覆盖新内容；恢复旧版本会创建新的当前版本。版本列表按版本号倒序并支持 `limit/offset`。
 
 所有租户字段由登录用户决定，不能通过请求体设置 merchant_id。其他商家的记录和关联 ID 返回 404。owner 可指定/转交 customer.owner_user_id、project.sales_user_id；销售人员可操作本商家资源，但不能转交归属。金额以十进制字符串返回，尺寸为 mm。请求中的文本（包括密码、元数据字符串和键）拒绝空字符 U+0000，返回不回显原始输入的 422。
 
@@ -159,7 +161,7 @@ python -m scene_schema.export
 python packages/api-contracts/export.py
 ```
 
-OpenAPI 的 SceneModel 组件用于共享协议，当前没有场景保存、版本编辑或转换 API。JSON Schema 校验结构；跨引用、几何规则由 Python 校验器执行，不能把结构通过当作碰撞检测通过。
+OpenAPI 的 SceneModel 组件用于共享协议。场景写入会执行完整 Pydantic 校验并核验商品租户归属；数据库在同一事务中写入不可变快照并更新当前指针。JSON Schema 校验结构；跨引用、几何规则由 Python 校验器执行，不能把结构通过当作碰撞检测通过。
 
 ```text
 apps/api/                 FastAPI、业务模块、Alembic
