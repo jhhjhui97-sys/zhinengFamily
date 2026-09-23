@@ -10,6 +10,8 @@
 
 Phase 2-5 已核实的 CI 基线 `63c83e00c79cce509ebae4f9004a421ce59a3559`：[前端 49 passed](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35691273046)、[后端 299 passed、2 warnings](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35691273050)。客户搜索验收修复的本地 Windows/Edge Playwright 为 57 passed（模拟上游 FastAPI），lint/typecheck/build 通过；修复 SHA `0f485f965d6d142577d44363217c88ba1ae8f092` 的 [前端 CI 57 passed](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35713156751)、[后端 CI 299 passed、2 warnings](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35713156963) 已分别核实成功。先前真实 FastAPI/PostgreSQL 项目创建、编辑、刷新持久化联调已完成；本次搜索故障回归使用模拟上游及浏览器网络故障注入。最新证据见 [Phase 2-5 验证记录](docs/superpowers/plans/2026-09-22-phase-2-5-projects.md)。
 
+Phase 2-6 实现 SHA `791b6a16b9e4f413e47aad142ccf751cf12c07bc` 已通过 [Admin Web Actions：69 passed](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35816317745) 和 [Backend Actions：328 passed、2 warnings](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35816317748)；后端作业同时通过 Ruff、迁移、Scene/OpenAPI 契约和 Docker build。完整本地及真实联调证据见 [Phase 2-6 验证记录](docs/superpowers/plans/2026-09-23-phase-2-6-scene-versions.md)。
+
 - Python 3.12（Windows、Linux 或 macOS）。Windows 安装可执行的 Python，而不是 WindowsApps 商店别名。
 - PostgreSQL 16；推荐 Docker Desktop/Engine 和 Compose v2 启动数据库。
 - Git。默认 API 端口 8000，开发 PostgreSQL 端口 5432。

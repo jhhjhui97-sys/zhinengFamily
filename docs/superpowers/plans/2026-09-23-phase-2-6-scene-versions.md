@@ -18,4 +18,7 @@ Review focus: lock covers scene creation as well as updates; stale restore canno
 - Backend local Windows/PostgreSQL: **325 passed, 3 skipped, 2 warnings**. The skipped cases require Windows symlink privilege and run on Linux CI. Scene version subset: 29 passed. Ruff check/format and generated Scene/OpenAPI contract checks passed. Migration round-trip and preservation are covered by passing PostgreSQL tests.
 - Admin Web local Windows/Edge: **69 passed** with simulated FastAPI; lint, TypeScript strict typecheck and production build passed.
 - Real integration: passed with real PostgreSQL, FastAPI, Next.js BFF and browser. Created a customer and linked project, saved the two-bedroom/living-room sample as v1, changed its title and saved v2, restored v1 as v3, refreshed, confirmed current v3 plus retained v1/v2/v3, and confirmed v2 remained immutable.
-- Local Docker: not run because Docker is not installed. GitHub Actions results and exact SHA are deliberately pending until the branch is pushed and those runs finish.
+- Local Docker: not run because Docker is not installed.
+- Verified implementation SHA: `791b6a16b9e4f413e47aad142ccf751cf12c07bc`.
+- [Admin Web Actions](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35816317745): success; **69 passed**, lint, TypeScript strict typecheck and production build passed.
+- [Backend Actions](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35816317748): success; **328 passed, 2 warnings**. Ruff check/format, Alembic upgrade, generated Scene/OpenAPI contracts and Docker build passed.
