@@ -228,7 +228,12 @@ def test_scene_concurrent_writers_use_independent_transactions(
     assert client.get(path + "/versions", headers=auth).json()["total"] == base + 1
 
 
-def test_scene_history_failure_rolls_back_current(client, scene_api, scene):
+@pytest.mark.parametrize(
+    "statement_prefix", ["INSERT INTO scene_versions", "UPDATE scene_states"]
+)
+def test_scene_history_failure_rolls_back_current(
+    client, scene_api, scene, statement_prefix
+):
     from smart_home.db import session_factory
     from sqlalchemy.exc import OperationalError
 
@@ -237,7 +242,7 @@ def test_scene_history_failure_rolls_back_current(client, scene_api, scene):
     engine = session_factory().kw["bind"]
 
     def fail_write(conn, cursor, statement, parameters, context, executemany):
-        if statement.startswith("INSERT INTO scene_versions"):
+        if statement.startswith(statement_prefix):
             raise OperationalError(
                 "internal sensitive sql", {}, Exception("secret database failure")
             )
@@ -251,6 +256,58 @@ def test_scene_history_failure_rolls_back_current(client, scene_api, scene):
         event.remove(engine, "before_cursor_execute", fail_write)
     assert client.get(path, headers=auth).json() == first
     assert client.get(path + "/versions", headers=auth).json()["total"] == 1
+
+
+@pytest.mark.parametrize("base", [-1, True, "0", 1.5, None])
+def test_scene_base_version_is_strict(client, scene_api, scene, base):
+    auth, path = scene_api
+    assert save(client, auth, path, scene, base).status_code == 422
+
+
+@pytest.mark.parametrize("query", ["limit=0", "limit=101", "offset=-1", "limit=bad"])
+def test_scene_pagination_validation(client, scene_api, query):
+    auth, path = scene_api
+    assert client.get(path + "/versions?" + query, headers=auth).status_code == 422
+
+
+def test_two_bedroom_example_uses_authoritative_protocol(client, scene_api):
+    from scene_schema import SceneModel
+
+    data = json.loads(
+        (Path(__file__).parents[1] / "apps/admin-web/lib/two-bedroom.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    model = SceneModel.model_validate(data)
+    assert [room.name for room in model.rooms] == ["客厅", "主卧", "次卧"]
+    assert len(model.walls) == 6
+    assert model.furniture_instances == []
+    auth, path = scene_api
+    assert save(client, auth, path, data).status_code == 200
+
+
+def test_database_rejects_duplicate_version_and_cross_tenant_author(
+    client, accounts, scene_api, scene, db_engine
+):
+    from sqlalchemy.exc import IntegrityError
+
+    auth, path = scene_api
+    version = save(client, auth, path, scene).json()
+    query = text(
+        "INSERT INTO scene_versions (id, merchant_id, design_project_id, version, scene_data, created_by) VALUES (:id, :merchant, :project, :version, '{}'::jsonb, :author)"
+    )
+    for number, author in [(1, accounts[0].id), (2, accounts[1].id)]:
+        with pytest.raises(IntegrityError), db_engine.begin() as conn:
+            conn.execute(
+                query,
+                {
+                    "id": uuid4(),
+                    "merchant": accounts[0].merchant_id,
+                    "project": version["design_project_id"],
+                    "version": number,
+                    "author": author,
+                },
+            )
 
 
 def test_scene_migration_preserves_business_data(
