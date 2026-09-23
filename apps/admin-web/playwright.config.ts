@@ -3,6 +3,9 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   fullyParallel: false,
+  // The mock FastAPI intentionally keeps mutable CRUD state for end-to-end flows.
+  // Run files serially so independent scenarios cannot mutate that shared fixture.
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: 'list',
