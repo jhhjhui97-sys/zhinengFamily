@@ -9,7 +9,7 @@
 - [x] Frontend TDD: extend mock upstream and browser tests; add shared scene API/BFF routes and a project-detail scene panel. Include a genuine two-bedroom/living-room example without product references, JSON editor/read-only snapshots, counts, paginated history and restore. Keep draft JSON on errors/conflicts; explicit refresh is required before retrying a stale base version.
 - [x] Full local verification: pytest, Ruff, migrations up/down, Scene/OpenAPI exports, frontend test/lint/typecheck/build. Docker is unavailable in this local environment; exact-SHA CI must perform Docker config/build.
 - [x] Real PostgreSQL/FastAPI/browser flow: customer → project → v1 → v2 → restore v1 as v3 → refresh and verify all snapshots.
-- [ ] Update README/API docs and evidence, small commits, push current branch, verify exact-SHA CI, create/update Phase 2 PR to main and attach it. Do not merge or start the next phase.
+- [x] Update README/API docs and evidence, small commits, push current branch, verify exact-SHA CI, create/update Phase 2 PR to main and attach it. Do not merge or start the next phase.
 
 Review focus: lock covers scene creation as well as updates; stale restore cannot win; injected history-write failure leaves pointer unchanged; product ownership is checked on restore too; scene_id grants no authority; unsafe JSON/nonfinite values never silently become null; unsaved editor text survives 409/network errors.
 
@@ -22,3 +22,4 @@ Review focus: lock covers scene creation as well as updates; stale restore canno
 - Verified implementation SHA: `791b6a16b9e4f413e47aad142ccf751cf12c07bc`.
 - [Admin Web Actions](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35816317745): success; **69 passed**, lint, TypeScript strict typecheck and production build passed.
 - [Backend Actions](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/35816317748): success; **328 passed, 2 warnings**. Ruff check/format, Alembic upgrade, generated Scene/OpenAPI contracts and Docker build passed.
+- Phase 2 pull request: [#2](https://github.com/jhhjhui97-sys/zhinengFamily/pull/2). It targets `main`, remains open and is not merged.
