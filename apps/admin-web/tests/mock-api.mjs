@@ -19,6 +19,7 @@ const projects = [
   ...Array.from({ length: 20 }, (_, index) => ({ id: `12121212-1212-4121-8121-${String(index + 12).padStart(12, '0')}`, merchant_id: user.merchant_id, customer_id: customers[index + 1].id, sales_user_id: user.id, name: `分页项目${index + 1}`, address: index % 2 ? null : `测试地址${index + 1}`, status: index % 3 === 0 ? 'draft' : index % 3 === 1 ? 'active' : 'archived', created_at: now, updated_at: now })),
 ];
 const error = (code, message, details = []) => ({ error: { code, message, details } });
+const scenes = new Map();
 createServer(async (req, res) => {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -91,6 +92,20 @@ createServer(async (req, res) => {
     if (!product) { status = 404; data = error('not_found', 'Record not found'); }
     else if (products.some(item => item.id !== id && item.sku === input.sku)) { status = 409; data = error('conflict', 'SKU already exists'); }
     else { Object.assign(product, input, { updated_at: now }); data = product; }
+  } else if (/^\/projects\/[^/]+\/scene/.test(req.url ?? '')) {
+    const url = new URL(req.url, 'http://mock'); const parts = url.pathname.split('/'); const id = parts[2];
+    const history = scenes.get(id) ?? []; const current = history.at(-1) ?? null;
+    if (!projects.some(project => project.id === id)) { status = 404; data = error('not_found', 'Project missing'); }
+    else if (req.method === 'GET') {
+      if (parts[5]) { data = history.find(item => item.version === Number(parts[5])); if (!data) { status = 404; data = error('not_found', 'Version missing'); } }
+      else if (parts[4] === 'versions') { const limit = Number(url.searchParams.get('limit') ?? 20); const offset = Number(url.searchParams.get('offset') ?? 0); data = { items: [...history].reverse().slice(offset, offset + limit), total: history.length, limit, offset }; }
+      else data = current;
+    } else if (input.base_version !== (current?.version ?? 0)) { status = 409; data = error('scene_conflict', 'Scene changed'); }
+    else {
+      const payload = req.method === 'PUT' ? input.scene_data : history.find(item => item.version === Number(parts[5]))?.scene_data;
+      if (!payload?.floors?.length) { status = 422; data = error('validation_error', 'Invalid scene'); }
+      else { data = { id: crypto.randomUUID(), merchant_id: user.merchant_id, design_project_id: id, version: history.length + 1, scene_data: structuredClone(payload), created_by: user.id, created_at: now }; history.push(data); scenes.set(id, history); }
+    }
   } else if (req.url?.startsWith('/projects') && req.method === 'GET') {
     const url = new URL(req.url, 'http://mock'); const id = url.pathname.split('/')[2];
     if (id) { const project = projects.find(item => item.id === id); if (!project || id === '13131313-1313-4131-8131-131313131313') { status = 404; data = error('not_found', 'Record not found'); } else data = project; }

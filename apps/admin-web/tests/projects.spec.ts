@@ -43,7 +43,7 @@ test('project form validates and presents API errors in Chinese', async ({ page 
 test('project detail includes customer and future design placeholders', async ({ page }) => {
   await page.goto('/projects/12121212-1212-4121-8121-121212121211');
   await expect(page.getByRole('heading', { name: '张先生全屋设计' })).toBeVisible();
-  await expect(page.getByText('SceneModel 尚未创建')).toBeVisible(); await expect(page.getByText('版本历史将在后续阶段开放')).toBeVisible();
+  await expect(page.getByText('SceneModel 尚未创建')).toBeVisible(); await expect(page.getByRole('heading', { name: '版本历史' })).toBeVisible();
   await expect(page.getByText('商品清单将在后续阶段开放')).toBeVisible(); await expect(page.getByRole('button', { name: '进入3D设计' })).toBeDisabled();
 });
 
