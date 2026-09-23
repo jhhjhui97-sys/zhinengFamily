@@ -6,7 +6,6 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from smart_home.contracts import include_scene_contract
-
 from smart_home.db import session_factory
 from smart_home.errors import ErrorResponse, install_error_handlers
 from smart_home.modules.auth.router import router as auth_router

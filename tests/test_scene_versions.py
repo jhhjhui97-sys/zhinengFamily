@@ -294,7 +294,9 @@ def test_database_rejects_duplicate_version_and_cross_tenant_author(
     auth, path = scene_api
     version = save(client, auth, path, scene).json()
     query = text(
-        "INSERT INTO scene_versions (id, merchant_id, design_project_id, version, scene_data, created_by) VALUES (:id, :merchant, :project, :version, '{}'::jsonb, :author)"
+        "INSERT INTO scene_versions "
+        "(id, merchant_id, design_project_id, version, scene_data, created_by) "
+        "VALUES (:id, :merchant, :project, :version, '{}'::jsonb, :author)"
     )
     for number, author in [(1, accounts[0].id), (2, accounts[1].id)]:
         with pytest.raises(IntegrityError), db_engine.begin() as conn:
