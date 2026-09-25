@@ -15,7 +15,7 @@ Phase 1 迁移真正建立 Merchant、User、Customer、Product、DesignProject�
 | DesignProject | id、merchant_id、customer_id、sales_user_id、name、address、status(draft/active/archived)、created_at、updated_at |
 | ProductAsset | merchant_id、product_id、object_key、media_type、checksum、asset_kind；复合外键归属商品 |
 | FloorPlan | merchant_id、project_id、object_key、source_format、parse_status；保留原文件 |
-| SceneState | merchant_id、design_project_id、current_version、updated_at；每个项目一行，复合外键精确指向当前 SceneVersion |
+| SceneState | merchant_id、design_project_id、version；每个项目一行，复合外键精确指向当前 SceneVersion；保存时间取当前版本的 created_at |
 | SceneVersion | id、merchant_id、design_project_id、version、scene_data JSONB、created_by、created_at；项目内版本唯一，快照不可变 |
 | FurnitureInstance | 未来按 SceneVersion 投影建立 merchant_id、scene_version_id、instance_id、product_id；快照仍是场景权威来源，禁止独立双写 |
 | Quotation / Item | merchant_id、project_id、scene_version_id、status、currency、total；子项存名称/SKU/数量/单价/金额快照及 product_id |
