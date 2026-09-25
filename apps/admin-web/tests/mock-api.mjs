@@ -27,6 +27,11 @@ createServer(async (req, res) => {
   try { input = JSON.parse(Buffer.concat(chunks).toString()); } catch { /* invalid request */ }
   let status = 200;
   let data;
+  if (/^\/(customers|products|projects)\/review-error-(403|422|503)$/.test(req.url ?? '')) {
+    res.writeHead(Number(req.url.split('-').at(-1)), { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(error('fixture_error', 'private stack')));
+    return;
+  }
   if (req.url === '/auth/login' && req.method === 'POST') {
     if (input.email === 'offline@example.test') { req.socket.destroy(); return; }
     const errors = {
