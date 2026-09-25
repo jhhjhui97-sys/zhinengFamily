@@ -41,11 +41,13 @@ for (const [resource, id] of [
   test(`${resource} form retains draft and allows retry after network and invalid JSON failures`, async ({ page }) => {
     await login(page);
     await page.goto(`/${resource}/${id}/edit`);
+    await page.locator('input[name="name"]').fill('审查暂存资料');
     for (const failure of ['network', 'json']) {
-      await page.route(`**/api/${resource}/${id}`, route => failure === 'network' ? route.abort('failed') : route.fulfill({ status: 502, contentType: 'text/html', body: '<html>private stack</html>' }));
+      await page.route(`**/api/${resource}/${id}`, route => failure === 'network' ? route.abort('failed') : route.fulfill({ status: 200, contentType: 'application/json', body: '{broken' }));
       await page.getByRole('button', { name: '保存修改' }).click();
       await expect(page.locator('p.form-error[role="alert"]')).toContainText('服务暂时不可用，请稍后重试');
       await expect(page.getByRole('button', { name: '保存修改' })).toBeEnabled();
+      await expect(page.locator('input[name="name"]')).toHaveValue('审查暂存资料');
       await expect(page).toHaveURL(new RegExp(`/${id}/edit$`));
       await page.unroute(`**/api/${resource}/${id}`);
     }
