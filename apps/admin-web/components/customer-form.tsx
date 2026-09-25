@@ -3,6 +3,8 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import type { Customer, CustomerInput, CustomerStatus } from '@/lib/api/types';
 import { customerStatuses } from '@/lib/customers';
+import { browserRequest } from '@/lib/api/browser';
+import { ApiError, errorMessage } from '@/lib/api/errors';
 
 export function CustomerForm({ customer }: { customer?: Customer }) {
   const router = useRouter(); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [nameError, setNameError] = useState('');
@@ -12,8 +14,8 @@ export function CustomerForm({ customer }: { customer?: Customer }) {
     const nullable = (key: string) => String(form.get(key) ?? '').trim() || null;
     const input: CustomerInput = { name, phone: nullable('phone'), wechat: nullable('wechat'), source: nullable('source'), address: nullable('address'), budget: nullable('budget'), status: String(form.get('status')) as CustomerStatus, notes: nullable('notes') };
     setBusy(true);
-    try { const response = await fetch(customer ? `/api/customers/${customer.id}` : '/api/customers', { method: customer ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }); const body = await response.json(); if (response.status === 401) { router.replace('/login?expired=1'); router.refresh(); return; } if (!response.ok) throw new Error(typeof body.error === 'string' ? body.error : '服务暂时不可用，请稍后重试'); router.replace(`/customers/${body.id}`); router.refresh(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '服务暂时不可用，请稍后重试'); setBusy(false); }
+    try { const body = await browserRequest<Customer>(customer ? `/api/customers/${customer.id}` : '/api/customers', { method: customer ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }); router.replace(`/customers/${body.id}`); router.refresh(); }
+    catch (cause) { if (cause instanceof ApiError && cause.status === 401) { router.replace('/login?expired=1'); router.refresh(); return; } setError(cause instanceof ApiError ? cause.message : errorMessage(503)); setBusy(false); }
   }
   return <form className="customer-form" noValidate onSubmit={submit}>
     <div><label htmlFor="name">姓名 *</label><input id="name" name="name" maxLength={200} defaultValue={customer?.name ?? ''} />{nameError && <small className="field-error">{nameError}</small>}</div>

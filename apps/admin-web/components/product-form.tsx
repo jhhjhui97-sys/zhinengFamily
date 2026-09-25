@@ -3,6 +3,8 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import type { Product, ProductInput } from '@/lib/api/types';
 import { parseMetadata } from '@/lib/product-metadata';
+import { browserRequest } from '@/lib/api/browser';
+import { ApiError, errorMessage } from '@/lib/api/errors';
 
 type Errors = Partial<Record<'name' | 'required' | 'price' | 'dimensions' | 'metadata', string>>;
 const moneyPattern = /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
@@ -25,12 +27,9 @@ export function ProductForm({ product }: { product?: Product }) {
     const input: ProductInput = { category, brand, name, sku, price, width_mm: Number(width), depth_mm: Number(depth), height_mm: Number(height), thumbnail: nullable('thumbnail'), model_url: nullable('model_url'), metadata: parsedMetadata.value ?? {} };
     setBusy(true);
     try {
-      const response = await fetch(product ? `/api/products/${product.id}` : '/api/products', { method: product ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }); const body = await response.json();
-      if (response.status === 401) { router.replace('/login?expired=1'); router.refresh(); return; }
-      if (response.status === 409) throw new Error('SKU 已存在，请使用其他 SKU');
-      if (!response.ok) throw new Error(typeof body.error === 'string' ? body.error : '服务暂时不可用，请稍后重试');
+      const body = await browserRequest<Product>(product ? `/api/products/${product.id}` : '/api/products', { method: product ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
       router.replace(`/products/${body.id}`); router.refresh();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '服务暂时不可用，请稍后重试'); setBusy(false); }
+    } catch (cause) { if (cause instanceof ApiError && cause.status === 401) { router.replace('/login?expired=1'); router.refresh(); return; } setError(cause instanceof ApiError && cause.status === 409 ? 'SKU 已存在，请使用其他 SKU' : cause instanceof ApiError ? cause.message : errorMessage(503)); setBusy(false); }
   }
   return <form className="customer-form" noValidate onSubmit={submit}>
     <div><label htmlFor="category">分类 *</label><input id="category" name="category" maxLength={100} defaultValue={product?.category ?? ''} /></div><div><label htmlFor="brand">品牌 *</label><input id="brand" name="brand" maxLength={100} defaultValue={product?.brand ?? ''} /></div>

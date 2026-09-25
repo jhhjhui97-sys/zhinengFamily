@@ -15,7 +15,7 @@ export default function DashboardPage() {
         <Link className="quick-card" href="/products"><span className="quick-symbol" aria-hidden="true">▦</span><h3>商品管理</h3><p>整理家具与家电，构建门店目录。</p><span className="quick-action">查看商品<span aria-hidden="true"> →</span></span></Link>
         <Link className="quick-card" href="/projects"><span className="quick-symbol" aria-hidden="true">◇</span><h3>设计项目</h3><p>围绕客户空间，组织设计工作。</p><span className="quick-action">查看项目<span aria-hidden="true"> →</span></span></Link>
       </div>
-      <aside className="scope-notice"><strong>当前为后台基础工作台</strong><p>客户、商品与项目列表仍为空状态，尚未接入业务 API。</p></aside>
+      <aside className="scope-notice"><strong>门店后台工作台</strong><p>客户、商品与设计项目已接入业务服务，项目支持场景 JSON 保存和历史版本恢复。3D 设计入口暂未开放。</p></aside>
     </>
   );
 }
