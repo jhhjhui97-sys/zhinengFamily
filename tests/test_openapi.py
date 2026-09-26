@@ -22,6 +22,10 @@ def test_openapi_documents_protocol_auth_and_business_routes():
         "/customers",
         "/products",
         "/projects",
+        "/projects/{project_id}/scene",
+        "/projects/{project_id}/scene/versions",
+        "/projects/{project_id}/scene/versions/{version}",
+        "/projects/{project_id}/scene/versions/{version}/restore",
     ]:
         assert path in schema["paths"]
     assert schema["components"]["securitySchemes"]["HTTPBearer"]["scheme"] == "bearer"

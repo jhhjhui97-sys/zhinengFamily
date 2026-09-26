@@ -82,3 +82,48 @@ def test_customer_rejects_invalid_patch(client, accounts, change):
 def test_customer_requires_auth(client):
     assert client.get("/customers").status_code == 401
     assert client.post("/customers", json={"name": "客户"}).status_code == 401
+
+
+def test_customer_search_filters_name_phone_wechat_with_tenant_and_pagination(
+    client, accounts
+):
+    a, b = [headers(client, user) for user in accounts]
+    for payload in (
+        {"name": "张先生", "phone": "13812340000"},
+        {"name": "李女士", "wechat": "张家微信"},
+        {"name": "王先生", "phone": "13900000000"},
+    ):
+        assert client.post("/customers", headers=a, json=payload).status_code == 201
+    assert (
+        client.post("/customers", headers=b, json={"name": "张家外商户"}).status_code
+        == 201
+    )
+
+    result = client.get(
+        "/customers", headers=a, params={"search": "张", "limit": 1, "offset": 0}
+    ).json()
+    assert result["total"] == 2
+    assert result["limit"] == 1 and result["offset"] == 0
+    assert len(result["items"]) == 1
+    second = client.get(
+        "/customers", headers=a, params={"search": "张", "limit": 1, "offset": 1}
+    ).json()
+    assert second["total"] == 2
+    assert {result["items"][0]["name"], second["items"][0]["name"]} == {
+        "张先生",
+        "李女士",
+    }
+    assert (
+        client.get("/customers", headers=a, params={"search": "1381234"}).json()[
+            "total"
+        ]
+        == 1
+    )
+    assert (
+        client.get("/customers", headers=b, params={"search": "张"}).json()["total"]
+        == 1
+    )
+    assert (
+        client.get("/customers", headers=a, params={"search": "x" * 101}).status_code
+        == 422
+    )

@@ -18,8 +18,10 @@ def get_record(session: Session, model, record_id: UUID, merchant_id: UUID):
     return record
 
 
-def page_records(session: Session, model, merchant_id: UUID, limit: int, offset: int):
-    query = select(model).where(model.merchant_id == merchant_id)
+def page_records(
+    session: Session, model, merchant_id: UUID, limit: int, offset: int, *criteria
+):
+    query = select(model).where(model.merchant_id == merchant_id, *criteria)
     total = session.scalar(select(func.count()).select_from(query.subquery()))
     items = session.scalars(
         query.order_by(model.created_at, model.id).limit(limit).offset(offset)
