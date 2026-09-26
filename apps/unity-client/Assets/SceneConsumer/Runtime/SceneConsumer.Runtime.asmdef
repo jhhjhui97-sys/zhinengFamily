@@ -1,0 +1,7 @@
+{
+  "name": "SceneConsumer.Runtime",
+  "references": [
+    "SceneConsumer.Core",
+    "Unity.Newtonsoft.Json"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "SceneConsumer.Tests",
+  "references": [
+    "SceneConsumer.Core",
+    "SceneConsumer.Runtime",
+    "Unity.Newtonsoft.Json"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

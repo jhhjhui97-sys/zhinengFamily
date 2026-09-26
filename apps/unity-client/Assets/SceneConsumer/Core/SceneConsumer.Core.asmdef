@@ -1,0 +1,7 @@
+{
+  "name": "SceneConsumer.Core",
+  "references": [
+    "Unity.Newtonsoft.Json"
+  ],
+  "noEngineReferences": true
+}
