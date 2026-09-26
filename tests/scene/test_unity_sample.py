@@ -52,3 +52,19 @@ def test_unity_export_check_does_not_modify_sample():
     )
     assert result.returncode == 0
     assert SAMPLE.read_bytes() == before
+
+
+def test_unity_assembly_references_resolve_to_source_assemblies():
+    # This preflight catches unresolved asmdef names; it is not Editor compilation.
+    definitions = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in (ROOT / "apps/unity-client/Assets").rglob("*.asmdef")
+    ]
+    available = {definition["name"] for definition in definitions} | {
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner",
+    }
+    for definition in definitions:
+        assert set(definition.get("references", [])) <= available
+        if definition.get("precompiledReferences"):
+            assert definition.get("overrideReferences") is True
