@@ -21,7 +21,10 @@ public sealed class SqliteConnection : IDisposable {
         } catch (DllNotFoundException) { Dispose(); throw new LocalStoreError(LocalErrorCode.Unavailable); }
           catch (EntryPointNotFoundException) { Dispose(); throw new LocalStoreError(LocalErrorCode.Unavailable); }
     }
-    internal static byte[] Bytes(string value) { return Encoding.UTF8.GetBytes(value + "\0"); }
+    internal static byte[] Bytes(string value) {
+        try { return new UTF8Encoding(false,true).GetBytes(value + "\0"); }
+        catch(EncoderFallbackException) { throw new LocalStoreError(LocalErrorCode.InvalidInput); }
+    }
     static void Fail(int code) {
         int primary = code & 255;
         throw new LocalStoreError(primary == 5 || primary == 6 ? LocalErrorCode.Busy :

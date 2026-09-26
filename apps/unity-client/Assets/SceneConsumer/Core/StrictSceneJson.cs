@@ -47,7 +47,12 @@ internal sealed class StrictSceneJson {
   var result=new StringBuilder();
   while(cursor<text.Length) {
    char ch=text[cursor++];
-   if(ch=='"') return result.ToString();
+   if(ch=='"') {
+    string value=result.ToString();
+    try { new UTF8Encoding(false,true).GetByteCount(value); }
+    catch(EncoderFallbackException) { Bad(); }
+    return value;
+   }
    if(ch<32) Bad();
    if(ch!='\\') { result.Append(ch); continue; }
    if(cursor>=text.Length) Bad();

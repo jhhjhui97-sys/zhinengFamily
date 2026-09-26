@@ -251,6 +251,41 @@ def fixtures():
     # Authority permits duplicate keys; offline import rejects ambiguity.
     cases[-1]["valid"] = False
     add("trailing JSON", raw + "{}")
+    for exponent in (19, 20, 100, 400):
+        change(
+            f"integer elevation 10^{exponent}",
+            lambda d, e=exponent: d["floors"][0].update({"elevation_mm": 10**e}),
+        )
+    for header in ("schema_version", "units", "coordinate_system"):
+        for wrong in ({}, []):
+            change(
+                f"malformed {header} {wrong}",
+                lambda d, h=header, w=wrong: d.update({h: w}),
+            )
+    for name, value in (
+        ("high surrogate", chr(0xD800)),
+        ("low surrogate", chr(0xDFFF)),
+        ("valid supplementary", chr(0x1F600)),
+    ):
+        data = copy.deepcopy(sample)
+        data["metadata"]["probe"] = value
+        add("escaped Unicode " + name, json.dumps(data, ensure_ascii=True))
+        data["metadata"] = {value: True}
+        add("escaped Unicode key " + name, json.dumps(data, ensure_ascii=True))
+    change(
+        "UUID X format",
+        lambda d: d.update(
+            {
+                "scene_id": (
+                    "{0x10000000,0x0000,0x4000,"
+                    "{0x80,0x00,0x00,0x00,0x00,0x00,0x00,0x01}}"
+                )
+            }
+        ),
+    )
+    change(
+        "UUID parentheses", lambda d: d.update({"scene_id": "(" + d["scene_id"] + ")"})
+    )
     return cases
 
 

@@ -23,8 +23,11 @@ internal sealed class SceneSchemaRules {
   Require(token!=null&&token.Type==JTokenType.String);
   string value=(string)token;
   Require(value==value.Trim());
-  if(value.StartsWith("urn:uuid:",StringComparison.Ordinal)) value=value.Substring(9);
-  Guid parsed; Require(Guid.TryParse(value,out parsed)); return parsed;
+  bool urn=value.StartsWith("urn:uuid:",StringComparison.Ordinal);
+  if(urn) value=value.Substring(9);
+  Guid parsed;
+  Require(Guid.TryParseExact(value,"D",out parsed)||(!urn&&(Guid.TryParseExact(value,"N",out parsed)||Guid.TryParseExact(value,"B",out parsed))));
+  return parsed;
  }
  internal void Validate(JToken value) { Match(root,value,0); }
  void Match(JObject schema,JToken value,int depth) {
@@ -64,7 +67,7 @@ internal sealed class SceneSchemaRules {
    if(schema["items"]!=null) foreach(var item in array) Match((JObject)schema["items"],item,depth+1);
   }
   if(type=="number") {
-   double n=value.Value<double>(); Require(!double.IsNaN(n)&&!double.IsInfinity(n));
+   double n=(double)value; Require(!double.IsNaN(n)&&!double.IsInfinity(n));
    if(schema["minimum"]!=null) Require(n>=(double)schema["minimum"]);
    if(schema["exclusiveMinimum"]!=null) Require(n>(double)schema["exclusiveMinimum"]);
    if(schema["exclusiveMaximum"]!=null) Require(n<(double)schema["exclusiveMaximum"]);

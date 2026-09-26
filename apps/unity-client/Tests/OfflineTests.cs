@@ -8,7 +8,8 @@ public static class OfflineTests {
    SqliteTests.Run(directory);
    ValidationTests.Run(args[0],args[1]);
    LocalStoreTests.Run(args[0],args[2],directory);
-   Console.WriteLine("Offline core: 256 checks passed (7 SQLite + 238 authority parity + 11 store scenarios)");
+   ReviewRegressionTests.Run(args[0],args[2]);
+   Console.WriteLine("All offline core suites passed on real SQLite");
    return 0;
   } catch(Exception e) { Console.Error.WriteLine(e); return 1; }
   finally { Directory.Delete(directory,true); }

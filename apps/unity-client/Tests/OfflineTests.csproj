@@ -6,7 +6,7 @@
  </PropertyGroup>
  <ItemGroup>
   <Compile Include="SqliteTests.cs" /><Compile Include="ValidationTests.cs" />
-  <Compile Include="LocalStoreTests.cs" /><Compile Include="OfflineTests.cs" />
+  <Compile Include="ReviewRegressionTests.cs" /><Compile Include="LocalStoreTests.cs" /><Compile Include="OfflineTests.cs" />
   <ProjectReference Include="LocalCompile.csproj" />
  </ItemGroup>
 </Project>

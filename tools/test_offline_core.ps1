@@ -14,7 +14,7 @@ $sceneTests = Join-Path $sceneOutput 'offline-tests.exe'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $sceneCompiler /nologo /target:library /define:SQLITE_WINDOWS "/r:$sceneCore" "/r:$sceneJson" "/out:$sceneLocal" apps\unity-client\Assets\LocalScenes\*.cs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-& $sceneCompiler /nologo /main:OfflineTests /r:System.Numerics.dll "/r:$sceneCore" "/r:$sceneLocal" "/r:$sceneJson" "/out:$sceneTests" apps\unity-client\Tests\OfflineTests.cs apps\unity-client\Tests\SqliteTests.cs apps\unity-client\Tests\ValidationTests.cs apps\unity-client\Tests\LocalStoreTests.cs
+& $sceneCompiler /nologo /main:OfflineTests /r:System.Numerics.dll "/r:$sceneCore" "/r:$sceneLocal" "/r:$sceneJson" "/out:$sceneTests" apps\unity-client\Tests\OfflineTests.cs apps\unity-client\Tests\SqliteTests.cs apps\unity-client\Tests\ValidationTests.cs apps\unity-client\Tests\LocalStoreTests.cs apps\unity-client\Tests\ReviewRegressionTests.cs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $sceneTests apps/unity-client/Assets/StreamingAssets/scene.schema.json apps/unity-client/Tests/Fixtures/offline-validation.json apps/unity-client/Assets/StreamingAssets/two-bedroom.json
 exit $LASTEXITCODE

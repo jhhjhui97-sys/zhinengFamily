@@ -10,6 +10,8 @@ namespace SmartHome.SceneConsumer {
   public string Export() { return source.ToString(Formatting.Indented); }
   public static SceneDocument Parse(string json) {
    var root=StrictSceneJson.Parse(json);
+   foreach(string header in new[]{"schema_version","units","coordinate_system"})
+    if(root[header]==null||root[header].Type!=JTokenType.String) throw new ArgumentException("Invalid scene protocol");
    if(root.Value<string>("schema_version")!="1.0.0"||root.Value<string>("units")!="mm"||root.Value<string>("coordinate_system")!="RH_Z_UP")
     throw new ArgumentException("Unsupported scene protocol");
    var floors=root["floors"] as JArray;
