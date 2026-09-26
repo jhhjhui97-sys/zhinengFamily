@@ -25,4 +25,4 @@ Review focus: floor elevation double counting; rotation handedness; bottom-cente
 ## Task 3: verification and handoff
 - [x] Add Unity project manifest, asmdefs, .NET console CI harness and workflow; README start/Editor tests/iPad prerequisites.
 - [x] Full applicable checks, independent whole-branch review; fix Important findings, record actual/unrun evidence.
-- [ ] Push Phase3 branch; create stacked PR targeting unmerged Phase2 branch; exact-SHA Actions evidence, no merge.
+- [x] Push Phase3 branch; create stacked PR targeting unmerged Phase2 branch; exact-SHA Actions evidence, no merge.
