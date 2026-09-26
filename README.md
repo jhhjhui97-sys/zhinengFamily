@@ -2,7 +2,7 @@
 
 面向家具/家电门店的 AI + 3D 设计与销售系统。当前已实现 Phase 1 业务后端、统一 SceneModel 协议，以及 Phase 2 中文后台的客户、商品、设计项目和场景版本管理。
 
-当前代码包含五个核心数据库实体、登录认证、客户/商品/项目 CRUD、SceneModel、Local 存储接口及交付配置。Linux CI 全量验证为 **290 passed, 2 warnings**；Ruff、Alembic migration、SceneModel/OpenAPI 契约检查和 Docker build 均通过，Phase 1 已通过复审。详细证据见 [执行记录](docs/superpowers/plans/2026-09-17-phase-1-progress.md)。没有 Unity、户型解析、AI 摆放或渲染实现。
+当前代码包含五个核心数据库实体、登录认证、客户/商品/项目 CRUD、SceneModel、Local 存储接口及交付配置。Linux CI 全量验证为 **290 passed, 2 warnings**；Ruff、Alembic migration、SceneModel/OpenAPI 契约检查和 Docker build 均通过，Phase 1 已通过复审。详细证据见 [执行记录](docs/superpowers/plans/2026-09-17-phase-1-progress.md)。新增 Phase 3-1 Unity 最小离线场景消费者源工程；尚未通过 Unity Editor 或 iPad 实机验收。没有户型解析、AI 摆放或渲染交付实现。
 
 ## 环境要求
 
@@ -177,3 +177,7 @@ docs/superpowers/         设计、计划、执行证据
 ```
 
 详细约束见 [总体设计](docs/superpowers/specs/2026-09-17-smart-home-mvp-design.md)、[SceneModel](docs/architecture/scene-model.md)、[数据字典](docs/architecture/data-model.md)。LocalObjectStorage 当前是可替换接口与适配器，没有开放上传路由；商家对象 key 必须由未来业务层生成。
+
+## Phase 3-1 Unity 最小场景客户端
+
+源工程位于 [apps/unity-client](apps/unity-client/README.md)，消费现有 SceneModel JSON，显示房间轮廓、墙及家具代理。后台 3D 入口仍禁用。坐标与原始 JSON 往返采用真实 C# 测试；Unity Editor、构建和 iPad 实机尚未执行，详见 [验证记录](docs/phase-3-1-verification.md)。
