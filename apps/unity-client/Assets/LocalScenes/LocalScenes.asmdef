@@ -1,0 +1,13 @@
+{
+  "name": "LocalScenes",
+  "rootNamespace": "LocalScenes",
+  "references": [
+    "SceneConsumer.Core"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}
