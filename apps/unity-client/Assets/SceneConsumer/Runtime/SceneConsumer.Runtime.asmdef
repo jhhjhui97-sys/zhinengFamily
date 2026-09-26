@@ -1,7 +1,10 @@
 {
   "name": "SceneConsumer.Runtime",
   "references": [
-    "SceneConsumer.Core",
-    "Unity.Newtonsoft.Json"
+    "SceneConsumer.Core"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
   ]
 }

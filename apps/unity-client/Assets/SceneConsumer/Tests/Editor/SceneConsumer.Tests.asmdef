@@ -3,12 +3,18 @@
   "references": [
     "SceneConsumer.Core",
     "SceneConsumer.Runtime",
-    "Unity.Newtonsoft.Json"
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner"
   ],
   "includePlatforms": [
     "Editor"
   ],
-  "optionalUnityReferences": [
-    "TestAssemblies"
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll",
+    "nunit.framework.dll"
+  ],
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
   ]
 }

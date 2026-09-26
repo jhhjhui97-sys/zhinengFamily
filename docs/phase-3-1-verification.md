@@ -29,3 +29,7 @@ Critical 0、Important 1、Minor 1；均已修复并复审。补齐 InputLegacy 
 完整本地后端回归：328 passed、3 skipped、2 warnings（Windows 文件存储用例跳过；Linux CI 单独核实）。Ruff check/format 通过，权威样例漂移、SceneModel 和 OpenAPI 契约检查通过。最初旧账号 smart_home 已不存在，改用新建专用 Phase3 测试数据库后运行成功；未更改开发/真实验收数据库。后端业务与 migration 没有改动。
 
 Git CLI 的 GitHub 连接连续重置/超时；改用 GitHub 连接器发布六个分步提交，每个 tree SHA 与本地完全一致，再校验并导入远端 Git 提交对象。本地原提交保存在 refs/archive 下；Phase 2 分支未修改。远端与本地 Phase 3 分支已对齐。
+
+最终配置核对补充：新增程序集引用解析预检查，先确认错误 Unity.Newtonsoft.Json 引用导致测试失败，再改为 overrideReferences + Newtonsoft.Json.dll；测试程序集明确引用 TestRunner 与 nunit.framework.dll。依据 [Unity 官方程序集文件格式](https://docs.unity.cn/Manual/AssemblyDefinitionFileFormat.html)。此检查仍不替代 Unity Editor 编译；修复后的 CI 数量以 PR 最新 SHA 为准。
+
+程序集修复后本地全量回归：329 passed、3 skipped、2 warnings；新增样例/配置用例 4 passed，Ruff check/format 通过。Unity 官方注册表 3.2.2 压缩包实际列出 Runtime/Newtonsoft.Json.dll 与 AOT 变体，不包含 Unity.Newtonsoft.Json.asmdef；下载仅保存在忽略的 .local 目录。配置修复已独立复审，无剩余 Important。修复后最终 Actions 尚需核实，最新证据更新到 PR #3。
