@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup>
+  <TargetFramework>net8.0</TargetFramework><EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  <ImplicitUsings>disable</ImplicitUsings><Nullable>disable</Nullable><AssemblyName>LocalScenes</AssemblyName>
+  <DefineConstants Condition="'$(OS)' == 'Windows_NT'">$(DefineConstants);SQLITE_WINDOWS</DefineConstants>
+ </PropertyGroup>
+ <ItemGroup><Compile Include="../Assets/LocalScenes/*.cs" /><ProjectReference Include="CoreCompile.csproj" /></ItemGroup>
+</Project>

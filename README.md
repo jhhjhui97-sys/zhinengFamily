@@ -4,6 +4,10 @@
 
 当前代码包含五个核心数据库实体、登录认证、客户/商品/项目 CRUD、SceneModel、Local 存储接口及交付配置。Linux CI 全量验证为 **290 passed, 2 warnings**；Ruff、Alembic migration、SceneModel/OpenAPI 契约检查和 Docker build 均通过，Phase 1 已通过复审。详细证据见 [执行记录](docs/superpowers/plans/2026-09-17-phase-1-progress.md)。新增 Phase 3-1 Unity 最小离线场景消费者源工程；尚未通过 Unity Editor 或 iPad 实机验收。没有户型解析、AI 摆放或渲染交付实现。
 
+## iPad 独立离线版方向
+
+用户已确认最终在 iPad 本机独立使用，日常无需电脑、局域网或互联网。Phase 3-2A 提供 SQLite 本地场景库、完整离线校验和不可变版本核心；已有 Web 后台不作为 iPad 运行依赖。本阶段未完成本地业务界面及 iOS 安装包，Unity Editor、IL2CPP 和 iPad 实机未执行。详见 [客户端说明](apps/unity-client/README.md) 和 [验证记录](docs/phase-3-2a-verification.md)。
+
 ## 环境要求
 
 后台 Web 位于 [`apps/admin-web`](apps/admin-web/README.md)。在该目录运行 `npm install` 和 `npm run dev`，打开 http://localhost:3000。已接入真实登录、HttpOnly Cookie、后台路由保护，以及客户、商品和设计项目的列表、新建、详情和编辑（当前 API 不提供删除）。商品支持搜索和任意分类筛选，项目可从客户详情创建并自动关联客户。项目详情可以编辑、保存、查看及恢复 SceneModel 版本；恢复会生成新版本并保留历史。3D 入口仍禁用。

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup>
+  <TargetFramework>net8.0</TargetFramework><EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  <ImplicitUsings>disable</ImplicitUsings><Nullable>disable</Nullable>
+  <AssemblyName>SceneConsumer.Core</AssemblyName>
+ </PropertyGroup>
+ <ItemGroup>
+  <Compile Include="../Assets/SceneConsumer/Core/*.cs" />
+  <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+ </ItemGroup>
+</Project>
