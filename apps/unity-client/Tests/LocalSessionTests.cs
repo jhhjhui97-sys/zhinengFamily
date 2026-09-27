@@ -87,6 +87,17 @@ public static class LocalSessionTests {
    s.New("二"); s.LoadSample(); s.Save(); string second=(string)JObject.Parse(s.Draft)["scene_id"];
    Check(first!=second&&store.Documents().Total==2,"sample document identity shared");
   },schema,sample,dir);
+  Test("protocol URN identifiers remain editable without changing references",(store,s,path)=>{
+   s.New("URN"); s.LoadSample();
+   var json=JObject.Parse(s.Draft);
+   Guid room=Guid.Parse((string)json["rooms"][0]["id"]);
+   foreach(var value in json.Descendants().OfType<JValue>()) {
+    Guid id; if(value.Type==JTokenType.String&&Guid.TryParse((string)value,out id)) value.Value="urn:uuid:"+id.ToString("D");
+   }
+   s.SetDraft(json.ToString()); Check(s.Save(),"URN save failed");
+   Check(s.ChangeRoomName(room,"URN 客厅")&&s.Save(),"valid URN room failed editing");
+   Check((string)JObject.Parse(s.Draft)["rooms"][0]["id"]=="urn:uuid:"+room.ToString("D"),"identifier representation was lost");
+  },schema,sample,dir);
   Console.WriteLine("Local session: "+passed+" passed");
  }
  public static int Main(string[] args) {

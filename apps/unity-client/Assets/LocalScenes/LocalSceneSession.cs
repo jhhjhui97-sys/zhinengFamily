@@ -60,7 +60,7 @@ namespace LocalScenes {
     json["scene_id"]=DocumentId.ToString("D");
     // Explicit offline sample catalog, never submitted to or impersonating the remote merchant catalog.
     foreach(JObject item in (JArray)json["furniture_instances"]) {
-     Guid product=Guid.Parse((string)item["product_id"]);
+     Guid product=SceneUuid.Parse((string)item["product_id"]);
      store.Catalog(product,"离线示例家具",(double)item["width_mm"],(double)item["depth_mm"],(double)item["height_mm"]);
     }
     Draft=validator.Validate(json.ToString()).Export();
@@ -70,7 +70,7 @@ namespace LocalScenes {
   public bool ChangeRoomName(Guid room,string name) {
    return Attempt(()=>{
     RequireDocument(); var json=validator.Validate(Draft).Copy();
-    var item=((JArray)json["rooms"]).OfType<JObject>().FirstOrDefault(x=>Guid.Parse((string)x["id"])==room);
+    var item=((JArray)json["rooms"]).OfType<JObject>().FirstOrDefault(x=>SceneUuid.Parse((string)x["id"])==room);
     if(item==null) throw new LocalStoreError(LocalErrorCode.NotFound);
     if(string.IsNullOrWhiteSpace(name)) throw new LocalStoreError(LocalErrorCode.InvalidInput);
     item["name"]=name; Draft=validator.Validate(json.ToString()).Export();

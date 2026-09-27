@@ -15,9 +15,9 @@ namespace SmartHome.SceneConsumer
             if(converted==0 && value!=0) throw new ArgumentException("Scene precision cannot be represented by Unity");
             return converted;
         }
-        static double Number(JToken token,string key) { return token.Value<double>(key); }
+        static double Number(JToken token,string key) { return (double)token[key]; }
         static JArray Items(JObject root,string key) { if(root[key]==null) return new JArray(); var items=root[key] as JArray; if(items==null) throw new ArgumentException("Expected scene collection"); return items; }
-        static double Floor(Dictionary<string,double> floors,JToken element) { double height; if(!floors.TryGetValue(element.Value<string>("floor_id"),out height)) throw new ArgumentException("Missing floor reference"); return height; }
+        static double Floor(Dictionary<Guid,double> floors,JToken element) { double height; if(!floors.TryGetValue(SceneUuid.Parse(element.Value<string>("floor_id")),out height)) throw new ArgumentException("Missing floor reference"); return height; }
         static Quaternion Rotation(double angle) {
             var forward=SceneCoordinates.RotateUnityBasis(new PresentationVector(0,0,1),angle);
             return Quaternion.LookRotation(Vector(forward),Vector3.up);
@@ -31,8 +31,8 @@ namespace SmartHome.SceneConsumer
         public static GameObject Build(SceneDocument document,Transform parent) {
             var root=new GameObject("SceneModel preview"); root.SetActive(false); root.transform.SetParent(parent,false);
             try {
-                var json=document.Copy(); var floors=new Dictionary<string,double>();
-                foreach(var floor in Items(json,"floors")) floors.Add(floor.Value<string>("id"),Number(floor,"elevation_mm"));
+                var json=document.Copy(); var floors=new Dictionary<Guid,double>();
+                foreach(var floor in Items(json,"floors")) floors.Add(SceneUuid.Parse(floor.Value<string>("id")),Number(floor,"elevation_mm"));
                 var materials=root.AddComponent<SceneResourceOwner>(); materials.Initialize();
                 foreach(var room in Items(json,"rooms")) {
                     var lineObject=new GameObject("room:"+room.Value<string>("id")); lineObject.transform.SetParent(root.transform,false);

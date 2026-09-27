@@ -4,7 +4,8 @@
     "SceneConsumer.Core",
     "SceneConsumer.Runtime",
     "UnityEngine.TestRunner",
-    "UnityEditor.TestRunner"
+    "UnityEditor.TestRunner",
+    "LocalScenes"
   ],
   "includePlatforms": [
     "Editor"

@@ -1,7 +1,8 @@
 {
   "name": "SceneConsumer.Runtime",
   "references": [
-    "SceneConsumer.Core"
+    "SceneConsumer.Core",
+    "LocalScenes"
   ],
   "overrideReferences": true,
   "precompiledReferences": [
