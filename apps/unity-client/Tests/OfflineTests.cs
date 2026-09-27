@@ -6,6 +6,7 @@ public static class OfflineTests {
   Directory.CreateDirectory(directory);
   try {
    SqliteTests.Run(directory);
+   LocalWorkspaceTests.Run(args[0],directory);
    ValidationTests.Run(args[0],args[1]);
    LocalStoreTests.Run(args[0],args[2],directory);
    ReviewRegressionTests.Run(args[0],args[2]);

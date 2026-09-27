@@ -131,6 +131,21 @@ public sealed class LocalSceneStore : IDisposable {
   string json=Version(document,revision).SceneJson;
   validator.Validate(json); return json;
  }
+public LocalScenePage Documents(int limit=20,int offset=0) {
+  Input(limit>=1&&limit<=100&&offset>=0);
+  LocalScenePage result=null;
+  db.Transaction(()=>{
+   var items=new List<LocalSceneSummary>();
+   long total=(long)db.Query("SELECT COUNT(*) n FROM scene_documents WHERE workspace_id=?",Key(workspace))[0]["n"];
+   foreach(var row in db.Query(@"SELECT id,name,current_revision,updated_at FROM scene_documents
+    WHERE workspace_id=? ORDER BY COALESCE(updated_at,'') DESC,id ASC LIMIT ? OFFSET ?",Key(workspace),limit,offset))
+    items.Add(new LocalSceneSummary { Id=Guid.Parse((string)row["id"]),Name=(string)row["name"],
+     Revision=Revision(row),UpdatedAt=(string)row["updated_at"] });
+   result=new LocalScenePage { Total=total,Items=items };
+  });
+  return result;
+ }
+
  public void BackupTo(string path) { db.BackupTo(path); }
  public void Dispose() { db.Dispose(); }
 }
