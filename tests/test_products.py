@@ -49,6 +49,83 @@ def test_product_tenant_isolation(client, accounts):
     assert client.get("/products").status_code == 401
 
 
+def test_product_search_category_pagination_and_total(client, accounts):
+    auth = headers(client, accounts[0])
+    products = [
+        {
+            **PRODUCT,
+            "name": "三人沙发",
+            "brand": "舒适家",
+            "sku": "SOFA-001",
+            "category": "sofa",
+        },
+        {
+            **PRODUCT,
+            "name": "单人沙发",
+            "brand": "安心居",
+            "sku": "CHAIR-001",
+            "category": "sofa",
+        },
+        {
+            **PRODUCT,
+            "name": "智能冰箱",
+            "brand": "舒适家",
+            "sku": "FRIDGE-001",
+            "category": "appliance",
+        },
+    ]
+    for product in products:
+        assert client.post("/products", headers=auth, json=product).status_code == 201
+
+    assert (
+        client.get("/products?search=三人", headers=auth).json()["items"][0]["sku"]
+        == "SOFA-001"
+    )
+    assert client.get("/products?search=CHAIR-001", headers=auth).json()["total"] == 1
+    assert client.get("/products?search=舒适家", headers=auth).json()["total"] == 2
+    assert client.get("/products?category=sofa", headers=auth).json()["total"] == 2
+    combined = client.get("/products?search=舒适家&category=sofa", headers=auth).json()
+    assert combined["total"] == 1
+    assert combined["items"][0]["name"] == "三人沙发"
+
+    first_page = client.get(
+        "/products?category=sofa&limit=1&offset=0", headers=auth
+    ).json()
+    second_page = client.get(
+        "/products?category=sofa&limit=1&offset=1", headers=auth
+    ).json()
+    assert first_page["total"] == second_page["total"] == 2
+    assert first_page["items"][0]["id"] != second_page["items"][0]["id"]
+
+
+def test_product_search_and_category_keep_tenant_isolation(client, accounts):
+    first, second = [headers(client, account) for account in accounts]
+    private_product = {
+        **PRODUCT,
+        "name": "私有沙发",
+        "sku": "PRIVATE-001",
+        "category": "sofa",
+    }
+    assert (
+        client.post("/products", headers=first, json=private_product).status_code == 201
+    )
+    assert client.get("/products?search=私有", headers=second).json()["total"] == 0
+    assert client.get("/products?category=sofa", headers=second).json()["total"] == 0
+
+
+@pytest.mark.parametrize(
+    "query",
+    [f"search={'x' * 101}", "search=", f"category={'x' * 101}", "category="],
+)
+def test_product_filters_reject_invalid_parameters(client, accounts, query):
+    assert (
+        client.get(
+            f"/products?{query}", headers=headers(client, accounts[0])
+        ).status_code
+        == 422
+    )
+
+
 @pytest.mark.parametrize(
     "change",
     [

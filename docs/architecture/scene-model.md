@@ -1,6 +1,6 @@
 # SceneModel 协议说明
 
-定义源：packages/scene-schema/src/scene_schema。生成文件：packages/scene-schema/scene.schema.json。数据库保存接口和 Unity 适配器不在 Phase 1 实现范围。
+定义源：packages/scene-schema/src/scene_schema。生成文件：packages/scene-schema/scene.schema.json。Phase 2-6 已实现数据库保存与版本接口；Unity 适配器尚未实现。
 
 ## 5. SceneModel：唯一场景交换协议
 
@@ -8,9 +8,9 @@
 
 `packages/scene-schema/src/scene_schema/` 中的 Pydantic 模型是类型定义源，导出 JSON Schema 2020-12；禁止手工维护两套字段定义。OpenAPI 引用相同模型。JSON Schema 负责结构约束，Python 校验器负责引用和几何基础约束；文档必须说明跨字段校验不能全由 JSON Schema 表达。
 
-`schema_version="1.0.0"` 表示协议版本；`revision` 是服务端单调递增的场景版本，两者独立。拒绝未知协议版本和未知结构字段；扩展信息只能放 metadata。SceneModel 不包含密码、客户联系方式或可决定权限的 merchant_id。
+`schema_version="1.0.0"` 表示协议版本；API 返回的 `version` 是项目内服务端单调递增的场景版本，两者独立。拒绝未知协议版本和未知结构字段；扩展信息只能放 metadata。SceneModel 不包含密码、客户联系方式或可决定权限的 merchant_id。
 
-SceneRecord 是数据库里的场景容器，避免与协议类 SceneModel 同名；关联 merchant_id/project_id。SceneVersion 保存完整且不可变的 SceneModel JSONB、revision、schema_version、created_by、created_at，唯一键 `(scene_id, revision)`。后续保存接口用 expected_revision 做乐观锁，冲突返回 409；Phase 1 只定义此契约，不声称已提供编辑/版本 API。
+SceneState 是数据库里的当前指针，SceneVersion 保存完整且不可变的 SceneModel JSONB 快照；两者都按 merchant/project 约束。保存和恢复请求用 `base_version` 做乐观锁，冲突返回 409。服务端先锁定租户范围内的项目行，因此首次保存的并发竞争也只能有一个成功；快照写入和当前指针更新位于同一事务。恢复旧快照会创建新版本，不修改历史。
 
 ### 5.2 单位与坐标
 
@@ -45,7 +45,7 @@ SceneRecord 是数据库里的场景容器，避免与协议类 SceneModel 同�
 
 几何容差统一为 0.001 mm；JSON 不自动调整坐标、不自动闭合错误轮廓。墙相交、洞口重叠、家具碰撞、通道宽度和水电合理性属于未来 ValidationEngine。
 
-product_id/asset_id 是外部目录引用：离线协议只检查 UUID 形状，未来保存边界必须核验当前商家商品/资源存在；不能将离线协议验证当作租户授权。家具尺寸存快照，商品更新不能偷偷改变已保存方案。
+product_id/asset_id 是外部目录引用：离线协议只检查 UUID 形状；保存边界会核验 `product_id` 属于当前商家，不能将离线协议验证当作租户授权。家具尺寸存快照，商品更新不能偷偷改变已保存方案。资产接口尚未实现，因此当前 `asset_id` 仅保留协议字段。
 
 ### 5.4 最小交换示例
 
