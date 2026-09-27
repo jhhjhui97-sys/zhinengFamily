@@ -1,0 +1,14 @@
+# Phase 3-2B local scene workspace
+User outcome: a Chinese standalone iPad app, usable without internet, LAN or a computer. The user delegates technical choices and says continue; do not ask them to review implementation documents. This architectural presentation stage implements a bounded local scene workspace, not the entire business app.
+Base: 0585c5e5942a1b183ff4b28842685cd0a1b58110. Reuse the clean, completed managed worktree on codex/phase-3-local-scene-ui, preserving prior branches/PRs.
+
+## Selected design
+Use Unity UI Toolkit for touch-friendly Chinese controls and mobile keyboard, above the existing 3D preview. An engine-independent LocalSceneSession coordinates the real LocalSceneStore. Compared with extending tiny IMGUI controls, Toolkit better supports text editing; compared with native iOS UI, it preserves the existing Unity client. No BFF, login or JWT is added to the standalone app.
+Persistent local workspace/actor identity lives transactionally in SQLite, not an ephemeral GUID each launch. Existing single-workspace data is adopted; ambiguous multiple-workspace databases fail safely rather than hide or delete data. Document listing is paged at 20, scoped and ordered deterministically.
+Library/new/open; explicitly load the existing genuine two-bedroom sample, register its deliberate offline catalog reference; save v1; edit a room name or advanced JSON; save v2; inspect readonly history JSON; restore v1 to v3. Current revision/counts and saved timestamp are shown. History is paged at 20. No Unity scene serialization is used for user data.
+Unvalidated JSON stays a draft; invalid input and storage errors show safe Chinese feedback. Save never silently rebases conflicts. Switching, reloading, loading sample or restoring while dirty requires a discard decision. History inspection does not replace the draft. Double submits are disabled; saving a clean draft does not create duplicate versions.
+Preview receives only validated snapshots and swaps atomically; preview failure does not undo successful durable saves or destroy drafts. Camera gestures start only in the preview, remain blocked if started over controls, and respect UI selection/scrolling. Safe-area layout and minimum 44-point targets, light panels, Chinese fonts using platform font availability with an explicit failure warning; font/device appearance remains a real acceptance gate.
+No Files sharing, uploads, customer/product/project management, CAD, AI, VR or quotation. Backups remain the core API until a separate device integration stage.
+
+## Evidence boundary
+Real SQLite/session tests run on Windows and Linux CI. Unity-specific adapter tests are supplied for Editor; no Engine/Play/IL2CPP/iPad execution is claimed without those tools. This environment has no Unity Editor/license, Mac/Xcode or connected iPad. Keep drafts open; do not merge. Completion means code and core behavior evidence, not an installable iPad app.
