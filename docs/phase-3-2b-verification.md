@@ -32,4 +32,3 @@ Deferred Minor: exactly20 history rows can enable an unnecessary empty next page
 - Exact-head CI is an independent gate; neither review nor dependency green substitutes. Cost: synchronization and acceptance delayed if CI fails.
 Git transport repeatedly failed Empty reply/connection timeout; GitHub connector publication may be used with every tree SHA checked against the exact local committed tree. If commit SHAs differ because GitHub records its author/time, preserve original local commits on a source branch; never force-overwrite an existing remote.
 Final publication SHA, Actions and draft PR are pending verification here and will be recorded in the PR only after actual completion. Local Docker remains unavailable; CI is the actual build evidence. Editor/iPad package remains a blocker for device usability.
-
