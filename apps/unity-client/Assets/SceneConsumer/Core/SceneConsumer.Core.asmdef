@@ -1,0 +1,9 @@
+{
+  "name": "SceneConsumer.Core",
+  "references": [],
+  "noEngineReferences": true,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ]
+}

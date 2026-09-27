@@ -1,0 +1,11 @@
+{
+  "name": "SceneConsumer.Runtime",
+  "references": [
+    "SceneConsumer.Core",
+    "LocalScenes"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ]
+}
