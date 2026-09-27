@@ -34,3 +34,16 @@ Actual local evidence:
 - Unity Editor, Play, IL2CPP, Xcode, iPad install/launch/lifecycle/Files/backup acceptance NOT RUN. No installable App delivered yet.
 
 CI: pending new publication. Prior SHA success is historical only. Exact new SHA/run links will be recorded after actual completion in the dependent draft PR and evidence update.
+## Verified code CI and publication
+
+Code SHA: dea5bd6f51561354d144cc790b6e6153760587da. Both actual push runs verified by raw Actions API, job summaries and decoded logs:
+- [Scene core](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/36314587794): success; 19 coordinate + 9 JSON; 7 SQLite + 256 authority/schema + 11 store + 7 review scenarios (281 local core checks). Actual Linux .NET8 and native SQLite.
+- [Backend](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/36314587748): success; 334 passed, 2 warnings. Ruff/format, Alembic, generated Scene/OpenAPI contracts, Docker config/build all successful.
+- Admin Web unchanged; this branch's frontend path filter does not trigger a new frontend workflow. The local identical-tree 81-browser-test evidence remains separate.
+
+Draft [PR #4](https://github.com/jhhjhui97-sys/zhinengFamily/pull/4) targets codex/phase-3-scene-consumer (dependency PR #3), not main. Neither PR is merged. No iPad installability claim.
+Git HTTP/2 reset; connector tree publication permission review timed out twice (not a safety rejection). Conventional git with HTTP/1.1 safely pushed all nine original local commits and retained every previous branch. Fixture Git blob SHAs verified; no sensitive files added.
+The normalized commit-workflow wrapper returned an empty list despite completed runs; raw repository Actions API and decoded job logs provided exact-SHA evidence. Do not use the empty wrapper output as proof of absent CI.
+This closing documentation commit will be independently verified; its latest SHA/run links will be kept in PR #4 after actual completion.
+
+Phase 3-2A core delivered; user subsequently authorized the next local UI step. SceneModel contract is unchanged. Editor/IL2CPP/iPad still pending. Four review findings fixed, no deferred Minor. Preserve this worktree for feedback.
