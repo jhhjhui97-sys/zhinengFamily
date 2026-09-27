@@ -1,14 +1,210 @@
-import http from 'node:http';
-import {randomBytes} from 'node:crypto';
-import {readFile,mkdir} from 'node:fs/promises';
-import {join,resolve,sep,extname} from 'node:path';
-import {execFile} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
-const here=import.meta.dirname;
-const BODY_LIMIT=1024*1024;
-const types={'.html':'text/html; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.glb':'model/gltf-binary','.md':'text/plain; charset=utf-8'};
-function finite(value){if(typeof value==='number'&&!Number.isFinite(value))return false;if(value&&typeof value==='object')return Object.values(value).every(finite);return true;}
-function bridge(config,body){return new Promise(resolveReply=>{const child=execFile(config.bridgePath,[join(config.dataDirectory,'scenes.sqlite'),join(config.protocolDirectory,'scene.schema.json'),join(config.protocolDirectory,'two-bedroom.json')],{encoding:'utf8',windowsHide:true,timeout:15000,maxBuffer:32*1024*1024},(error,stdout)=>{if(error){resolveReply({status:503,error:'本地资料服务暂时无法使用，请检查安装后重试。'});return;}try{const result=JSON.parse(stdout.replace(/^\uFEFF/,''));if(!Number.isInteger(result.status)||result.status<200||result.status>599)throw Error();resolveReply(result);}catch{resolveReply({status:503,error:'本地资料服务暂时无法使用，请重试。'});}});child.stdin.on('error',()=>{});child.stdin.end(body);});}
-export function createLocalServer(options){const config={publicDirectory:join(here,'public'),protocolDirectory:join(here,'protocol'),vendorDirectory:join(here,'node_modules/three'),...options};const token=randomBytes(32).toString('hex'),nonce=randomBytes(18).toString('base64');return http.createServer(async(req,res)=>{const port=res.socket.localPort,origin=`http://127.0.0.1:${port}`;const reply=(status,data)=>{res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'});res.end(JSON.stringify(data));};if(req.headers.host!==`127.0.0.1:${port}`){reply(403,{error:'此服务仅允许本机访问。'});return;}let pathname;try{pathname=decodeURIComponent(new URL(req.url,origin).pathname);}catch{reply(404,{error:'找不到该页面。'});return;}if(pathname==='/api/local'){if(req.method!=='POST'){reply(405,{error:'请求方式不支持。'});return;}if(req.headers.origin!==origin||!(req.headers.cookie??'').split(';').map(x=>x.trim()).includes(`local_session=${token}`)){reply(403,{error:'请求来源无效，请重新打开本地软件。'});return;}if(!/^application\/json(?:;|$)/i.test(req.headers['content-type']??'')){reply(415,{error:'请提交 JSON 格式。'});return;}try{let size=0,chunks=[];for await(const chunk of req){size+=chunk.length;if(size<=BODY_LIMIT)chunks.push(chunk);}if(size>BODY_LIMIT){reply(413,{error:'场景过大，请减少内容后重试。'});return;}const body=Buffer.concat(chunks).toString('utf8');const parsed=JSON.parse(body);if(!parsed||Array.isArray(parsed)||!finite(parsed)){reply(422,{error:'场景包含非法数值，请检查后重试。'});return;}await mkdir(config.dataDirectory,{recursive:true});const result=await bridge(config,body);reply(result.status,result);}catch{reply(422,{error:'输入不是合法 JSON，请检查后重试。'});}return;}if(req.method!=='GET'&&req.method!=='HEAD'){reply(405,{error:'请求方式不支持。'});return;}const vendor=pathname.startsWith('/vendor/three/');const directory=resolve(vendor?config.vendorDirectory:config.publicDirectory);const relative=vendor?pathname.slice('/vendor/three/'.length):pathname==='/'?'index.html':pathname.slice(1);const file=resolve(directory,relative);if(!file.startsWith(directory+sep)||!types[extname(file)]){reply(404,{error:'找不到该文件。'});return;}try{let content=await readFile(file);const headers={'content-type':types[extname(file)],'cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer','content-security-policy':`default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'`};if(pathname==='/'){content=Buffer.from(content.toString().replaceAll('__NONCE__',nonce));headers['set-cookie']=`local_session=${token}; HttpOnly; SameSite=Strict; Path=/`;}res.writeHead(200,headers);res.end(req.method==='HEAD'?undefined:content);}catch{reply(404,{error:'找不到该文件。'});}});}
-export function startLocal(options){const server=createLocalServer(options);server.listen(0,'127.0.0.1',()=>console.log(`LOCAL_URL=http://127.0.0.1:${server.address().port}`));return server;}
-if(process.argv[1]&&fileURLToPath(import.meta.url)===resolve(process.argv[1])){const root=resolve(here,'../..');startLocal({bridgePath:process.env.FAMILY_BRIDGE??join(root,'.local/windows-bridge/LocalBridge.exe'),protocolDirectory:process.env.FAMILY_PROTOCOL??join(root,'apps/unity-client/Assets/StreamingAssets'),dataDirectory:process.env.FAMILY_DATA??join(process.env.LOCALAPPDATA??here,'ZhinengFamily')});}
+import http from "node:http";
+import { randomBytes } from "node:crypto";
+import { readFile, mkdir } from "node:fs/promises";
+import { join, resolve, sep, extname } from "node:path";
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
+const here = import.meta.dirname;
+const BODY_LIMIT = 1024 * 1024;
+const types = {
+  ".html": "text/html; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".glb": "model/gltf-binary",
+  ".md": "text/plain; charset=utf-8",
+  ".svg": "image/svg+xml",
+};
+function finite(value) {
+  if (typeof value === "number" && !Number.isFinite(value)) return false;
+  if (value && typeof value === "object")
+    return Object.values(value).every(finite);
+  return true;
+}
+function bridge(config, body) {
+  return new Promise((resolveReply) => {
+    const child = execFile(
+      config.bridgePath,
+      [
+        join(config.dataDirectory, "scenes.sqlite"),
+        join(config.protocolDirectory, "scene.schema.json"),
+        join(config.protocolDirectory, "two-bedroom.json"),
+      ],
+      {
+        encoding: "utf8",
+        windowsHide: true,
+        timeout: 15000,
+        maxBuffer: 32 * 1024 * 1024,
+      },
+      (error, stdout) => {
+        if (error) {
+          resolveReply({
+            status: 503,
+            error: "本地资料服务暂时无法使用，请检查安装后重试。",
+          });
+          return;
+        }
+        try {
+          const result = JSON.parse(stdout.replace(/^\uFEFF/, ""));
+          if (
+            !Number.isInteger(result.status) ||
+            result.status < 200 ||
+            result.status > 599
+          )
+            throw Error();
+          resolveReply(result);
+        } catch {
+          resolveReply({
+            status: 503,
+            error: "本地资料服务暂时无法使用，请重试。",
+          });
+        }
+      },
+    );
+    child.stdin.on("error", () => {});
+    child.stdin.end(body);
+  });
+}
+export function createLocalServer(options) {
+  const config = {
+    publicDirectory: join(here, "public"),
+    protocolDirectory: join(here, "protocol"),
+    vendorDirectory: join(here, "node_modules/three"),
+    ...options,
+  };
+  const token = randomBytes(32).toString("hex"),
+    nonce = randomBytes(18).toString("base64");
+  return http.createServer(async (req, res) => {
+    const port = res.socket.localPort,
+      origin = `http://127.0.0.1:${port}`;
+    const reply = (status, data) => {
+      res.writeHead(status, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      res.end(JSON.stringify(data));
+    };
+    if (req.headers.host !== `127.0.0.1:${port}`) {
+      reply(403, { error: "此服务仅允许本机访问。" });
+      return;
+    }
+    let pathname;
+    try {
+      pathname = decodeURIComponent(new URL(req.url, origin).pathname);
+    } catch {
+      reply(404, { error: "找不到该页面。" });
+      return;
+    }
+    if (pathname === "/api/local") {
+      if (req.method !== "POST") {
+        reply(405, { error: "请求方式不支持。" });
+        return;
+      }
+      if (
+        req.headers.origin !== origin ||
+        !(req.headers.cookie ?? "")
+          .split(";")
+          .map((x) => x.trim())
+          .includes(`local_session=${token}`)
+      ) {
+        reply(403, { error: "请求来源无效，请重新打开本地软件。" });
+        return;
+      }
+      if (
+        !/^application\/json(?:;|$)/i.test(req.headers["content-type"] ?? "")
+      ) {
+        reply(415, { error: "请提交 JSON 格式。" });
+        return;
+      }
+      try {
+        let size = 0,
+          chunks = [];
+        for await (const chunk of req) {
+          size += chunk.length;
+          if (size <= BODY_LIMIT) chunks.push(chunk);
+        }
+        if (size > BODY_LIMIT) {
+          reply(413, { error: "场景过大，请减少内容后重试。" });
+          return;
+        }
+        const body = Buffer.concat(chunks).toString("utf8");
+        const parsed = JSON.parse(body);
+        if (!parsed || Array.isArray(parsed) || !finite(parsed)) {
+          reply(422, { error: "场景包含非法数值，请检查后重试。" });
+          return;
+        }
+        await mkdir(config.dataDirectory, { recursive: true });
+        const result = await bridge(config, body);
+        reply(result.status, result);
+      } catch {
+        reply(422, { error: "输入不是合法 JSON，请检查后重试。" });
+      }
+      return;
+    }
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      reply(405, { error: "请求方式不支持。" });
+      return;
+    }
+    const vendor = pathname.startsWith("/vendor/three/");
+    const directory = resolve(
+      vendor ? config.vendorDirectory : config.publicDirectory,
+    );
+    const relative = vendor
+      ? pathname.slice("/vendor/three/".length)
+      : pathname === "/"
+        ? "index.html"
+        : pathname.slice(1);
+    const file = resolve(directory, relative);
+    if (!file.startsWith(directory + sep) || !types[extname(file)]) {
+      reply(404, { error: "找不到该文件。" });
+      return;
+    }
+    try {
+      let content = await readFile(file);
+      const headers = {
+        "content-type": types[extname(file)],
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "no-referrer",
+        "content-security-policy": `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' blob:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'`,
+      };
+      if (pathname === "/") {
+        content = Buffer.from(
+          content.toString().replaceAll("__NONCE__", nonce),
+        );
+        headers["set-cookie"] =
+          `local_session=${token}; HttpOnly; SameSite=Strict; Path=/`;
+      }
+      res.writeHead(200, headers);
+      res.end(req.method === "HEAD" ? undefined : content);
+    } catch {
+      reply(404, { error: "找不到该文件。" });
+    }
+  });
+}
+export function startLocal(options) {
+  const server = createLocalServer(options);
+  server.listen(0, "127.0.0.1", () =>
+    console.log(`LOCAL_URL=http://127.0.0.1:${server.address().port}`),
+  );
+  return server;
+}
+if (
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) === resolve(process.argv[1])
+) {
+  const root = resolve(here, "../..");
+  startLocal({
+    bridgePath:
+      process.env.FAMILY_BRIDGE ??
+      join(root, ".local/windows-bridge/LocalBridge.exe"),
+    protocolDirectory:
+      process.env.FAMILY_PROTOCOL ??
+      join(root, "apps/unity-client/Assets/StreamingAssets"),
+    dataDirectory:
+      process.env.FAMILY_DATA ??
+      join(process.env.LOCALAPPDATA ?? here, "ZhinengFamily"),
+  });
+}

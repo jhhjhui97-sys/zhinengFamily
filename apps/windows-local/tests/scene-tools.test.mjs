@@ -1,6 +1,72 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {renderPosition,editFurniture,wallSegments} from '../public/scene-tools.mjs';
-test('RH_Z_UP millimetres map to right handed Y up metres',()=>assert.deepEqual(renderPosition({x:1000,y:2000,z:3000},500),[1,3.5,-2]));
-const fixture={floors:[{id:'floor',elevation_mm:0}],furniture_instances:[{id:'one',position:{x:1000,y:2000,z:0},rotation_deg:0,width_mm:2400,depth_mm:950,height_mm:850,metadata:{keep:'是'}}]};
-test('furniture edit validates finite bounds and retains metadata without source mutation',()=>{const updated=editFurniture(fixture,'one',{x:3000,y:1000,rotation:90});assert.equal(updated.furniture_instances[0].position.x,3000);assert.equal(fixture.furniture_instances[0].position.x,1000);assert.equal(updated.furniture_instances[0].metadata.keep,'是');});
-test('invalid furniture edits reject NaN Infinity negative limits and missing id',()=>{for(const x of [NaN,Infinity,-1e8])assert.throws(()=>editFurniture(fixture,'one',{x,y:1000,rotation:0}));assert.throws(()=>editFurniture(fixture,'missing',{x:0,y:0,rotation:0}));});
-test('wall openings create header sill and side segments instead of sealed wall',()=>{const segments=wallSegments({id:'wall',start:{x:0,y:0},end:{x:4000,y:0},height_mm:2800},[{wall_id:'wall',offset_mm:1000,width_mm:1000,height_mm:1200,sill_height_mm:900}]);assert.equal(segments.length,4);assert.ok(segments.some(x=>x.start===1000&&x.bottom===2100));assert.ok(segments.some(x=>x.start===1000&&x.top===900));assert.ok(!segments.some(x=>x.start<2000&&x.end>1000&&x.bottom<2100&&x.top>900));});
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  renderPosition,
+  editFurniture,
+  wallSegments,
+} from "../public/scene-tools.mjs";
+test("RH_Z_UP millimetres map to right handed Y up metres", () =>
+  assert.deepEqual(
+    renderPosition({ x: 1000, y: 2000, z: 3000 }, 500),
+    [1, 3.5, -2],
+  ));
+const fixture = {
+  floors: [{ id: "floor", elevation_mm: 0 }],
+  furniture_instances: [
+    {
+      id: "one",
+      position: { x: 1000, y: 2000, z: 0 },
+      rotation_deg: 0,
+      width_mm: 2400,
+      depth_mm: 950,
+      height_mm: 850,
+      metadata: { keep: "是" },
+    },
+  ],
+};
+test("furniture edit validates finite bounds and retains metadata without source mutation", () => {
+  const updated = editFurniture(fixture, "one", {
+    x: 3000,
+    y: 1000,
+    rotation: 90,
+  });
+  assert.equal(updated.furniture_instances[0].position.x, 3000);
+  assert.equal(fixture.furniture_instances[0].position.x, 1000);
+  assert.equal(updated.furniture_instances[0].metadata.keep, "是");
+});
+test("invalid furniture edits reject NaN Infinity negative limits and missing id", () => {
+  for (const x of [NaN, Infinity, -1e8])
+    assert.throws(() =>
+      editFurniture(fixture, "one", { x, y: 1000, rotation: 0 }),
+    );
+  assert.throws(() =>
+    editFurniture(fixture, "missing", { x: 0, y: 0, rotation: 0 }),
+  );
+});
+test("wall openings create header sill and side segments instead of sealed wall", () => {
+  const segments = wallSegments(
+    {
+      id: "wall",
+      start: { x: 0, y: 0 },
+      end: { x: 4000, y: 0 },
+      height_mm: 2800,
+    },
+    [
+      {
+        wall_id: "wall",
+        offset_mm: 1000,
+        width_mm: 1000,
+        height_mm: 1200,
+        sill_height_mm: 900,
+      },
+    ],
+  );
+  assert.equal(segments.length, 4);
+  assert.ok(segments.some((x) => x.start === 1000 && x.bottom === 2100));
+  assert.ok(segments.some((x) => x.start === 1000 && x.top === 900));
+  assert.ok(
+    !segments.some(
+      (x) => x.start < 2000 && x.end > 1000 && x.bottom < 2100 && x.top > 900,
+    ),
+  );
+});
