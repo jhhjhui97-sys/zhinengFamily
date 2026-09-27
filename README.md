@@ -185,3 +185,9 @@ docs/superpowers/         设计、计划、执行证据
 ## Phase 3-1 Unity 最小场景客户端
 
 源工程位于 [apps/unity-client](apps/unity-client/README.md)，消费现有 SceneModel JSON，显示房间轮廓、墙及家具代理。后台 3D 入口仍禁用。坐标与原始 JSON 往返采用真实 C# 测试；Unity Editor、构建和 iPad 实机尚未执行，详见 [验证记录](docs/phase-3-1-verification.md)。
+
+## Phase 3 独立离线 iPad 方向
+
+本地场景核心已实现真实 SQLite、完整 SceneModel 校验及不可变版本。已增加本地场景操作界面源码：场景库、新建/打开、两室一厅示例、保存/修改、只读历史及恢复。日常目标不依赖电脑、网络或后台登录。客户/商品/项目后台功能仍在 Web，尚未移植到本机 App。
+
+**Unity 引擎编译、iPad 安装包及实机验收仍未完成。** 当前控制台检查不等同于 iPad 可用性。详见 [客户端说明](apps/unity-client/README.md) 与 [Phase 3-2B 验证](docs/phase-3-2b-verification.md)。
