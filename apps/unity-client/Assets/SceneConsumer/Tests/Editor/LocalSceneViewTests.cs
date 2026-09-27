@@ -52,7 +52,8 @@ namespace SmartHome.SceneConsumer.Tests {
   }
   [Test] public void RestoreModalBlocksUnderlyingControlsAndCapturesTarget() {
    using(var f=new Fixture()) {
-    f.Session.SetDraft(f.Session.Draft+" "); f.Session.Save(); f.Session.ViewHistory(1); f.View.Refresh();
+    Guid room=SceneUuid.Parse((string)SceneDocument.Parse(f.Session.Draft).Copy()["rooms"][0]["id"]);
+    f.Session.ChangeRoomName(room,"第二版客厅"); f.Session.Save(); f.Session.ViewHistory(1); f.View.Refresh();
     f.Click("将查看的历史恢复为新版本");
     Assert.That(f.View.Root.Q<VisualElement>("confirmation"),Is.Not.Null);
     Assert.That(f.View.Root.Query<Button>().ToList().First(b=>b.text=="保存版本").enabledInHierarchy,Is.False);
@@ -63,6 +64,7 @@ namespace SmartHome.SceneConsumer.Tests {
     f.Click("确认恢复");
     Assert.That(f.Session.BaseRevision,Is.EqualTo(3));
     Assert.That(f.Session.Draft,Is.EqualTo(f.Store.ExportVersion(f.Session.DocumentId,1)));
+    Assert.That((string)SceneDocument.Parse(f.Session.Draft).Copy()["rooms"][0]["name"],Is.EqualTo("客厅"));
    }
   }
   [Test] public void ModalCancelPreservesDraftAndBusyBlocksEditingAndSave() {
@@ -91,6 +93,8 @@ namespace SmartHome.SceneConsumer.Tests {
     Assert.That(f.View.PreviewArea.worldBound.width,Is.GreaterThan(0));
     Assert.That(f.View.CanPreviewAt(center),Is.True);
     Assert.That(f.View.CanPreviewAt(new Vector2(-100,-100)),Is.False);
+    f.View.Root.Query<Foldout>().ToList().First(x=>x.text=="高级：编辑场景 JSON").value=true;
+    yield return null;
     var field=f.View.Root.Q<TextField>("draft-json"); field.Focus(); yield return null;
     Assert.That(f.View.CanPreviewAt(center),Is.False);
     field.Blur(); f.View.Root.Focus(); yield return null;
