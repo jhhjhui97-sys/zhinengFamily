@@ -57,6 +57,9 @@ namespace SmartHome.SceneConsumer {
    catch(Exception e) { view.Notice(LocalSceneSession.Friendly(e)); }
    finally { busy=false; if(view!=null) view.SetBusy(false); }
   }
+  public static Rect Viewport(Rect area,Rect panel) {
+   return new Rect((area.x-panel.x)/panel.width,1-(area.yMax-panel.y)/panel.height,area.width/panel.width,area.height/panel.height);
+  }
   void LateUpdate() {
    if(view==null||view.Root.panel==null||preview==null) return;
    var root=document.rootVisualElement.worldBound; if(root.width<=0||root.height<=0||Screen.width<=0||Screen.height<=0) return;
@@ -66,7 +69,7 @@ namespace SmartHome.SceneConsumer {
    view.Root.style.paddingTop=(Screen.height-safe.yMax)/Screen.height*root.height;
    view.Root.style.paddingBottom=safe.y/Screen.height*root.height;
    var area=view.PreviewArea.worldBound;
-   if(area.width>0&&area.height>0) preview.PreviewCamera.rect=new Rect(area.x/root.width,1-area.yMax/root.height,area.width/root.width,area.height/root.height);
+   if(area.width>0&&area.height>0) preview.PreviewCamera.rect=Viewport(area,root);
   }
   void OnDestroy() {
    StopAllCoroutines(); if(preview&&preview.Orbit) preview.Orbit.CanGesture=null;

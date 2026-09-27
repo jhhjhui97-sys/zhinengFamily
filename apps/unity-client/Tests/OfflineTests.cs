@@ -5,6 +5,7 @@ public static class OfflineTests {
   string directory=Path.Combine(Path.GetTempPath(),"offline-core-"+Guid.NewGuid());
   Directory.CreateDirectory(directory);
   try {
+   ConfirmationTests.Run();
    PreviewGestureTests.Run();
    SqliteTests.Run(directory);
    LocalWorkspaceTests.Run(args[0],directory);

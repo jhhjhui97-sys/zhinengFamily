@@ -8,6 +8,7 @@ namespace SmartHome.SceneConsumer {
  /// <summary>Toolkit adapter. All persistence and conflict rules are owned by the tested session.</summary>
  public sealed class LocalSceneView {
   readonly LocalSceneStore store; readonly LocalSceneSession session;
+  readonly LocalInteractionGate interaction=new LocalInteractionGate();
   readonly Action<Action> runner; readonly Action<SceneDocument> preview; readonly Action clearPreview;
   readonly VisualElement library,editor,modalHost; readonly ScrollView documents,versions,roomFields;
   readonly Label status,summary,libraryPage,historyPage; readonly TextField draft,current,history,newName;
@@ -53,7 +54,7 @@ namespace SmartHome.SceneConsumer {
    roomFields=new ScrollView(); roomFields.AddToClassList("room-fields"); editor.Add(roomFields);
    var advanced=new Foldout { text="高级：编辑场景 JSON",value=false }; editor.Add(advanced);
    draft=Field(advanced,"草稿 JSON","draft-json"); draft.multiline=true; draft.maxLength=8*1024*1024; draft.AddToClassList("json");
-   draft.RegisterValueChangedCallback(e=>{ session.SetDraft(e.newValue); UpdateStatus(); });
+   draft.RegisterValueChangedCallback(e=>{ if(interaction.CanInteract) { session.SetDraft(e.newValue); UpdateStatus(); } });
    var saved=new Foldout { text="当前保存的 JSON（只读）",value=false }; editor.Add(saved);
    current=JsonField(saved,"current-json");
    var historySection=new Foldout { text="版本历史",value=true }; editor.Add(historySection);
@@ -63,28 +64,33 @@ namespace SmartHome.SceneConsumer {
    historyPrevious=Button(historyButtons,"上一页版本",()=>Run(()=>versionOffset=Math.Max(0,versionOffset-20)));
    historyNext=Button(historyButtons,"下一页版本",()=>Run(()=>versionOffset+=20));
    history=JsonField(historySection,"history-json");
-   Button(historySection,"将查看的历史恢复为新版本",()=>Request(discard=>{
-    if(session.Restore(session.HistoryRevision,discard)) { versionOffset=0; DrawSaved(); }
-   },true));
+   Button(historySection,"将查看的历史恢复为新版本",()=>{
+    if(!interaction.CanInteract) return;
+    var intent=session.CaptureRestore(); if(intent==null) { UpdateStatus(); return; }
+    Request(discard=>{ if(session.Restore(intent,discard)) { versionOffset=0; DrawSaved(); } },true,intent.Revision);
+   });
    status=new Label(); status.name="operation-status"; status.AddToClassList("status"); Root.Add(status);
    modalHost=new VisualElement { pickingMode=PickingMode.Ignore }; modalHost.AddToClassList("modal-host"); Root.Add(modalHost);
    Refresh();
   }
   static VisualElement Row(VisualElement parent) { var row=new VisualElement(); row.AddToClassList("row"); parent.Add(row); return row; }
   static VisualElement Panel(VisualElement parent,string name) { var panel=new VisualElement(); panel.AddToClassList(name); parent.Add(panel); return panel; }
-  static Button Button(VisualElement parent,string text,Action action) { var button=new Button(action) { text=text }; parent.Add(button); return button; }
+  static Button Button(VisualElement parent,string text,Action action) { var button=new Button(action) { text=text,name=text }; parent.Add(button); return button; }
   static TextField Field(VisualElement parent,string label,string name) { var field=new TextField(label) { name=name }; parent.Add(field); return field; }
   static TextField JsonField(VisualElement parent,string name) { var field=Field(parent,"",name); field.multiline=true; field.isReadOnly=true; field.AddToClassList("json"); return field; }
-  void Run(Action action) { runner(()=>{ action(); Refresh(); }); }
-  void Request(Action<bool> action,bool restore=false) {
+  void Run(Action action) { interaction.TryRun(()=>runner(()=>{ action(); Refresh(); })); }
+  void Request(Action<bool> action,bool restore=false,long revision=0) {
+   if(!interaction.CanInteract) return;
    if(!session.Dirty&&!restore) { Run(()=>action(false)); return; }
-   if(modal!=null) return;
-   draft.Blur(); modal=new VisualElement(); modal.AddToClassList("confirm"); modalHost.Add(modal);
-   modal.Add(new Label(restore?"将历史恢复为一个新版本。未保存的修改会被放弃，已有历史仍保留。":"还有未保存的修改，继续会放弃这些修改。"));
-   Button(modal,"继续编辑",CloseModal);
-   Button(modal,restore?"确认恢复":"放弃修改并继续",()=>{ CloseModal(); Run(()=>action(true)); });
+   if(!interaction.BeginConfirmation(()=>Run(()=>action(true)))) return;
+   Root.Focus(); foreach(var child in Root.Children()) if(child!=modalHost) child.SetEnabled(false);
+   modalHost.pickingMode=PickingMode.Position;
+   modal=new VisualElement { name="confirmation" }; modal.AddToClassList("confirm"); modalHost.Add(modal);
+   modal.Add(new Label(restore?"将 v"+revision+" 恢复为一个新版本。未保存的修改会被放弃，已有历史仍保留。":"还有未保存的修改，继续会放弃这些修改。"));
+   Button(modal,"继续编辑",()=>{ interaction.Cancel(); CloseModal(); Refresh(); });
+   Button(modal,restore?"确认恢复":"放弃修改并继续",()=>{ CloseModal(); interaction.Confirm(); });
   }
-  void CloseModal() { if(modal!=null) { modal.RemoveFromHierarchy(); modal=null; } }
+  void CloseModal() { if(modal!=null) { modal.RemoveFromHierarchy(); modal=null; } modalHost.pickingMode=PickingMode.Ignore; foreach(var child in Root.Children()) if(child!=modalHost) child.SetEnabled(true); }
   void DrawDraft() { var scene=session.Preview(); if(scene!=null) Draw(scene); }
   void DrawSaved() {
    if(string.IsNullOrEmpty(session.CurrentJson)) { clearPreview(); return; }
@@ -94,7 +100,7 @@ namespace SmartHome.SceneConsumer {
    try { preview(scene); previewNotice=""; }
    catch { previewNotice="资料已保留，但当前场景无法预览。请检查几何范围。"; }
   }
-  public void SetBusy(bool value) { Root.SetEnabled(!value); if(value) status.text="正在处理，请稍候…"; }
+  public void SetBusy(bool value) { interaction.SetBusy(value); Root.SetEnabled(!value); if(value) status.text="正在处理，请稍候…"; }
   public void Notice(string message) { status.text=message; }
   void UpdateStatus() { status.text=session.Message+(previewNotice.Length>0?"\n"+previewNotice:""); save.SetEnabled(session.DocumentId!=Guid.Empty&&session.Dirty); }
   public void Refresh() {

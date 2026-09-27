@@ -98,6 +98,24 @@ public static class LocalSessionTests {
    Check(s.ChangeRoomName(room,"URN 客厅")&&s.Save(),"valid URN room failed editing");
    Check((string)JObject.Parse(s.Draft)["rooms"][0]["id"]=="urn:uuid:"+room.ToString("D"),"identifier representation was lost");
   },schema,sample,dir);
+Test("restore confirmation retains captured revision when history selection changes",(store,s,path)=>{
+   s.New("确认"); s.LoadSample(); s.Save();
+   Guid room=Guid.Parse((string)JObject.Parse(s.Draft)["rooms"][0]["id"]);
+   s.ChangeRoomName(room,"第二版"); s.Save(); s.ViewHistory(1);
+   var intent=s.CaptureRestore(); s.ViewHistory(2);
+   Check(s.Restore(intent)&&s.BaseRevision==3&&(string)JObject.Parse(s.Draft)["rooms"][0]["name"]=="客厅","mutable restore target");
+  },schema,sample,dir);
+  Test("restore confirmation never silently uses a newer base",(store,s,path)=>{
+   s.New("确认基线"); s.LoadSample(); s.Save(); s.ViewHistory(1); var intent=s.CaptureRestore();
+   s.SetDraft(s.Draft+" "); s.Save(); string current=s.Draft;
+   Check(!s.Restore(intent)&&s.BaseRevision==2&&s.Draft==current&&store.Versions(s.DocumentId).Count==2,"confirmation rebased");
+  },schema,sample,dir);
+  Test("restore confirmation cannot follow the user into another document",(store,s,path)=>{
+   s.New("第一"); s.LoadSample(); s.Save(); s.ViewHistory(1); var intent=s.CaptureRestore();
+   s.New("第二"); Guid second=s.DocumentId; string draft=s.Draft;
+   Check(!s.Restore(intent)&&s.DocumentId==second&&s.BaseRevision==0&&s.Draft==draft&&store.Current(second)==null,"confirmation crossed document");
+  },schema,sample,dir);
+
   Console.WriteLine("Local session: "+passed+" passed");
  }
  public static int Main(string[] args) {

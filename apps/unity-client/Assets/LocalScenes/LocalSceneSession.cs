@@ -88,9 +88,22 @@ namespace LocalScenes {
   public bool ViewHistory(long revision) {
    return Attempt(()=>{ RequireDocument(); string json=store.ExportVersion(DocumentId,revision); HistoryJson=json; HistoryRevision=revision; },"正在查看历史版本；当前草稿没有改变。");
   }
-  public bool Restore(long revision,bool discard=false) {
+  public LocalRestoreIntent CaptureRestore() {
+   LocalRestoreIntent result=null;
+   Attempt(()=>{ RequireDocument(); if(HistoryRevision<1) throw new LocalStoreError(LocalErrorCode.NotFound);
+    result=new LocalRestoreIntent(DocumentId,BaseRevision,HistoryRevision); },"请确认恢复所选历史版本。");
+   return result;
+  }
+  public bool Restore(LocalRestoreIntent intent,bool discard=false) {
    if(!Discard(discard)) return false;
-   return Attempt(()=>{ RequireDocument(); var restored=store.Restore(DocumentId,BaseRevision,revision); Adopt(DocumentId,restored); },"已恢复为新版本，原有历史仍保留。");
+   return Attempt(()=>{ RequireDocument();
+    if(intent==null) throw new LocalStoreError(LocalErrorCode.InvalidInput);
+    if(intent.DocumentId!=DocumentId||intent.BaseRevision!=BaseRevision) throw new LocalStoreError(LocalErrorCode.Conflict);
+    var restored=store.Restore(intent.DocumentId,intent.BaseRevision,intent.Revision); Adopt(intent.DocumentId,restored);
+   },"已恢复为新版本，原有历史仍保留。");
+  }
+  public bool Restore(long revision,bool discard=false) {
+   return Restore(new LocalRestoreIntent(DocumentId,BaseRevision,revision),discard);
   }
  }
 }
