@@ -307,3 +307,147 @@ test(
     );
   },
 );
+
+test(
+  "offline catalog loads sofa chair velvet sofa and refrigerator and persists them",
+  { timeout: 180000 },
+  async (t) => {
+    const { page, errors } = await setup(t);
+    await project(page, true);
+    assert.equal(await page.locator("#catalog-select option").count(), 4);
+    await page
+      .locator("#catalog-select")
+      .selectOption("40000000-0000-4000-8000-000000000003");
+    await page
+      .locator("#room-select")
+      .selectOption("30000000-0000-4000-8000-000000000003");
+    await page.getByRole("button", { name: "放入场景", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "已放入" }).waitFor();
+    assert.match(
+      await page.locator("#scene-json").inputValue(),
+      /40000000-0000-4000-8000-000000000003/,
+    );
+    await page
+      .locator('canvas[data-model-loaded="true"]')
+      .waitFor({ timeout: 90000 });
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "已保存 v1" }).waitFor();
+    await page.reload();
+    await page
+      .getByRole("button", { name: "张先生 · 龙湖小区120㎡", exact: true })
+      .click();
+    await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    assert.equal(await page.locator("#furniture-select option").count(), 2);
+    await page
+      .locator('canvas[data-model-loaded="true"]')
+      .waitFor({ timeout: 90000 });
+    await page
+      .locator("#catalog-select")
+      .selectOption("40000000-0000-4000-8000-000000000004");
+    await page
+      .locator("#room-select")
+      .selectOption("30000000-0000-4000-8000-000000000004");
+    await page.getByRole("button", { name: "放入场景", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "已放入" }).waitFor();
+    await page
+      .locator("#catalog-select")
+      .selectOption("40000000-0000-4000-8000-000000000005");
+    await page
+      .locator("#room-select")
+      .selectOption("30000000-0000-4000-8000-000000000005");
+    await page.getByRole("button", { name: "放入场景", exact: true }).click();
+    await page
+      .locator("#render-status")
+      .filter({ hasText: "4 件真实家具模型" })
+      .waitFor({ timeout: 90000 });
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "已保存 v2" }).waitFor();
+    await page.reload();
+    await page
+      .getByRole("button", { name: "张先生 · 龙湖小区120㎡", exact: true })
+      .click();
+    await page.locator("#revision").filter({ hasText: "当前 v2" }).waitFor();
+    assert.equal(await page.locator("#furniture-select option").count(), 4);
+    await page
+      .locator("#render-status")
+      .filter({ hasText: "4 件真实家具模型" })
+      .waitFor({ timeout: 90000 });
+    await mkdir(join(root, ".local/windows-evidence"), { recursive: true });
+    await page.screenshot({
+      path: join(root, ".local/windows-evidence/catalog-room.png"),
+    });
+    await page.getByRole("button", { name: "户型总览", exact: true }).click();
+    await page.waitForTimeout(500);
+    await page.screenshot({
+      path: join(root, ".local/windows-evidence/catalog-overview.png"),
+    });
+    assert.equal(errors.length, 0, errors.join("\n"));
+  },
+);
+
+test(
+  "repeated large sofas in a bedroom stay inside its walls and reject a fourth",
+  { timeout: 90000 },
+  async (t) => {
+    const { page } = await setup(t);
+    await project(page);
+    await page
+      .locator("#catalog-select")
+      .selectOption("40000000-0000-4000-8000-000000000004");
+    await page
+      .locator("#room-select")
+      .selectOption("30000000-0000-4000-8000-000000000004");
+    for (let expected = 1; expected <= 3; expected++) {
+      await page.getByRole("button", { name: "放入场景", exact: true }).click();
+      await page.waitForFunction(
+        (count) =>
+          JSON.parse(
+            document.querySelector("#scene-json").value,
+          ).furniture_instances.filter(
+            (item) => item.room_id === "30000000-0000-4000-8000-000000000004",
+          ).length === count,
+        expected,
+      );
+      const scene = JSON.parse(await page.locator("#scene-json").inputValue());
+      const bedroom = scene.furniture_instances.filter(
+        (item) => item.room_id === "30000000-0000-4000-8000-000000000004",
+      );
+      assert.equal(bedroom.length, expected);
+      for (const item of bedroom) {
+        assert.ok(item.position.x - item.width_mm / 2 >= 0);
+        assert.ok(item.position.x + item.width_mm / 2 <= 4000);
+        assert.ok(item.position.y - item.depth_mm / 2 >= 4000);
+        assert.ok(item.position.y + item.depth_mm / 2 <= 8000);
+      }
+    }
+    const previous = await page.locator("#scene-json").inputValue();
+    await page.getByRole("button", { name: "放入场景", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "没有足够空间" })
+      .waitFor();
+    assert.equal(await page.locator("#scene-json").inputValue(), previous);
+  },
+);
+
+test(
+  "missing bundled furniture reports a clear error without pretending to render it",
+  { timeout: 90000 },
+  async (t) => {
+    const { page } = await setup(t);
+    await page.route("**/assets/chair.glb", (route) => route.abort());
+    await project(page, true);
+    await page
+      .locator("#catalog-select")
+      .selectOption("40000000-0000-4000-8000-000000000003");
+    await page.getByRole("button", { name: "放入场景", exact: true }).click();
+    await page
+      .locator("#render-status")
+      .filter({ hasText: "1 件家具模型未能加载" })
+      .waitFor();
+    assert.equal(
+      await page.locator("canvas").getAttribute("data-model-loaded"),
+      "partial",
+    );
+  },
+);

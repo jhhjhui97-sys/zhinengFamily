@@ -271,6 +271,11 @@ canvas {
 .number-row label {
   width: 50%;
 }
+#add-furniture {
+  width: 100%;
+  margin-top: 12px;
+  background: #e8efe5;
+}
 #apply-position {
   width: 100%;
   margin-top: 12px;

@@ -30,6 +30,7 @@ function bridge(config, body) {
         join(config.dataDirectory, "scenes.sqlite"),
         join(config.protocolDirectory, "scene.schema.json"),
         join(config.protocolDirectory, "two-bedroom.json"),
+        join(config.publicDirectory, "catalog.json"),
       ],
       {
         encoding: "utf8",

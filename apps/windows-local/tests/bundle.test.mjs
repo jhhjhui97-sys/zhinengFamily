@@ -17,7 +17,14 @@ test("portable Windows bundle contains executable runtime protocol model and lic
     "runtime/bridge/Newtonsoft.Json.dll",
     "runtime/client/protocol/scene.schema.json",
     "runtime/client/protocol/two-bedroom.json",
+    "runtime/client/public/catalog.json",
     "runtime/client/public/assets/sofa.glb",
+    "runtime/client/public/assets/chair.glb",
+    "runtime/client/public/assets/velvet-sofa.glb",
+    "runtime/client/public/assets/refrigerator.glb",
+    "runtime/client/public/assets/CHAIR-LICENSE.md",
+    "runtime/client/public/assets/VELVET-SOFA-LICENSE.md",
+    "runtime/client/public/assets/REFRIGERATOR-LICENSE.md",
     "licenses/Node-LICENSE.txt",
     "licenses/Newtonsoft-LICENSE.txt",
     "licenses/Three-LICENSE.txt",
@@ -25,12 +32,42 @@ test("portable Windows bundle contains executable runtime protocol model and lic
   ]) {
     assert.ok((await stat(join(bundle, file))).size > 0, file);
   }
-  const model = await readFile(
-    join(bundle, "runtime/client/public/assets/sofa.glb"),
+  const models = {
+    "sofa.glb":
+      "5349e042ad41e695e89f1110230c4ee0c75b2bc62ef830c7016be6ecf665bfb6",
+    "chair.glb":
+      "f0af2a2b102d28d540236306ae19f8fb36842df76bd38cf76f063f9bd2853399",
+    "velvet-sofa.glb":
+      "67202c74a1a33377771f162dc7fad612a6c9bd51ee15124c488e9851d9ac5266",
+    "refrigerator.glb":
+      "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+  };
+  for (const [file, hash] of Object.entries(models)) {
+    const model = await readFile(
+      join(bundle, "runtime/client/public/assets", file),
+    );
+    assert.equal(createHash("sha256").update(model).digest("hex"), hash);
+  }
+  const credits = await readFile(
+    join(bundle, "licenses/ASSET-LICENSES.md"),
+    "utf8",
   );
-  assert.equal(
-    createHash("sha256").update(model).digest("hex"),
-    "5349e042ad41e695e89f1110230c4ee0c75b2bc62ef830c7016be6ecf665bfb6",
+  const visibleCredits = await readFile(
+    join(bundle, "runtime/client/public/index.html"),
+    "utf8",
+  );
+  const sofaCredits = credits
+    .split("Glam Velvet Sofa, source:")[1]
+    .split("GLB size:")[0];
+  const fridgeCredits = credits
+    .split("Commercial Refrigerator, source:")[1]
+    .split("GLB size:")[0];
+  assert.match(sofaCredits, /Eric Chadwick/);
+  assert.match(fridgeCredits, /Eric Chadwick/);
+  assert.match(visibleCredits, /Glam Velvet Sofa：[\s\S]*Eric Chadwick/);
+  assert.match(
+    visibleCredits,
+    /Commercial Refrigerator：[\s\S]*Eric[\s\S]*Chadwick/,
   );
 });
 test("bundle manifest records exact checksums and excludes credentials and user database", async () => {

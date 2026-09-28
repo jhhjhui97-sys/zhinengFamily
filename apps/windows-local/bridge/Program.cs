@@ -13,18 +13,28 @@ public static class LocalBridge {
  public static int Main(string[] args) {
   Console.InputEncoding=Encoding.UTF8;Console.OutputEncoding=new UTF8Encoding(false);
   try {
-   if(args.Length!=3) throw new LocalStoreError(LocalErrorCode.InvalidInput);
+   if(args.Length<3||args.Length>4) throw new LocalStoreError(LocalErrorCode.InvalidInput);
    string text=Console.In.ReadToEnd();if(text.Length>1024*1024) throw new LocalStoreError(LocalErrorCode.InvalidInput);
    JObject input=JObject.Parse(text);
    string[] allowed={"action","id","name","base_revision","revision","scene","limit","offset"};
    if(input.Properties().Any(x=>!allowed.Contains(x.Name))) throw new LocalStoreError(LocalErrorCode.InvalidInput);
    string action=(string)input["action"];
-   if(!new[]{"list","create","sample","current","save","versions","restore","validate"}.Contains(action)) throw new LocalStoreError(LocalErrorCode.InvalidInput);
+   if(!new[]{"list","create","sample","current","save","versions","restore","validate","catalog"}.Contains(action)) throw new LocalStoreError(LocalErrorCode.InvalidInput);
    var validator=new OfflineSceneValidator(File.ReadAllText(args[1]));
    var identity=LocalIdentity.Open(args[0]);object data=null;
    using(var store=new LocalSceneStore(args[0],identity.WorkspaceId,identity.ActorId,validator)) {
     int limit=checked((int)Number(input,"limit",20)),offset=checked((int)Number(input,"offset",0));
     switch(action) {
+     case "catalog":
+      if(args.Length!=4) throw new LocalStoreError(LocalErrorCode.InvalidInput);
+      var products=JArray.Parse(File.ReadAllText(args[3]));
+      foreach(JObject item in products) {
+       Guid product=Guid.Parse((string)item["id"]);
+       string name=(string)item["name"];
+       double width=(double)item["width_mm"],depth=(double)item["depth_mm"],height=(double)item["height_mm"];
+       store.Catalog(product,name,width,depth,height);
+      }
+      data=products;break;
      case "list":var page=store.Documents(limit,offset);data=new {total=page.Total,items=page.Items.Select(x=>new{id=x.Id,name=x.Name,revision=x.Revision,saved_at=x.UpdatedAt})};break;
      case "create":data=new{id=store.Create((string)input["name"])};break;
      case "current":data=Version(store.Current(Id(input)));break;

@@ -54,10 +54,8 @@ export class RoomRenderer {
     this.scene.add(this.content);
     this.resources = [];
     this.renderSerial = 0;
-    this.modelPromise = new GLTFLoader()
-      .loadAsync("/assets/sofa.glb")
-      .then((g) => g.scene);
-    this.modelPromise.catch(() => {});
+    this.catalog = new Map();
+    this.modelPromises = new Map();
     this.resize = new ResizeObserver(() => this.size());
     this.resize.observe(host);
     this.interior();
@@ -70,6 +68,23 @@ export class RoomRenderer {
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
     });
+  }
+  configureCatalog(products) {
+    this.catalog = new Map(products.map((product) => [product.id, product]));
+  }
+  modelFor(productId) {
+    const id = productId.replace(/^urn:uuid:/i, "");
+    const product = this.catalog.get(id);
+    if (!product || !/^\/assets\/[a-z-]+\.glb$/.test(product.model))
+      return Promise.reject(Error("模型不在本地目录中"));
+    if (!this.modelPromises.has(id)) {
+      const promise = new GLTFLoader()
+        .loadAsync(product.model)
+        .then((g) => g.scene);
+      this.modelPromises.set(id, promise);
+      promise.catch(() => this.modelPromises.delete(id));
+    }
+    return this.modelPromises.get(id);
   }
   size() {
     const w = this.host.clientWidth,
@@ -205,10 +220,11 @@ export class RoomRenderer {
       this.content.add(pane);
     }
     this.scheduleFrame();
-    try {
-      const source = await this.modelPromise;
-      if (serial !== this.renderSerial) return;
-      for (const item of document.furniture_instances) {
+    let failed = 0;
+    for (const item of document.furniture_instances) {
+      try {
+        const source = await this.modelFor(item.product_id);
+        if (serial !== this.renderSerial) return;
         const model = source.clone(true),
           bounds = new THREE.Box3().setFromObject(model),
           size = bounds.getSize(new THREE.Vector3()),
@@ -234,15 +250,20 @@ export class RoomRenderer {
           }
         });
         this.content.add(placed);
+        this.scheduleFrame();
+      } catch {
+        failed++;
       }
-      this.renderer.domElement.dataset.modelLoaded = "true";
-      this.status.textContent = "真实沙发模型 · PBR 材质 · 本地渲染";
-      this.scheduleFrame();
-    } catch {
-      if (serial === this.renderSerial)
-        this.status.textContent =
-          "家具模型无法加载，请检查本地模型文件；未使用方块冒充家具。";
     }
+    if (serial !== this.renderSerial) return;
+    if (failed) {
+      this.renderer.domElement.dataset.modelLoaded = "partial";
+      this.status.textContent = `${failed} 件家具模型未能加载；请检查安装文件，已保存场景不受影响。`;
+    } else {
+      this.renderer.domElement.dataset.modelLoaded = "true";
+      this.status.textContent = `${document.furniture_instances.length} 件真实家具模型 · PBR 材质 · 本地渲染`;
+    }
+    this.scheduleFrame();
   }
   capture() {
     this.renderer.render(this.scene, this.camera);
@@ -258,21 +279,22 @@ export class RoomRenderer {
     this.renderer.dispose();
     this.environment.dispose();
     for (const r of this.resources) r.dispose();
-    this.modelPromise
-      .then((model) =>
-        model.traverse((o) => {
-          if (o.isMesh) {
-            o.geometry.dispose();
-            for (const m of Array.isArray(o.material)
-              ? o.material
-              : [o.material]) {
-              for (const value of Object.values(m))
-                if (value?.isTexture) value.dispose();
-              m.dispose();
+    for (const promise of this.modelPromises.values())
+      promise
+        .then((model) =>
+          model.traverse((o) => {
+            if (o.isMesh) {
+              o.geometry.dispose();
+              for (const m of Array.isArray(o.material)
+                ? o.material
+                : [o.material]) {
+                for (const value of Object.values(m))
+                  if (value?.isTexture) value.dispose();
+                m.dispose();
+              }
             }
-          }
-        }),
-      )
-      .catch(() => {});
+          }),
+        )
+        .catch(() => {});
   }
 }

@@ -1,5 +1,5 @@
 import { RoomRenderer } from "./renderer.mjs";
-import { editFurniture } from "./scene-tools.mjs";
+import { addFurniture, editFurniture } from "./scene-tools.mjs";
 const $ = (id) => document.getElementById(id);
 let active = null,
   baseline = 0,
@@ -10,7 +10,8 @@ let active = null,
   libraryOffset = 0,
   historyOffset = 0,
   restoreIntent = null,
-  furnitureFieldsBaseline = null;
+  furnitureFieldsBaseline = null,
+  catalogItems = [];
 const view = new RoomRenderer($("viewport"), $("render-status"));
 function message(value, error = false) {
   $("message").textContent = value;
@@ -99,6 +100,7 @@ function fields() {
 }
 function refreshDraft() {
   const selected = $("furniture-select").value;
+  const selectedRoom = $("room-select").value;
   $("empty-view").hidden = Boolean(draft);
   $("scene-json").value = draft ? JSON.stringify(draft, null, 2) : "";
   $("furniture-select").replaceChildren();
@@ -111,6 +113,16 @@ function refreshDraft() {
   if (selected) $("furniture-select").value = selected;
   if (!$("furniture-select").value && $("furniture-select").options.length)
     $("furniture-select").selectedIndex = 0;
+  $("room-select").replaceChildren();
+  for (const room of draft?.rooms ?? []) {
+    const option = document.createElement("option");
+    option.value = room.id;
+    option.textContent = room.name;
+    $("room-select").append(option);
+  }
+  if (selectedRoom) $("room-select").value = selectedRoom;
+  if (!$("room-select").value && $("room-select").options.length)
+    $("room-select").selectedIndex = 0;
   fields();
   refreshRevision();
   $("scene-stats").textContent = draft
@@ -118,6 +130,17 @@ function refreshDraft() {
     : "毫米为单位 · 真实比例";
   if (draft) view.show(draft);
   else view.clear();
+}
+async function loadCatalog() {
+  catalogItems = await api("catalog");
+  view.configureCatalog(catalogItems);
+  $("catalog-select").replaceChildren();
+  for (const product of catalogItems) {
+    const option = document.createElement("option");
+    option.value = product.id;
+    option.textContent = product.name;
+    $("catalog-select").append(option);
+  }
 }
 async function library() {
   const page = await api("list", { limit: 20, offset: libraryOffset });
@@ -226,6 +249,28 @@ $("save").onclick = () =>
     await versions();
     await library();
     message(`已保存 v${baseline}，资料在本机。`);
+  });
+$("add-furniture").onclick = () =>
+  run(async () => {
+    if (!draft) {
+      message("请先载入场景，再放入家具。", true);
+      return;
+    }
+    if (pendingJson() || pendingFurniture()) {
+      message("请先应用输入框中的修改，再放入家具。", true);
+      return;
+    }
+    const product = catalogItems.find(
+      (item) => item.id === $("catalog-select").value,
+    );
+    const id = crypto.randomUUID();
+    const candidate = addFurniture(draft, product, $("room-select").value, id);
+    const validated = await api("validate", { scene: candidate });
+    draft = validated.scene;
+    refreshDraft();
+    $("furniture-select").value = id;
+    fields();
+    message(`${product.name}已放入场景，请调整位置并保存新版本。`);
   });
 $("apply-position").onclick = () =>
   run(async () => {
@@ -357,4 +402,11 @@ for (const id of [
 ])
   $(id).addEventListener("input", refreshRevision);
 window.addEventListener("pagehide", () => view.dispose());
-run(library);
+run(async () => {
+  try {
+    await loadCatalog();
+  } catch (error) {
+    message(`演示家具目录暂不可用：${error.message}`, true);
+  }
+  await library();
+});

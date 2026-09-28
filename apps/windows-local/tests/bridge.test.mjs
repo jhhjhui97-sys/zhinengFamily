@@ -7,7 +7,7 @@ import { resolve, join } from "node:path";
 const root = resolve(import.meta.dirname, "../../..");
 const bridge = join(root, ".local/windows-bridge/LocalBridge.exe");
 const assets = join(root, "apps/unity-client/Assets/StreamingAssets");
-function workspace() {
+function workspace(withCatalog = false) {
   const db = join(
     mkdtempSync(join(tmpdir(), "family-bridge-")),
     "local.sqlite",
@@ -15,7 +15,14 @@ function workspace() {
   return (input) => {
     const result = spawnSync(
       bridge,
-      [db, join(assets, "scene.schema.json"), join(assets, "two-bedroom.json")],
+      [
+        db,
+        join(assets, "scene.schema.json"),
+        join(assets, "two-bedroom.json"),
+        ...(withCatalog
+          ? [join(root, "apps/windows-local/public/catalog.json")]
+          : []),
+      ],
       { input: JSON.stringify(input), encoding: "utf8", timeout: 10000 },
     );
     assert.equal(
@@ -26,6 +33,28 @@ function workspace() {
     return JSON.parse(result.stdout.replace(/^\uFEFF/, ""));
   };
 }
+test("bundled catalog registers only curated products for local scene saves", () => {
+  const w = workspace(true);
+  const products = w({ action: "catalog" });
+  assert.equal(products.status, 200);
+  assert.equal(products.data.length, 4);
+  const chair = products.data.find((p) => p.category === "chair");
+  assert.ok(chair);
+  const { id, scene } = sample(w);
+  scene.furniture_instances.push({
+    ...structuredClone(scene.furniture_instances[0]),
+    id: "40000000-0000-4000-8000-000000000101",
+    product_id: chair.id,
+    width_mm: chair.width_mm,
+    depth_mm: chair.depth_mm,
+    height_mm: chair.height_mm,
+    metadata: { name: chair.name },
+  });
+  assert.equal(w({ action: "save", id, base_revision: 0, scene }).status, 200);
+  scene.furniture_instances[1].product_id =
+    "99999999-0000-4000-8000-000000000001";
+  assert.equal(w({ action: "save", id, base_revision: 1, scene }).status, 422);
+});
 function sample(w) {
   const created = w({ action: "create", name: "张先生 / 龙湖小区" });
   assert.equal(created.status, 200);
