@@ -28,7 +28,7 @@ Copy-Item -LiteralPath "$taskApp/ASSET-LICENSES.md" -Destination "$taskOutput/li
 $taskCompiler=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 & $taskCompiler /nologo /target:winexe /r:System.Windows.Forms.dll "/out:$taskOutput/智能家居.exe" ([IO.Path]::GetFullPath("$taskApp/launcher/Program.cs"))
 if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-$taskInstructions=@('智能家居 Windows 本地体验版','双击「智能家居.exe」启动，无需联网或后台服务器。','运行条件：Windows10/11、Microsoft Edge、.NET Framework4.8。','新建方案 → 载入两室一厅 → 从演示目录放入真实家具/家电模型 → 调整位置/角度 → 保存新版本。','可查看、恢复历史版本，导出当前真实渲染截图。','用户资料保存在 %LOCALAPPDATA%\ZhinengFamily，升级时不要删除该目录。','当前内置四款已授权演示模型；它们不代表门店在售商品，完整本地业务管理仍在开发中。','可执行文件未购买商业代码签名，企业安全软件可能要求确认来源。')
+$taskInstructions=@('智能家居 Windows 本地体验版','双击「智能家居.exe」启动，无需联网或后台服务器。','运行条件：Windows10/11、Microsoft Edge、.NET Framework4.8。','新建客户 → 新建设计项目 → 新建方案 → 载入两室一厅 → 放入演示家具 → 保存和恢复版本。','旧版未关联项目的场景可从「旧方案入口」打开；升级时数据库会先自动生成 pre-v2 备份。','用户资料保存在 %LOCALAPPDATA%\ZhinengFamily；升级前建议自行备份整个目录，切勿删除原资料。','本机客户/项目与在线后台不会自动同步；四款已授权演示模型不代表门店在售商品。','目前不包含离线商品管理、报价、CAD、AI 自动布局或 VR。','可执行文件未购买商业代码签名，企业安全软件可能要求确认来源。')
 $taskInstructions | Set-Content -Encoding UTF8 "$taskOutput/使用说明.txt"
 $taskFiles=Get-ChildItem -LiteralPath $taskOutput -Recurse -File | ForEach-Object { @{path=$_.FullName.Substring($taskOutput.Length+1).Replace('\','/');sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()} }
 $taskRevision=git rev-parse HEAD

@@ -75,6 +75,156 @@ async function project(page, requireModel = false) {
       .waitFor({ timeout: 90000 });
 }
 test(
+  "offline customer to project to scene survives reload and keeps legacy scenes separate",
+  { timeout: 120000 },
+  async (t) => {
+    const { page, errors } = await setup(t);
+    await page.locator("#project-name").fill("旧方案");
+    await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    await page.locator("#customer-name").fill("张先生");
+    await page.locator("#customer-phone").fill("13800000000");
+    await page.locator("#customer-budget").fill("80000.50");
+    await page.getByRole("button", { name: "保存客户", exact: true }).click();
+    await page
+      .locator("#selected-customer")
+      .filter({ hasText: "张先生" })
+      .waitFor();
+    await page.locator("#sales-project-name").fill("龙湖小区120㎡");
+    await page.locator("#sales-project-address").fill("杭州龙湖小区");
+    await page.getByRole("button", { name: "保存项目", exact: true }).click();
+    await page
+      .locator("#selected-project")
+      .filter({ hasText: "龙湖小区120㎡" })
+      .waitFor();
+    await page
+      .locator("#message")
+      .filter({ hasText: "可以新建方案" })
+      .waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: "旧方案", exact: true }).count(),
+      0,
+    );
+    await page.locator("#project-name").fill("客厅设计");
+    await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    await page
+      .getByRole("button", { name: "载入两室一厅", exact: true })
+      .click();
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    await page.locator("#furniture-x").fill("3500");
+    await page
+      .getByRole("button", { name: "更新家具位置", exact: true })
+      .click();
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v2" }).waitFor();
+    await page.getByRole("button", { name: "查看 v1", exact: true }).click();
+    await page.getByRole("button", { name: "恢复此版本", exact: true }).click();
+    await page.getByRole("button", { name: "确认恢复", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v3" }).waitFor();
+    await page.reload();
+    await page.getByRole("button", { name: "张先生", exact: true }).click();
+    await page
+      .getByRole("button", { name: "龙湖小区120㎡", exact: true })
+      .click();
+    await page.getByRole("button", { name: "客厅设计", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v3" }).waitFor();
+    await page.getByRole("button", { name: "查看 v1", exact: true }).waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: "查看 v1", exact: true }).count(),
+      1,
+    );
+    assert.equal(
+      await page.getByRole("button", { name: "查看 v2", exact: true }).count(),
+      1,
+    );
+    await page.getByRole("button", { name: "旧方案入口", exact: true }).click();
+    await page.getByRole("button", { name: "旧方案", exact: true }).waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: "客厅设计", exact: true }).count(),
+      0,
+    );
+    assert.equal(errors.length, 0, errors.join("\n"));
+    assert.equal(
+      await page.evaluate(() => localStorage.length + sessionStorage.length),
+      0,
+    );
+  },
+);
+test(
+  "customer and project stale edits preserve form values and layout fits landscape width",
+  { timeout: 90000 },
+  async (t) => {
+    const { page } = await setup(t);
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.locator("#customer-name").fill("李女士");
+    await page.getByRole("button", { name: "保存客户", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "已保存在本机" })
+      .waitFor();
+    await page.locator("#sales-project-name").fill("江景苑");
+    await page.getByRole("button", { name: "保存项目", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "可以新建方案" })
+      .waitFor();
+    const origin = new URL(page.url()).origin;
+    const call = async (body) =>
+      (
+        await page.request.post(`${origin}/api/local`, {
+          headers: { origin },
+          data: body,
+        })
+      ).json();
+    const customers = await call({ action: "customers" });
+    assert.equal(customers.status, 200, JSON.stringify(customers));
+    const customer = customers.data.items[0];
+    await call({
+      action: "customer_update",
+      id: customer.id,
+      base_revision: 1,
+      name: "其他窗口修改",
+      status: "following",
+    });
+    await page.locator("#customer-name").fill("我的未保存修改");
+    await page.getByRole("button", { name: "更新客户", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: /修改已保留|数据已变化/ })
+      .waitFor();
+    assert.equal(
+      await page.locator("#customer-name").inputValue(),
+      "我的未保存修改",
+    );
+    const project = (
+      await call({ action: "projects", customer_id: customer.id })
+    ).data.items[0];
+    await call({
+      action: "project_update",
+      id: project.id,
+      base_revision: 1,
+      name: "其他项目名",
+      status: "active",
+    });
+    await page.locator("#sales-project-name").fill("我的项目改动");
+    await page.getByRole("button", { name: "更新项目", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: /修改已保留|数据已变化/ })
+      .waitFor();
+    assert.equal(
+      await page.locator("#sales-project-name").inputValue(),
+      "我的项目改动",
+    );
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      true,
+    );
+  },
+);
+test(
   "actual offline render, furniture edit v2, immutable restore v3 and page reload",
   { timeout: 120000 },
   async (t) => {

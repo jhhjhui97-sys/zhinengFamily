@@ -27,8 +27,77 @@
     </header>
     <main>
       <aside class="library">
+        <div class="section-title">门店客户</div>
+        <div id="selected-customer" class="selection-note">尚未选择客户</div>
+        <div id="customer-items" class="library-items"></div>
+        <div class="pager">
+          <button id="customer-prev">上一页</button
+          ><button id="customer-next">下一页</button>
+        </div>
+        <div id="customer-count" class="muted">共 0 位客户</div>
+        <details id="customer-form-panel" open>
+          <summary>新建 / 编辑客户</summary>
+          <label for="customer-name">姓名 *</label
+          ><input id="customer-name" maxlength="120" autocomplete="off" />
+          <label for="customer-phone">手机</label
+          ><input id="customer-phone" maxlength="40" autocomplete="off" />
+          <label for="customer-wechat">微信</label
+          ><input id="customer-wechat" maxlength="100" autocomplete="off" />
+          <label for="customer-source">来源</label
+          ><input id="customer-source" maxlength="100" />
+          <label for="customer-address">地址</label
+          ><input id="customer-address" maxlength="500" />
+          <label for="customer-budget">预算 / 元</label
+          ><input
+            id="customer-budget"
+            inputmode="decimal"
+            placeholder="例如 80000.50"
+          />
+          <label for="customer-status">状态</label
+          ><select id="customer-status">
+            <option value="new">新客户</option>
+            <option value="following">跟进中</option>
+            <option value="won">已成交</option>
+            <option value="lost">未成交</option>
+          </select>
+          <label for="customer-notes">备注</label
+          ><textarea id="customer-notes"></textarea>
+          <div class="form-actions">
+            <button id="customer-create">保存客户</button
+            ><button id="customer-edit">更新客户</button>
+          </div>
+        </details>
+        <hr />
+        <div class="section-title">设计项目</div>
+        <div id="selected-project" class="selection-note">请先选择客户</div>
+        <div id="sales-project-items" class="library-items"></div>
+        <div class="pager">
+          <button id="sales-project-prev">上一页</button
+          ><button id="sales-project-next">下一页</button>
+        </div>
+        <div id="sales-project-count" class="muted">共 0 个项目</div>
+        <details id="sales-project-form-panel" open>
+          <summary>新建 / 编辑项目</summary>
+          <label for="sales-project-name">项目名称 *</label
+          ><input id="sales-project-name" maxlength="200" />
+          <label for="sales-project-address">项目地址</label
+          ><input id="sales-project-address" maxlength="500" />
+          <label for="sales-project-status">状态</label
+          ><select id="sales-project-status">
+            <option value="draft">草稿</option>
+            <option value="active">进行中</option>
+            <option value="archived">已归档</option>
+          </select>
+          <div class="form-actions">
+            <button id="sales-project-create">保存项目</button
+            ><button id="sales-project-edit">更新项目</button>
+          </div>
+        </details>
+        <hr />
+        <button id="legacy">旧方案入口</button>
         <div class="section-title">
-          我的方案 <span id="library-count">0</span>
+          <span id="scene-scope-label">旧方案</span>
+          <span id="library-count">0</span>
         </div>
         <label for="project-name">方案名称</label
         ><input
