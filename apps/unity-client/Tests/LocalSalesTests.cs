@@ -75,6 +75,43 @@ public static class LocalSalesTests {
     Reject(()=>other.UpdateProject(project,2,"越权",null,"draft"),LocalErrorCode.NotFound);
    }
   });
+  Test("project scenes are linked atomically and legacy scenes remain available",()=>{
+   string path=Path.Combine(directory,"sales-scene-links.sqlite");
+   Guid workspace=Guid.NewGuid(),actor=Guid.NewGuid(),linked,project,legacy;
+   using(var store=new LocalSceneStore(path,workspace,actor,validator)) {
+    Guid customer=store.CreateCustomer("张先生").Id;
+    Guid otherCustomer=store.CreateCustomer("李女士").Id;
+    project=store.CreateProject(customer,"龙湖小区").Id;
+    Guid otherProject=store.CreateProject(otherCustomer,"江景苑").Id;
+    linked=store.CreateForProject(project,"客厅方案");
+    legacy=store.Create("以前保存的方案");
+    Check(store.ProjectScenes(project).Total==1&&store.ProjectScenes(otherProject).Total==0,"project scene list leaked");
+    Check(store.LegacyDocuments().Total==1&&store.LegacyDocuments().Items[0].Id==legacy,"legacy scene was hidden or linked");
+    store.RequireSceneAccess(linked,project);
+    store.RequireSceneAccess(legacy,null);
+    Reject(()=>store.RequireSceneAccess(linked,null),LocalErrorCode.NotFound);
+    Reject(()=>store.RequireSceneAccess(linked,otherProject),LocalErrorCode.NotFound);
+    Reject(()=>store.RequireSceneAccess(legacy,project),LocalErrorCode.NotFound);
+    Reject(()=>store.CreateForProject(Guid.NewGuid(),"不存在"),LocalErrorCode.NotFound);
+    store.Catalog(Guid.Parse("40000000-0000-4000-8000-000000000002"),"沙发",2400,950,850);
+    string scene=File.ReadAllText(Path.Combine(Path.GetDirectoryName(schema),"two-bedroom.json"));
+    store.Put(linked,0,scene);store.Put(linked,1,scene);store.Restore(linked,2,1);
+    Check(store.Current(linked).Revision==3&&store.Versions(linked).Count==3,"linked history damaged");
+    using(var sql=new SqliteConnection(path)) {
+     sql.Execute("CREATE TRIGGER reject_link BEFORE INSERT ON project_scenes BEGIN SELECT RAISE(ABORT,'test failure'); END");
+     Reject(()=>store.CreateForProject(project,"不能半成品"),LocalErrorCode.Conflict);
+     Check((long)sql.Query("SELECT COUNT(*) n FROM scene_documents WHERE name='不能半成品'")[0]["n"]==0,"failed link left orphan scene");
+    }
+   }
+   using(var reopened=new LocalSceneStore(path,workspace,actor,validator)) {
+    reopened.RequireSceneAccess(linked,project);
+    Check(reopened.Current(linked).Revision==3&&reopened.LegacyDocuments().Total==1,"restart lost scene relation");
+   }
+   using(var other=new LocalSceneStore(path,Guid.NewGuid(),Guid.NewGuid(),validator)) {
+    Reject(()=>other.RequireSceneAccess(linked,project),LocalErrorCode.NotFound);
+    Reject(()=>other.ProjectScenes(project),LocalErrorCode.NotFound);
+   }
+  });
   Console.WriteLine("Local sales: "+passed+" passed");
  }
 }

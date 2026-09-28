@@ -146,5 +146,54 @@ namespace LocalScenes {
    if(changed!=1) throw new LocalStoreError(LocalErrorCode.Conflict);
    return Project(id);
   }
+  public Guid CreateForProject(Guid projectId,string name) {
+   name=Name(name);
+   Guid document=Guid.NewGuid();
+   db.Transaction(()=>{
+    Project(projectId);
+    db.Execute("INSERT INTO scene_documents(id,workspace_id,name) VALUES(?,?,?)",Key(document),Key(workspace),name);
+    db.Execute("INSERT INTO project_scenes(workspace_id,project_id,document_id) VALUES(?,?,?)",Key(workspace),Key(projectId),Key(document));
+   });
+   return document;
+  }
+  public void RequireSceneAccess(Guid document,Guid? projectId) {
+   Document(document);
+   if(projectId.HasValue) Project(projectId.Value);
+   var links=db.Query("SELECT project_id FROM project_scenes WHERE workspace_id=? AND document_id=?",Key(workspace),Key(document));
+   if(projectId.HasValue) {
+    if(links.Count!=1||(string)links[0]["project_id"]!=Key(projectId.Value)) throw new LocalStoreError(LocalErrorCode.NotFound);
+   } else if(links.Count!=0) throw new LocalStoreError(LocalErrorCode.NotFound);
+  }
+  public LocalScenePage ProjectScenes(Guid projectId,int limit=20,int offset=0) {
+   Input(limit>=1&&limit<=100&&offset>=0);Project(projectId);
+   LocalScenePage page=null;
+   db.Transaction(()=>{
+    long total=(long)db.Query("SELECT COUNT(*) n FROM project_scenes WHERE workspace_id=? AND project_id=?",Key(workspace),Key(projectId))[0]["n"];
+    var items=new List<LocalSceneSummary>();
+    foreach(var row in db.Query(@"SELECT d.id,d.name,d.current_revision,d.updated_at FROM scene_documents d
+     JOIN project_scenes l ON l.workspace_id=d.workspace_id AND l.document_id=d.id
+     WHERE l.workspace_id=? AND l.project_id=? ORDER BY COALESCE(d.updated_at,'') DESC,d.id ASC LIMIT ? OFFSET ?",Key(workspace),Key(projectId),limit,offset))
+     items.Add(new LocalSceneSummary {Id=Guid.Parse((string)row["id"]),Name=(string)row["name"],
+      Revision=row["current_revision"]==null?0:(long)row["current_revision"],UpdatedAt=(string)row["updated_at"]});
+    page=new LocalScenePage {Total=total,Items=items};
+   });
+   return page;
+  }
+  public LocalScenePage LegacyDocuments(int limit=20,int offset=0) {
+   Input(limit>=1&&limit<=100&&offset>=0);
+   LocalScenePage page=null;
+   db.Transaction(()=>{
+    long total=(long)db.Query(@"SELECT COUNT(*) n FROM scene_documents d WHERE d.workspace_id=?
+     AND NOT EXISTS(SELECT 1 FROM project_scenes l WHERE l.workspace_id=d.workspace_id AND l.document_id=d.id)",Key(workspace))[0]["n"];
+    var items=new List<LocalSceneSummary>();
+    foreach(var row in db.Query(@"SELECT d.id,d.name,d.current_revision,d.updated_at FROM scene_documents d WHERE d.workspace_id=?
+     AND NOT EXISTS(SELECT 1 FROM project_scenes l WHERE l.workspace_id=d.workspace_id AND l.document_id=d.id)
+     ORDER BY COALESCE(d.updated_at,'') DESC,d.id ASC LIMIT ? OFFSET ?",Key(workspace),limit,offset))
+     items.Add(new LocalSceneSummary {Id=Guid.Parse((string)row["id"]),Name=(string)row["name"],
+      Revision=row["current_revision"]==null?0:(long)row["current_revision"],UpdatedAt=(string)row["updated_at"]});
+    page=new LocalScenePage {Total=total,Items=items};
+   });
+   return page;
+  }
  }
 }

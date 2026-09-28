@@ -236,3 +236,106 @@ test("customer and project bridge actions persist data and reject stale edits", 
     422,
   );
 });
+test("scene bridge scopes linked versions to customer and project while legacy scenes remain accessible", () => {
+  const w = workspace(true);
+  w({ action: "catalog" });
+  const firstCustomer = w({ action: "customer_create", name: "张先生" }).data
+    .id;
+  const secondCustomer = w({ action: "customer_create", name: "李女士" }).data
+    .id;
+  const project = w({
+    action: "project_create",
+    customer_id: firstCustomer,
+    name: "龙湖小区",
+  }).data.id;
+  const otherProject = w({
+    action: "project_create",
+    customer_id: secondCustomer,
+    name: "江景苑",
+  }).data.id;
+  assert.equal(
+    w({
+      action: "create",
+      customer_id: secondCustomer,
+      project_id: project,
+      name: "错误关联",
+    }).status,
+    404,
+  );
+  const created = w({
+    action: "create",
+    customer_id: firstCustomer,
+    project_id: project,
+    name: "客厅设计",
+  });
+  assert.equal(created.status, 200);
+  const id = created.data.id;
+  assert.equal(
+    w({ action: "list", customer_id: firstCustomer, project_id: project }).data
+      .total,
+    1,
+  );
+  assert.equal(w({ action: "list" }).data.total, 0);
+  assert.equal(w({ action: "current", id }).status, 404);
+  assert.equal(
+    w({
+      action: "current",
+      id,
+      customer_id: secondCustomer,
+      project_id: project,
+    }).status,
+    404,
+  );
+  assert.equal(
+    w({
+      action: "current",
+      id,
+      customer_id: secondCustomer,
+      project_id: otherProject,
+    }).status,
+    404,
+  );
+  const fields = { id, customer_id: firstCustomer, project_id: project };
+  const scene = w({ action: "sample", ...fields }).data.scene;
+  assert.equal(
+    w({ action: "save", ...fields, base_revision: 0, scene }).data.revision,
+    1,
+  );
+  scene.rooms[0].name = "更新后的客厅";
+  assert.equal(
+    w({ action: "save", ...fields, base_revision: 1, scene }).data.revision,
+    2,
+  );
+  assert.equal(
+    w({ action: "restore", ...fields, base_revision: 2, revision: 1 }).data
+      .revision,
+    3,
+  );
+  assert.deepEqual(
+    w({ action: "versions", ...fields }).data.map((v) => v.revision),
+    [3, 2, 1],
+  );
+  assert.equal(
+    w({
+      action: "save",
+      id,
+      customer_id: secondCustomer,
+      project_id: otherProject,
+      base_revision: 3,
+      scene,
+    }).status,
+    404,
+  );
+  const legacy = sample(w);
+  assert.equal(w({ action: "list" }).data.total, 1);
+  assert.equal(w({ action: "current", id: legacy.id }).status, 200);
+  assert.equal(
+    w({
+      action: "current",
+      id: legacy.id,
+      customer_id: firstCustomer,
+      project_id: project,
+    }).status,
+    404,
+  );
+});
