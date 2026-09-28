@@ -179,3 +179,110 @@ test(
     assert.equal(await page.locator("#empty-view").isVisible(), true);
   },
 );
+
+test(
+  "pending JSON cannot be silently saved or discarded when switching projects",
+  { timeout: 45000 },
+  async (t) => {
+    const { page } = await setup(t);
+    await project(page);
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "已保存 v1" }).waitFor();
+    await page.locator("#advanced").click();
+    const edited = (await page.locator("#scene-json").inputValue()).replace(
+      "客厅",
+      "我编辑的客厅",
+    );
+    await page.locator("#scene-json").fill(edited);
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "请先应用" }).waitFor();
+    assert.match(await page.locator("#revision").textContent(), /未保存修改/);
+    page.once("dialog", (dialog) => dialog.dismiss());
+    await page.locator("#project-name").fill("不会切换的方案");
+    await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    assert.equal(await page.locator("#scene-json").inputValue(), edited);
+    assert.match(await page.locator("#project-title").textContent(), /张先生/);
+    await page.getByRole("button", { name: "应用 JSON", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "场景已更新" }).waitFor();
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v2" }).waitFor();
+  },
+);
+
+test(
+  "pending furniture fields warn before project switch and pending history is cleared",
+  { timeout: 45000 },
+  async (t) => {
+    const { page } = await setup(t);
+    await project(page);
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "已保存 v1" }).waitFor();
+    await page.getByRole("button", { name: "查看 v1", exact: true }).click();
+    assert.equal(
+      await page.locator("#history-json-panel").evaluate((el) => el.open),
+      true,
+    );
+    await page.locator("#furniture-x").fill("3555");
+    page.once("dialog", (dialog) => dialog.dismiss());
+    await page.locator("#project-name").fill("别的方案");
+    await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    assert.equal(await page.locator("#furniture-x").inputValue(), "3555");
+    assert.match(await page.locator("#project-title").textContent(), /张先生/);
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "方案已建立" }).waitFor();
+    assert.equal(
+      await page.locator("#history-json-panel").evaluate((el) => el.open),
+      false,
+    );
+    assert.equal(await page.locator("#history-json").textContent(), "");
+  },
+);
+
+test(
+  "switching existing projects clears the prior history JSON and pending edits trigger unload protection",
+  { timeout: 45000 },
+  async (t) => {
+    const { page } = await setup(t);
+    await project(page);
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "已保存 v1" }).waitFor();
+    await page.locator("#project-name").fill("第二个方案");
+    await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "方案已建立" }).waitFor();
+    await page
+      .getByRole("button", { name: "张先生 · 龙湖小区120㎡", exact: true })
+      .click();
+    await page.getByRole("button", { name: "查看 v1", exact: true }).click();
+    assert.equal(
+      await page.locator("#history-json-panel").evaluate((el) => el.open),
+      true,
+    );
+    await page.getByRole("button", { name: "第二个方案", exact: true }).click();
+    await page
+      .locator("#project-title")
+      .filter({ hasText: "第二个方案" })
+      .waitFor();
+    assert.equal(
+      await page.locator("#history-json-panel").evaluate((el) => el.open),
+      false,
+    );
+    assert.equal(await page.locator("#history-json").textContent(), "");
+    await page
+      .getByRole("button", { name: "张先生 · 龙湖小区120㎡", exact: true })
+      .click();
+    await page
+      .locator("#project-title")
+      .filter({ hasText: "张先生 · 龙湖小区120㎡" })
+      .waitFor();
+    await page.locator("#furniture-y").fill("4000");
+    assert.equal(
+      await page.evaluate(() => {
+        const event = new Event("beforeunload", { cancelable: true });
+        window.dispatchEvent(event);
+        return event.defaultPrevented;
+      }),
+      true,
+    );
+  },
+);

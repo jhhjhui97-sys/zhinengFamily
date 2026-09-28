@@ -9,7 +9,8 @@ let active = null,
   busy = false,
   libraryOffset = 0,
   historyOffset = 0,
-  restoreIntent = null;
+  restoreIntent = null,
+  furnitureFieldsBaseline = null;
 const view = new RoomRenderer($("viewport"), $("render-status"));
 function message(value, error = false) {
   $("message").textContent = value;
@@ -18,8 +19,29 @@ function message(value, error = false) {
 function dirty() {
   return draft && JSON.stringify(draft) !== JSON.stringify(saved);
 }
+function pendingJson() {
+  return draft && $("scene-json").value !== JSON.stringify(draft, null, 2);
+}
+function pendingFurniture() {
+  return (
+    draft &&
+    furnitureFieldsBaseline &&
+    ["furniture-x", "furniture-y", "furniture-rotation"].some(
+      (id) => $(id).value !== furnitureFieldsBaseline[id],
+    )
+  );
+}
+function hasUnsavedChanges() {
+  return Boolean(dirty() || pendingJson() || pendingFurniture());
+}
+function refreshRevision() {
+  $("revision").textContent = active
+    ? (baseline ? `当前 v${baseline}` : "未保存") +
+      (hasUnsavedChanges() ? " · 有未保存修改" : "")
+    : "未保存";
+}
 function discard() {
-  return !dirty() || confirm("还有未保存的修改，确定放弃吗？");
+  return !hasUnsavedChanges() || confirm("还有未保存的修改，确定放弃吗？");
 }
 async function api(action, fields = {}) {
   const response = await fetch("/api/local", {
@@ -66,13 +88,17 @@ function fields() {
   $("dimensions").textContent = item
     ? `${item.width_mm} × ${item.depth_mm} × ${item.height_mm} mm`
     : "暂无家具";
+  furnitureFieldsBaseline = Object.fromEntries(
+    ["furniture-x", "furniture-y", "furniture-rotation"].map((id) => [
+      id,
+      $(id).value,
+    ]),
+  );
+  furnitureFieldsBaseline.selection = $("furniture-select").value;
+  refreshRevision();
 }
 function refreshDraft() {
   const selected = $("furniture-select").value;
-  $("revision").textContent = active
-    ? (baseline ? `当前 v${baseline}` : "未保存") +
-      (dirty() ? " · 有未保存修改" : "")
-    : "未保存";
   $("empty-view").hidden = Boolean(draft);
   $("scene-json").value = draft ? JSON.stringify(draft, null, 2) : "";
   $("furniture-select").replaceChildren();
@@ -86,6 +112,7 @@ function refreshDraft() {
   if (!$("furniture-select").value && $("furniture-select").options.length)
     $("furniture-select").selectedIndex = 0;
   fields();
+  refreshRevision();
   $("scene-stats").textContent = draft
     ? `${draft.rooms.length} 个房间 · ${draft.walls.length} 段墙体 · ${draft.furniture_instances.length} 件家具 · 真实毫米比例`
     : "毫米为单位 · 真实比例";
@@ -106,6 +133,8 @@ async function library() {
       saved = structuredClone(draft);
       history = null;
       historyOffset = 0;
+      $("history-json").textContent = "";
+      $("history-json-panel").open = false;
       $("project-title").textContent = item.name;
       refreshDraft();
       await versions();
@@ -155,6 +184,8 @@ $("new").onclick = () =>
     draft = saved = null;
     history = null;
     historyOffset = 0;
+    $("history-json").textContent = "";
+    $("history-json-panel").open = false;
     $("project-title").textContent = name;
     refreshDraft();
     await library();
@@ -178,6 +209,10 @@ $("save").onclick = () =>
       message("请先载入或编辑场景。", true);
       return;
     }
+    if (pendingJson() || pendingFurniture()) {
+      message("请先应用输入框中的修改，再保存新版本。", true);
+      return;
+    }
     if (!dirty()) {
       message("当前内容已保存，无需再次保存。");
       return;
@@ -196,6 +231,10 @@ $("apply-position").onclick = () =>
   run(async () => {
     if (!draft) {
       message("请先载入场景。", true);
+      return;
+    }
+    if (pendingJson()) {
+      message("请先应用高级场景 JSON，再调整家具位置。", true);
       return;
     }
     const x = Number($("furniture-x").value),
@@ -219,9 +258,19 @@ $("apply-position").onclick = () =>
     refreshDraft();
     message("家具位置已更新，请保存新版本。");
   });
-$("furniture-select").onchange = fields;
+$("furniture-select").onchange = () => {
+  if (pendingFurniture() && !confirm("位置输入尚未应用，确定放弃吗？")) {
+    $("furniture-select").value = furnitureFieldsBaseline.selection;
+    return;
+  }
+  fields();
+};
 $("apply-json").onclick = () =>
   run(async () => {
+    if (pendingFurniture()) {
+      message("请先更新家具位置，再应用高级场景 JSON。", true);
+      return;
+    }
     let candidate;
     try {
       candidate = JSON.parse($("scene-json").value);
@@ -295,10 +344,17 @@ $("capture").onclick = () => {
   message("已导出当前实际渲染画面。");
 };
 window.addEventListener("beforeunload", (e) => {
-  if (dirty()) {
+  if (hasUnsavedChanges()) {
     e.preventDefault();
     e.returnValue = "";
   }
 });
+for (const id of [
+  "scene-json",
+  "furniture-x",
+  "furniture-y",
+  "furniture-rotation",
+])
+  $(id).addEventListener("input", refreshRevision);
 window.addEventListener("pagehide", () => view.dispose());
 run(library);

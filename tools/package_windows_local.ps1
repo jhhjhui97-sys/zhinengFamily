@@ -35,4 +35,3 @@ $taskRevision=git rev-parse HEAD
 $taskDirty=!!(git status --porcelain)
 @{sourceRevision=$taskRevision;sourceDirty=$taskDirty;createdAt=[DateTime]::UtcNow.ToString('o');files=@($taskFiles)} | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 "$taskOutput/manifest.json"
 Write-Output "Windows local bundle: $taskOutput"
-
