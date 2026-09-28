@@ -4,14 +4,31 @@ import { chromium } from "playwright-core";
 import { mkdtemp, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
-import { createLocalServer } from "../server.mjs";
+import { pathToFileURL } from "node:url";
+const { createLocalServer } = await import(
+  process.env.FAMILY_BUNDLE
+    ? pathToFileURL(
+        join(process.env.FAMILY_BUNDLE, "runtime/client/server.mjs"),
+      ).href
+    : new URL("../server.mjs", import.meta.url).href
+);
 const root = resolve(import.meta.dirname, "../../..");
 async function setup(t) {
   const data = await mkdtemp(join(tmpdir(), "family-browser-"));
   const server = createLocalServer({
-    bridgePath: join(root, ".local/windows-bridge/LocalBridge.exe"),
+    bridgePath: process.env.FAMILY_BUNDLE
+      ? join(process.env.FAMILY_BUNDLE, "runtime/bridge/LocalBridge.exe")
+      : join(root, ".local/windows-bridge/LocalBridge.exe"),
     dataDirectory: data,
-    protocolDirectory: join(root, "apps/unity-client/Assets/StreamingAssets"),
+    protocolDirectory: process.env.FAMILY_BUNDLE
+      ? join(process.env.FAMILY_BUNDLE, "runtime/client/protocol")
+      : join(root, "apps/unity-client/Assets/StreamingAssets"),
+    publicDirectory: process.env.FAMILY_BUNDLE
+      ? join(process.env.FAMILY_BUNDLE, "runtime/client/public")
+      : join(root, "apps/windows-local/public"),
+    vendorDirectory: process.env.FAMILY_BUNDLE
+      ? join(process.env.FAMILY_BUNDLE, "runtime/client/node_modules/three")
+      : join(root, "apps/windows-local/node_modules/three"),
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   const url = `http://127.0.0.1:${server.address().port}`;

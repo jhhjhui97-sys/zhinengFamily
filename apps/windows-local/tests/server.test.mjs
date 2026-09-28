@@ -22,6 +22,7 @@ async function setup(t, extra = {}) {
   const response = await fetch(url);
   const cookie = response.headers.get("set-cookie").split(";")[0];
   return {
+    dataDirectory: dir,
     url,
     cookie,
     request: (body, headers = {}) =>
@@ -109,4 +110,42 @@ test("missing subprocess returns Chinese safe error", async (t) => {
   const r = await s.request({ action: "list" });
   assert.equal(r.status, 503);
   assert.match((await r.json()).error, /本地/);
+});
+test("same local data survives service restart without internet or login", async (t) => {
+  const s = await setup(t);
+  const created = await (
+    await s.request({ action: "create", name: "离线重启" })
+  ).json();
+  const id = created.data.id;
+  const sample = await (await s.request({ action: "sample", id })).json();
+  assert.equal(
+    (
+      await s.request({
+        action: "save",
+        id,
+        base_revision: 0,
+        scene: sample.data.scene,
+      })
+    ).status,
+    200,
+  );
+  const current = await (await s.request({ action: "current", id })).json();
+  assert.equal(current.data.revision, 1);
+  const recreated = createLocalServer({
+    bridgePath: join(root, ".local/windows-bridge/LocalBridge.exe"),
+    dataDirectory: s.dataDirectory,
+    protocolDirectory: join(root, "apps/unity-client/Assets/StreamingAssets"),
+    publicDirectory: s.dataDirectory,
+  });
+  await new Promise((r) => recreated.listen(0, "127.0.0.1", r));
+  t.after(() => new Promise((r) => recreated.close(r)));
+  const url = `http://127.0.0.1:${recreated.address().port}`;
+  const cookie = (await fetch(url)).headers.get("set-cookie").split(";")[0];
+  const response = await fetch(url + "/api/local", {
+    method: "POST",
+    headers: { origin: url, cookie, "content-type": "application/json" },
+    body: JSON.stringify({ action: "current", id }),
+  });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.revision, 1);
 });
