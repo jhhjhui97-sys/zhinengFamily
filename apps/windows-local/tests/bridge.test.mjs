@@ -132,3 +132,107 @@ test("unknown action and client identity fields rejected", () => {
     422,
   );
 });
+test("customer and project bridge actions persist data and reject stale edits", () => {
+  const w = workspace();
+  const customer = w({
+    action: "customer_create",
+    name: "张先生",
+    phone: "13800000001",
+    budget: "80000.50",
+    status: "following",
+  });
+  assert.equal(customer.status, 200);
+  const customerId = customer.data.id;
+  assert.equal(customer.data.budget, "80000.50");
+  assert.equal(w({ action: "customers" }).data.total, 1);
+  assert.equal(w({ action: "customer", id: customerId }).data.name, "张先生");
+  const edited = w({
+    action: "customer_update",
+    id: customerId,
+    base_revision: 1,
+    name: "张先生",
+    phone: "13800000001",
+    wechat: "wx-zhang",
+    source: "到店",
+    address: "龙湖小区",
+    budget: "90000.67",
+    status: "won",
+    notes: "已签约",
+  });
+  assert.equal(edited.data.revision, 2);
+  assert.equal(edited.data.budget, "90000.67");
+  assert.equal(
+    w({
+      action: "customer_update",
+      id: customerId,
+      base_revision: 1,
+      name: "覆盖",
+      status: "new",
+    }).status,
+    409,
+  );
+  const project = w({
+    action: "project_create",
+    customer_id: customerId,
+    name: "龙湖小区120㎡",
+    address: "杭州龙湖小区",
+  });
+  assert.equal(project.status, 200);
+  assert.equal(project.data.customer_id, customerId);
+  assert.equal(
+    w({ action: "projects", customer_id: customerId }).data.total,
+    1,
+  );
+  assert.equal(
+    w({ action: "project", id: project.data.id }).data.name,
+    "龙湖小区120㎡",
+  );
+  assert.equal(
+    w({
+      action: "project_update",
+      id: project.data.id,
+      base_revision: 1,
+      name: "龙湖精装",
+      address: "新地址",
+      status: "active",
+    }).data.revision,
+    2,
+  );
+  assert.equal(
+    w({
+      action: "project_update",
+      id: project.data.id,
+      base_revision: 1,
+      name: "旧编辑",
+      status: "draft",
+    }).status,
+    409,
+  );
+  assert.equal(
+    w({ action: "project_create", customer_id: customerId, name: "龙湖精装" })
+      .status,
+    409,
+  );
+  assert.equal(
+    w({ action: "customer_create", name: "张先生2", phone: "13800000001" })
+      .status,
+    409,
+  );
+  assert.equal(
+    w({
+      action: "project_create",
+      customer_id: "99999999-0000-4000-8000-000000000001",
+      name: "越权",
+    }).status,
+    404,
+  );
+  assert.equal(
+    w({
+      action: "project_create",
+      customer_id: customerId,
+      name: "伪造",
+      workspace_id: "other",
+    }).status,
+    422,
+  );
+});

@@ -13,6 +13,7 @@ public static class OfflineTests {
    ValidationTests.Run(args[0],args[1]);
    LocalStoreTests.Run(args[0],args[2],directory);
    LocalMigrationTests.Run(args[0],args[2],directory);
+   LocalSalesTests.Run(args[0],directory);
    ReviewRegressionTests.Run(args[0],args[2]);
    Console.WriteLine("All offline core suites passed on real SQLite");
    return 0;

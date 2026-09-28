@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 using SmartHome.SceneConsumer;
 namespace LocalScenes {
 /// <summary>Offline library. Workspace and actor are local provenance, never remote authentication.</summary>
-public sealed class LocalSceneStore : IDisposable {
+public sealed partial class LocalSceneStore : IDisposable {
  readonly SqliteConnection db;
  readonly Guid workspace,actor;
  readonly OfflineSceneValidator validator;
@@ -45,13 +45,15 @@ public sealed class LocalSceneStore : IDisposable {
      workspace_id TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL,
      phone TEXT, wechat TEXT, source TEXT, address TEXT, budget TEXT,
      status TEXT NOT NULL CHECK(status IN ('new','following','won','lost')),
-     notes TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+     notes TEXT, revision INTEGER NOT NULL CHECK(revision>=1),
+     created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
      PRIMARY KEY(workspace_id,id))");
     db.Execute("CREATE UNIQUE INDEX local_customers_phone ON local_customers(workspace_id,phone) WHERE phone IS NOT NULL AND phone<>''");
     db.Execute(@"CREATE TABLE local_projects(
      workspace_id TEXT NOT NULL, id TEXT NOT NULL, customer_id TEXT NOT NULL,
      sales_actor_id TEXT NOT NULL, name TEXT NOT NULL, address TEXT,
      status TEXT NOT NULL CHECK(status IN ('draft','active','archived')),
+     revision INTEGER NOT NULL CHECK(revision>=1),
      created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
      PRIMARY KEY(workspace_id,id), UNIQUE(workspace_id,customer_id,name),
      FOREIGN KEY(workspace_id,customer_id) REFERENCES local_customers(workspace_id,id))");
