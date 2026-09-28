@@ -13,7 +13,7 @@ const { createLocalServer } = await import(
     : new URL("../server.mjs", import.meta.url).href
 );
 const root = resolve(import.meta.dirname, "../../..");
-async function setup(t) {
+async function setup(t, { trackFrames = false } = {}) {
   const data = await mkdtemp(join(tmpdir(), "family-browser-"));
   const server = createLocalServer({
     bridgePath: process.env.FAMILY_BUNDLE
@@ -36,6 +36,16 @@ async function setup(t) {
   const context = await browser.newContext({
     viewport: { width: 1500, height: 1000 },
   });
+  if (trackFrames)
+    await context.addInitScript(() => {
+      const original = window.requestAnimationFrame.bind(window);
+      let requests = 0;
+      window.requestAnimationFrame = (callback) => {
+        requests++;
+        return original(callback);
+      };
+      window.__frameRequests = () => requests;
+    });
   await context.route("**/*", (route) =>
     new URL(route.request().url()).origin === url
       ? route.continue()
@@ -68,8 +78,17 @@ test(
   "actual offline render, furniture edit v2, immutable restore v3 and page reload",
   { timeout: 120000 },
   async (t) => {
-    const { page, errors } = await setup(t);
+    const { page, errors } = await setup(t, { trackFrames: true });
     await project(page, true);
+    await page.waitForTimeout(150);
+    const beforeIdle = await page.evaluate(() => window.__frameRequests());
+    await page.waitForTimeout(750);
+    const idleFrames =
+      (await page.evaluate(() => window.__frameRequests())) - beforeIdle;
+    assert.ok(
+      idleFrames <= 8,
+      `idle render loop requested ${idleFrames} frames`,
+    );
     await page.getByRole("button", { name: "保存新版本", exact: true }).click();
     await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
     await page.locator("#furniture-x").fill("3500");

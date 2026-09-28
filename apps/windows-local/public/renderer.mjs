@@ -25,6 +25,10 @@ export class RoomRenderer {
     this.controls.minDistance = 1;
     this.controls.maxDistance = 30;
     this.controls.maxPolarAngle = Math.PI * 0.49;
+    this.frame = 0;
+    this.disposed = false;
+    this.onControlsChange = () => this.scheduleFrame();
+    this.controls.addEventListener("change", this.onControlsChange);
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.environment = pmrem.fromScene(new RoomEnvironment(), 0.04);
     this.scene.environment = this.environment.texture;
@@ -58,7 +62,11 @@ export class RoomRenderer {
     this.resize.observe(host);
     this.interior();
     this.size();
-    this.renderer.setAnimationLoop(() => {
+  }
+  scheduleFrame() {
+    if (this.frame || this.disposed) return;
+    this.frame = requestAnimationFrame(() => {
+      this.frame = 0;
       this.controls.update();
       this.renderer.render(this.scene, this.camera);
     });
@@ -69,16 +77,19 @@ export class RoomRenderer {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
+    this.scheduleFrame();
   }
   interior() {
     this.camera.position.set(7, 2.15, -0.5);
     this.controls.target.set(4, 0.8, -2);
     this.controls.update();
+    this.scheduleFrame();
   }
   overview() {
     this.camera.position.set(13, 12, 9);
     this.controls.target.set(4, 0, -4);
     this.controls.update();
+    this.scheduleFrame();
   }
   box(w, h, d, material, x, y, z) {
     const geometry = new THREE.BoxGeometry(w, h, d);
@@ -96,6 +107,7 @@ export class RoomRenderer {
     this.resources = [];
     this.renderer.domElement.dataset.modelLoaded = "false";
     this.status.textContent = "家具模型尚未加载";
+    this.scheduleFrame();
   }
   async show(document) {
     this.clear();
@@ -192,6 +204,7 @@ export class RoomRenderer {
       pane.castShadow = false;
       this.content.add(pane);
     }
+    this.scheduleFrame();
     try {
       const source = await this.modelPromise;
       if (serial !== this.renderSerial) return;
@@ -224,6 +237,7 @@ export class RoomRenderer {
       }
       this.renderer.domElement.dataset.modelLoaded = "true";
       this.status.textContent = "真实沙发模型 · PBR 材质 · 本地渲染";
+      this.scheduleFrame();
     } catch {
       if (serial === this.renderSerial)
         this.status.textContent =
@@ -236,9 +250,11 @@ export class RoomRenderer {
   }
   dispose() {
     this.renderSerial++;
+    this.disposed = true;
+    if (this.frame) cancelAnimationFrame(this.frame);
     this.resize.disconnect();
+    this.controls.removeEventListener("change", this.onControlsChange);
     this.controls.dispose();
-    this.renderer.setAnimationLoop(null);
     this.renderer.dispose();
     this.environment.dispose();
     for (const r of this.resources) r.dispose();
