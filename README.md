@@ -2,11 +2,17 @@
 
 面向家具/家电门店的 AI + 3D 设计与销售系统。当前已实现 Phase 1 业务后端、统一 SceneModel 协议，以及 Phase 2 中文后台的客户、商品、设计项目和场景版本管理。
 
-当前代码包含五个核心数据库实体、登录认证、客户/商品/项目 CRUD、SceneModel、Local 存储接口及交付配置。Linux CI 全量验证为 **290 passed, 2 warnings**；Ruff、Alembic migration、SceneModel/OpenAPI 契约检查和 Docker build 均通过，Phase 1 已通过复审。详细证据见 [执行记录](docs/superpowers/plans/2026-09-17-phase-1-progress.md)。新增 Phase 3-1 Unity 最小离线场景消费者源工程；尚未通过 Unity Editor 或 iPad 实机验收。没有户型解析、AI 摆放或渲染交付实现。
+当前代码包含五个核心数据库实体、登录认证、客户/商品/项目 CRUD、SceneModel、Local 存储接口及交付配置。Linux CI 全量验证为 **290 passed, 2 warnings**；Ruff、Alembic migration、SceneModel/OpenAPI 契约检查和 Docker build 均通过，Phase 1 已通过复审。详细证据见 [执行记录](docs/superpowers/plans/2026-09-17-phase-1-progress.md)。新增 Phase 3-1 Unity 最小离线场景消费者源工程；尚未通过 Unity Editor 或 iPad 实机验收。仍没有自动户型解析和 AI 摆放；Windows 本地客户端已有实际 3D 渲染，但 Unity Editor/Player 尚未验收。
 
-## iPad 独立离线版方向
+## Windows 本地体验版（当前首要交付）
 
-用户已确认最终在 iPad 本机独立使用，日常无需电脑、局域网或互联网。Phase 3-2A 提供 SQLite 本地场景库、完整离线校验和不可变版本核心；已有 Web 后台不作为 iPad 运行依赖。本阶段未完成本地业务界面及 iOS 安装包，Unity Editor、IL2CPP 和 iPad 实机未执行。详见 [客户端说明](apps/unity-client/README.md) 和 [验证记录](docs/phase-3-2a-verification.md)。
+可在 Windows 10/11 双击便携包的 `智能家居.exe` 使用本机离线 3D 场景：内置沙发、单人椅、丝绒沙发和冰箱四款有纹理的演示模型，可选房间放置、调整位置/角度，并用 SQLite 保存和恢复版本。无需 Mac 或云端 API。这些演示模型不等于门店在售商品；客户/商品业务仍由原 Web 后台提供，完整离线门店软件尚未完成。实际运行画面及启动方式见 [Windows 客户端说明](apps/windows-local/README.md)，验证见 [记录](docs/windows-local-verification.md)。
+
+![实际运行的沙发与单人椅场景](docs/images/windows-local-catalog-room.png)
+
+## 原 iPad 独立离线方向（暂缓）
+
+先前目标是 iPad 本机独立使用；用户现将 Windows 本地版设为首要交付，iPad 安装包暂缓。Phase 3-2A 提供 SQLite 本地场景库、完整离线校验和不可变版本核心；已有 Web 后台不作为 iPad 运行依赖。本阶段未完成本地业务界面及 iOS 安装包，Unity Editor、IL2CPP 和 iPad 实机未执行。详见 [客户端说明](apps/unity-client/README.md) 和 [验证记录](docs/phase-3-2a-verification.md)。
 
 ## 环境要求
 

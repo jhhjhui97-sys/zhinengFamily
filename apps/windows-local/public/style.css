@@ -1,0 +1,376 @@
+:root {
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: #263732;
+  background: #f4f5f1;
+  font-size: 14px;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+header {
+  height: 76px;
+  background: #17382f;
+  color: white;
+  display: flex;
+  align-items: center;
+  padding: 0 28px;
+  gap: 34px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-mark {
+  font-size: 24px;
+  background: #d8b987;
+  color: #17382f;
+  border-radius: 12px;
+  padding: 8px;
+}
+.brand strong {
+  display: block;
+  font-size: 20px;
+  letter-spacing: 3px;
+}
+.brand small {
+  display: block;
+  color: #b9cdc3;
+  margin-top: 4px;
+  letter-spacing: 2px;
+}
+.local-tag {
+  border: 1px solid #527164;
+  border-radius: 30px;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: #d2e3d9;
+}
+.header-note {
+  margin-left: auto;
+  color: #b9cdc3;
+}
+main {
+  display: grid;
+  grid-template-columns: 230px minmax(380px, 1fr) 270px;
+  min-height: calc(100vh - 76px);
+}
+aside {
+  padding: 24px 18px;
+  background: #fff;
+  border-right: 1px solid #e1e6df;
+}
+.inspector {
+  border-left: 1px solid #e1e6df;
+  border-right: 0;
+}
+.section-title {
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 22px;
+}
+.section-title span {
+  font-size: 12px;
+  color: #7b897f;
+  margin-left: 10px;
+}
+label {
+  display: block;
+  margin: 12px 0 7px;
+  font-size: 12px;
+  color: #617168;
+}
+input,
+textarea,
+select {
+  font: inherit;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d7dfd5;
+  border-radius: 7px;
+  background: #fbfcfa;
+  color: #263732;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid #4f806c;
+  outline-offset: 1px;
+}
+button {
+  font: inherit;
+  padding: 10px 14px;
+  border: 1px solid #cfdace;
+  border-radius: 7px;
+  background: #fff;
+  color: #355347;
+  cursor: pointer;
+  min-height: 40px;
+}
+button:hover {
+  background: #eef4ee;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.primary {
+  background: #315e4b;
+  color: white;
+  border-color: #315e4b;
+}
+.primary:hover {
+  background: #224b3a;
+}
+.library > #new {
+  width: 100%;
+  margin-top: 12px;
+  background: #e8efe5;
+}
+.library-items {
+  margin-top: 25px;
+  display: grid;
+  gap: 8px;
+}
+.library-items button {
+  text-align: left;
+  font-size: 13px;
+  background: #f5f7f2;
+}
+.library-items small {
+  display: block;
+  color: #859488;
+  font-size: 11px;
+  margin-top: 5px;
+}
+.pager {
+  display: flex;
+  gap: 7px;
+  margin-top: 16px;
+}
+.pager button {
+  font-size: 11px;
+  flex: 1;
+  padding: 6px;
+}
+.library-foot {
+  color: #859084;
+  line-height: 1.8;
+  margin-top: 30px;
+  font-size: 11px;
+}
+.workspace {
+  padding: 25px 26px;
+  min-width: 0;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+h1 {
+  font-size: 21px;
+  margin: 0 0 7px;
+  font-weight: 600;
+}
+#revision {
+  font-size: 12px;
+  color: #6c7d70;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+}
+#message {
+  min-height: 39px;
+  padding-top: 13px;
+  color: #56715e;
+  font-size: 12px;
+}
+#message.error {
+  color: #ac4032;
+}
+.viewport-wrap {
+  position: relative;
+  background: #e5e6df;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #dce2d6;
+}
+#viewport {
+  height: min(65vh, 680px);
+  min-height: 420px;
+  position: relative;
+}
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.empty-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #798478;
+  z-index: 1;
+  pointer-events: none;
+}
+.empty-view span {
+  font-size: 23px;
+}
+.empty-view p {
+  font-size: 13px;
+}
+.view-tools {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  display: flex;
+  gap: 6px;
+}
+.view-tools button {
+  background: #ffffffe3;
+  font-size: 12px;
+  border: 0;
+  box-shadow: 0 2px 8px #0001;
+}
+.render-note {
+  position: absolute;
+  bottom: 14px;
+  left: 16px;
+  background: #ffffffdb;
+  color: #576f5f;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.scene-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  color: #84907f;
+  font-size: 11px;
+  padding: 14px 2px;
+}
+.muted {
+  color: #7c887c;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.number-row {
+  display: flex;
+  gap: 10px;
+}
+.number-row label {
+  width: 50%;
+}
+#add-furniture {
+  width: 100%;
+  margin-top: 12px;
+  background: #e8efe5;
+}
+#apply-position {
+  width: 100%;
+  margin-top: 12px;
+}
+hr {
+  border: 0;
+  border-top: 1px solid #e3e8dd;
+  margin: 24px 0;
+}
+#history-items button {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  font-size: 12px;
+}
+#history-items small {
+  color: #8b978b;
+  font-size: 10px;
+}
+details {
+  margin-top: 16px;
+  color: #677560;
+  font-size: 12px;
+}
+summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 7px 0;
+}
+textarea {
+  height: 260px;
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  margin: 8px 0;
+}
+pre {
+  white-space: pre-wrap;
+  max-height: 250px;
+  overflow: auto;
+  font-size: 10px;
+  background: #f3f5f0;
+  padding: 12px;
+}
+dialog {
+  border: 0;
+  border-radius: 12px;
+  padding: 26px;
+  box-shadow: 0 10px 80px #0005;
+  max-width: 400px;
+}
+dialog::backdrop {
+  background: #152e2655;
+}
+dialog p {
+  line-height: 1.8;
+  color: #657566;
+}
+dialog h2 {
+  font-size: 20px;
+}
+a {
+  color: #3d6a51;
+}
+@media (max-width: 1200px) {
+  main {
+    grid-template-columns: 190px minmax(380px, 1fr) 230px;
+  }
+  .workspace {
+    padding: 20px 15px;
+  }
+  .toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  #viewport {
+    height: 56vh;
+  }
+  .scene-footer {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+@media (max-width: 900px) {
+  main {
+    grid-template-columns: 180px 1fr;
+  }
+  .inspector {
+    grid-column: 1/3;
+  }
+  .header-note {
+    display: none;
+  }
+}
+[hidden] {
+  display: none !important;
+}

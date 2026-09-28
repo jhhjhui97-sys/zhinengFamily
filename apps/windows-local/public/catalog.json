@@ -1,0 +1,38 @@
+[
+  {
+    "id": "40000000-0000-4000-8000-000000000002",
+    "name": "复古三人沙发（演示）",
+    "category": "sofa",
+    "width_mm": 2400,
+    "depth_mm": 950,
+    "height_mm": 850,
+    "model": "/assets/sofa.glb"
+  },
+  {
+    "id": "40000000-0000-4000-8000-000000000003",
+    "name": "织物单人椅（演示）",
+    "category": "chair",
+    "width_mm": 800,
+    "depth_mm": 800,
+    "height_mm": 900,
+    "model": "/assets/chair.glb"
+  },
+  {
+    "id": "40000000-0000-4000-8000-000000000004",
+    "name": "丝绒沙发（演示）",
+    "category": "sofa",
+    "width_mm": 2200,
+    "depth_mm": 900,
+    "height_mm": 820,
+    "model": "/assets/velvet-sofa.glb"
+  },
+  {
+    "id": "40000000-0000-4000-8000-000000000005",
+    "name": "商用冰箱（演示）",
+    "category": "appliance",
+    "width_mm": 900,
+    "depth_mm": 700,
+    "height_mm": 2000,
+    "model": "/assets/refrigerator.glb"
+  }
+]

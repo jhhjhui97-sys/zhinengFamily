@@ -1,0 +1,56 @@
+name: Windows Local
+on:
+  push:
+    branches: [main, 'codex/**']
+    paths: ['apps/windows-local/**', 'apps/unity-client/Assets/LocalScenes/**', 'apps/unity-client/Assets/SceneConsumer/Core/**', 'apps/unity-client/Assets/StreamingAssets/**', 'tools/*windows*.ps1', '.github/workflows/windows-local.yml']
+  pull_request:
+    paths: ['apps/windows-local/**', 'apps/unity-client/Assets/LocalScenes/**', 'apps/unity-client/Assets/SceneConsumer/Core/**', 'apps/unity-client/Assets/StreamingAssets/**', 'tools/*windows*.ps1', '.github/workflows/windows-local.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-local:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/windows-local/package-lock.json
+      - name: Install dependencies
+        run: npm ci --prefix apps/windows-local
+      - name: Prepare licensed runtime inputs
+        run: |
+          New-Item -ItemType Directory -Force .local/ci-input | Out-Null
+          Invoke-WebRequest 'https://www.nuget.org/api/v2/package/Newtonsoft.Json/13.0.2' -OutFile .local/ci-input/newtonsoft.zip
+          Expand-Archive -LiteralPath .local/ci-input/newtonsoft.zip -DestinationPath .local/ci-input/json
+          $taskNodeVersion = node --version
+          Invoke-WebRequest "https://raw.githubusercontent.com/nodejs/node/$taskNodeVersion/LICENSE" -OutFile .local/ci-input/Node-LICENSE.txt
+          Invoke-WebRequest 'https://raw.githubusercontent.com/JamesNK/Newtonsoft.Json/13.0.2/LICENSE.md' -OutFile .local/ci-input/Newtonsoft-LICENSE.txt
+      - name: Build portable Windows bundle
+        run: |
+          ./tools/package_windows_local.ps1 -NodeExe (Get-Command node.exe).Source -NewtonsoftDll .local/ci-input/json/lib/net45/Newtonsoft.Json.dll -NodeLicense .local/ci-input/Node-LICENSE.txt -NewtonsoftLicense .local/ci-input/Newtonsoft-LICENSE.txt
+      - name: Existing offline core regressions
+        run: ./tools/test_offline_core.ps1 -NewtonsoftDll .local/ci-input/json/lib/net45/Newtonsoft.Json.dll
+      - name: Syntax and format
+        run: |
+          npm run check --prefix apps/windows-local
+          npm run format:check --prefix apps/windows-local
+      - name: Real SQLite and packaged browser tests
+        run: |
+          $env:FAMILY_BUNDLE = Join-Path $PWD '.local/windows-portable/智能家居本地版'
+          npm test --prefix apps/windows-local
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-local-evidence
+          path: .local/windows-evidence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zhineng-family-windows-local
+          path: .local/windows-portable/智能家居本地版
