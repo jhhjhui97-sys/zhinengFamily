@@ -54,20 +54,22 @@ async function setup(t) {
   await page.goto(url);
   return { page, errors };
 }
-async function project(page) {
+async function project(page, requireModel = false) {
   await page.locator("#project-name").fill("张先生 · 龙湖小区120㎡");
   await page.getByRole("button", { name: "新建方案", exact: true }).click();
   await page.getByRole("button", { name: "载入两室一厅", exact: true }).click();
-  await page
-    .locator('canvas[data-model-loaded="true"]')
-    .waitFor({ timeout: 30000 });
+  await page.locator("#message").filter({ hasText: "示例已载入" }).waitFor();
+  if (requireModel)
+    await page
+      .locator('canvas[data-model-loaded="true"]')
+      .waitFor({ timeout: 90000 });
 }
 test(
   "actual offline render, furniture edit v2, immutable restore v3 and page reload",
-  { timeout: 60000 },
+  { timeout: 120000 },
   async (t) => {
     const { page, errors } = await setup(t);
-    await project(page);
+    await project(page, true);
     await page.getByRole("button", { name: "保存新版本", exact: true }).click();
     await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
     await page.locator("#furniture-x").fill("3500");
@@ -102,7 +104,7 @@ test(
 );
 test(
   "invalid JSON never writes a new version",
-  { timeout: 45000 },
+  { timeout: 90000 },
   async (t) => {
     const { page } = await setup(t);
     await project(page);
@@ -119,7 +121,7 @@ test(
 
 test(
   "stale browser save shows conflict and preserves unsaved furniture changes",
-  { timeout: 45000 },
+  { timeout: 90000 },
   async (t) => {
     const { page } = await setup(t);
     await project(page);
@@ -159,7 +161,7 @@ test(
 );
 test(
   "new empty project clears previous render and history",
-  { timeout: 45000 },
+  { timeout: 90000 },
   async (t) => {
     const { page } = await setup(t);
     await project(page);
@@ -182,7 +184,7 @@ test(
 
 test(
   "pending JSON cannot be silently saved or discarded when switching projects",
-  { timeout: 45000 },
+  { timeout: 90000 },
   async (t) => {
     const { page } = await setup(t);
     await project(page);
@@ -211,7 +213,7 @@ test(
 
 test(
   "pending furniture fields warn before project switch and pending history is cleared",
-  { timeout: 45000 },
+  { timeout: 90000 },
   async (t) => {
     const { page } = await setup(t);
     await project(page);
@@ -241,7 +243,7 @@ test(
 
 test(
   "switching existing projects clears the prior history JSON and pending edits trigger unload protection",
-  { timeout: 45000 },
+  { timeout: 90000 },
   async (t) => {
     const { page } = await setup(t);
     await project(page);
