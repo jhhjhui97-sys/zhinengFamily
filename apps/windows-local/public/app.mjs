@@ -1,5 +1,6 @@
 import { RoomRenderer } from "./renderer.mjs";
 import { addFurniture, editFurniture } from "./scene-tools.mjs";
+import { mountProducts } from "./products.mjs";
 const $ = (id) => document.getElementById(id);
 let active = null,
   baseline = 0,
@@ -91,6 +92,18 @@ async function api(action, fields = {}) {
   if (!response.ok) throw Error(body.error ?? "操作失败，请重试。");
   return body.data;
 }
+const productsView = mountProducts({ api });
+$("nav-design").onclick = () => {
+  if (!productsView.canLeave()) return;
+  $("products-page").hidden = true;
+  $("design-page").hidden = false;
+};
+$("nav-products").onclick = () => {
+  if (!discard()) return;
+  $("design-page").hidden = true;
+  $("products-page").hidden = false;
+  productsView.open();
+};
 async function run(operation) {
   if (busy) return;
   busy = true;
@@ -613,7 +626,7 @@ $("capture").onclick = () => {
   message("已导出当前实际渲染画面。");
 };
 window.addEventListener("beforeunload", (e) => {
-  if (hasUnsavedChanges()) {
+  if (hasUnsavedChanges() || productsView.dirty()) {
     e.preventDefault();
     e.returnValue = "";
   }

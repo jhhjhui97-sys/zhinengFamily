@@ -6,7 +6,7 @@
  </PropertyGroup>
  <ItemGroup>
   <Compile Include="ConfirmationTests.cs" /><Compile Include="PreviewGestureTests.cs" /><Compile Include="SqliteTests.cs" /><Compile Include="LocalWorkspaceTests.cs" /><Compile Include="LocalSessionTests.cs" /><Compile Include="ValidationTests.cs" />
-  <Compile Include="ReviewRegressionTests.cs" /><Compile Include="LocalStoreTests.cs" /><Compile Include="LocalMigrationTests.cs" /><Compile Include="LocalSalesTests.cs" /><Compile Include="OfflineTests.cs" />
+  <Compile Include="ReviewRegressionTests.cs" /><Compile Include="LocalStoreTests.cs" /><Compile Include="LocalMigrationTests.cs" /><Compile Include="LocalSalesTests.cs" /><Compile Include="LocalProductTests.cs" /><Compile Include="OfflineTests.cs" />
   <ProjectReference Include="LocalCompile.csproj" />
  </ItemGroup>
 </Project>

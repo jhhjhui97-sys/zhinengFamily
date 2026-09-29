@@ -23,7 +23,11 @@ function workspace(withCatalog = false) {
           ? [join(root, "apps/windows-local/public/catalog.json")]
           : []),
       ],
-      { input: JSON.stringify(input), encoding: "utf8", timeout: 10000 },
+      {
+        input: typeof input === "string" ? input : JSON.stringify(input),
+        encoding: "utf8",
+        timeout: 10000,
+      },
     );
     assert.equal(
       result.status,
@@ -338,4 +342,97 @@ test("scene bridge scopes linked versions to customer and project while legacy s
     }).status,
     404,
   );
+});
+test("offline sellable products create search filter edit and keep exact price strings", () => {
+  const w = workspace();
+  const fields = {
+    category: "sofa",
+    brand: "示例品牌",
+    name: "三人沙发",
+    sku: "SOFA-001",
+    price: "6800.50",
+    width_mm: 2400,
+    depth_mm: 950,
+    height_mm: 850,
+    metadata: { color: "浅灰", material: "科技布" },
+  };
+  const created = w({ action: "product_create", ...fields });
+  assert.equal(created.status, 200);
+  assert.equal(created.data.price, "6800.50");
+  assert.deepEqual(created.data.metadata, fields.metadata);
+  const id = created.data.id;
+  assert.equal(w({ action: "product", id }).data.sku, "SOFA-001");
+  assert.equal(
+    w({ action: "products", search: "三人", category: "sofa" }).data.total,
+    1,
+  );
+  assert.equal(w({ action: "products", search: "SOFA" }).data.total, 1);
+  assert.equal(w({ action: "products", search: "示例品牌" }).data.total, 1);
+  assert.equal(w({ action: "products", category: "bed" }).data.total, 0);
+  const duplicate = w({ action: "product_create", ...fields });
+  assert.equal(duplicate.status, 409);
+  assert.match(duplicate.error, /SKU/);
+  const updated = w({
+    action: "product_update",
+    id,
+    base_revision: 1,
+    ...fields,
+    price: "12345.67",
+  });
+  assert.equal(updated.data.price, "12345.67");
+  assert.equal(updated.data.revision, 2);
+  assert.equal(
+    w({ action: "product_update", id, base_revision: 1, ...fields, price: "1" })
+      .status,
+    409,
+  );
+  assert.equal(w({ action: "product", id }).data.price, "12345.67");
+  const missing = w({
+    action: "product",
+    id: "99999999-0000-4000-8000-000000000001",
+  });
+  assert.equal(missing.status, 404);
+  assert.match(missing.error, /商品/);
+});
+test("offline product bridge rejects invalid metadata dimensions and client identity", () => {
+  const w = workspace();
+  const fields = {
+    category: "sofa",
+    brand: "品牌",
+    name: "沙发",
+    sku: "S-1",
+    price: "3999.90",
+    width_mm: 2100,
+    depth_mm: 900,
+    height_mm: 850,
+  };
+  const invalid = w({ action: "product_create", ...fields, metadata: [] });
+  assert.equal(invalid.status, 422);
+  assert.match(invalid.error, /商品/);
+  assert.equal(
+    w({ action: "product_create", ...fields, price: "1e400" }).status,
+    422,
+  );
+  assert.equal(
+    w({ action: "product_create", ...fields, width_mm: 0 }).status,
+    422,
+  );
+  assert.equal(
+    w({ action: "product_create", ...fields, workspace_id: "fake" }).status,
+    422,
+  );
+  assert.equal(
+    w({
+      action: "product_create",
+      ...fields,
+      id: "99999999-0000-4000-8000-000000000001",
+    }).status,
+    422,
+  );
+  const raw = JSON.stringify({ action: "product_create", ...fields }).replace(
+    /}\s*$/,
+    ',"metadata":{"nested":[1e400]}}',
+  );
+  assert.equal(w(raw).status, 422);
+  assert.equal(w({ action: "products" }).data.total, 0);
 });

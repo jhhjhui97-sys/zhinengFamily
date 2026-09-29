@@ -15,7 +15,7 @@ public sealed partial class LocalSceneStore : IDisposable {
   db=new SqliteConnection(path);
   try {
    long format=(long)db.Query("PRAGMA user_version")[0]["user_version"];
-   if(format!=0&&format!=1&&format!=2) throw new LocalStoreError(LocalErrorCode.Corrupt);
+   if(format!=0&&format!=1&&format!=2&&format!=3) throw new LocalStoreError(LocalErrorCode.Corrupt);
    if(format==1) {
     string backup=path+".pre-v2-"+DateTime.UtcNow.ToString("yyyyMMddHHmmss",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N")+".bak";
     db.BackupTo(backup);
@@ -63,6 +63,22 @@ public sealed partial class LocalSceneStore : IDisposable {
      FOREIGN KEY(workspace_id,project_id) REFERENCES local_projects(workspace_id,id),
      FOREIGN KEY(workspace_id,document_id) REFERENCES scene_documents(workspace_id,id))");
     db.Execute("PRAGMA user_version=2");
+   });
+   if(format==1||format==2) {
+    string backup=path+".pre-v3-"+DateTime.UtcNow.ToString("yyyyMMddHHmmss",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N")+".bak";
+    db.BackupTo(backup);
+   }
+   if(format<3) db.Transaction(()=>{
+    db.Execute(@"CREATE TABLE local_products(
+     workspace_id TEXT NOT NULL, id TEXT NOT NULL, category TEXT NOT NULL,
+     brand TEXT NOT NULL, name TEXT NOT NULL, sku TEXT NOT NULL,
+     price TEXT NOT NULL, width_mm REAL NOT NULL CHECK(width_mm>0),
+     depth_mm REAL NOT NULL CHECK(depth_mm>0), height_mm REAL NOT NULL CHECK(height_mm>0),
+     metadata_json TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision>=1),
+     created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,id), UNIQUE(workspace_id,sku))");
+    db.Execute("CREATE INDEX local_products_category ON local_products(workspace_id,category)");
+    db.Execute("PRAGMA user_version=3");
    });
   } catch { db.Dispose(); throw; }
  }

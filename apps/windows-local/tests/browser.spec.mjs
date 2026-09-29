@@ -164,6 +164,328 @@ test(
   },
 );
 test(
+  "offline products create filter paginate edit and survive local-service restart",
+  { timeout: 120000 },
+  async (t) => {
+    const { page, restart, errors } = await setup(t);
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await page.locator("#product-category").fill("sofa");
+    await page.locator("#product-brand").fill("示例品牌");
+    await page.locator("#product-name").fill("三人沙发");
+    await page.locator("#product-sku").fill("SOFA-001");
+    await page.locator("#product-price").fill("6800.50");
+    await page.locator("#product-width").fill("2400");
+    await page.locator("#product-depth").fill("950");
+    await page.locator("#product-height").fill("850");
+    await page.locator("#product-metadata").fill('{"color":"浅灰"}');
+    await page
+      .getByRole("button", { name: "新建在售商品", exact: true })
+      .click();
+    await page
+      .locator("#product-detail")
+      .filter({ hasText: "SOFA-001" })
+      .waitFor();
+    assert.match(
+      await page.locator("#products-items").textContent(),
+      /¥6,800.50/,
+    );
+    assert.match(
+      await page.locator("#products-items").textContent(),
+      /2400 × 950 × 850 mm/,
+    );
+    assert.match(
+      await page.locator("#product-detail").textContent(),
+      /暂无与该 SKU 对应的真实 3D 模型/,
+    );
+    const origin = new URL(page.url()).origin;
+    const call = async (body) =>
+      (
+        await page.request.post(`${origin}/api/local`, {
+          headers: { origin },
+          data: body,
+        })
+      ).json();
+    for (let i = 0; i < 22; i++) {
+      const result = await call({
+        action: "product_create",
+        category: "bed",
+        brand: "木作",
+        name: `床架${i}`,
+        sku: `BED-${String(i).padStart(3, "0")}`,
+        price: "3999.90",
+        width_mm: 2000,
+        depth_mm: 1800,
+        height_mm: 500,
+      });
+      assert.equal(result.status, 200);
+    }
+    await page.locator("#products-search").fill("床架");
+    await page.locator("#products-category-filter").fill("bed");
+    await page.getByRole("button", { name: "搜索商品", exact: true }).click();
+    await page
+      .locator("#products-count")
+      .filter({ hasText: "共 22 件" })
+      .waitFor();
+    await page.setViewportSize({ width: 1024, height: 768 });
+    assert.ok(
+      await page.evaluate(() => document.documentElement.scrollWidth <= 1024),
+    );
+    await page.locator("#products-page").evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    await mkdir(join(root, ".local/windows-evidence"), { recursive: true });
+    await page.screenshot({
+      path: join(root, ".local/windows-evidence/offline-products.png"),
+    });
+    await page
+      .getByRole("button", { name: "下一页", exact: true })
+      .last()
+      .click();
+    await page
+      .locator("#products-count")
+      .filter({ hasText: "显示 21–22" })
+      .waitFor();
+    assert.equal(await page.locator("#products-search").inputValue(), "床架");
+    assert.equal(
+      await page.locator("#products-category-filter").inputValue(),
+      "bed",
+    );
+    await page.locator("#products-search").fill("SOFA");
+    await page.locator("#products-category-filter").fill("sofa");
+    await page.getByRole("button", { name: "搜索商品", exact: true }).click();
+    await page
+      .locator("#products-count")
+      .filter({ hasText: "共 1 件" })
+      .waitFor();
+    await page
+      .getByRole("button", { name: "查看 三人沙发", exact: true })
+      .click();
+    const product = (await call({ action: "products", search: "SOFA" })).data
+      .items[0];
+    await call({
+      action: "product_update",
+      id: product.id,
+      base_revision: 1,
+      category: "sofa",
+      brand: "其他窗口",
+      name: "三人沙发",
+      sku: "SOFA-001",
+      price: "7000.00",
+      width_mm: 2400,
+      depth_mm: 950,
+      height_mm: 850,
+    });
+    await page.locator("#product-price").fill("6999.90");
+    await page
+      .getByRole("button", { name: "更新在售商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: /修改已保留|信息已变化/ })
+      .waitFor();
+    assert.equal(await page.locator("#product-price").inputValue(), "6999.90");
+    await restart();
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await page.locator("#products-search").fill("SOFA");
+    await page.getByRole("button", { name: "搜索商品", exact: true }).click();
+    await page
+      .getByRole("button", { name: "查看 三人沙发", exact: true })
+      .click();
+    await page.waitForFunction(
+      () => document.querySelector("#product-price").value === "7000.00",
+    );
+    assert.equal(await page.locator("#product-price").inputValue(), "7000.00");
+    assert.equal(
+      await page.evaluate(() => localStorage.length + sessionStorage.length),
+      0,
+    );
+    assert.equal(
+      errors.filter((error) => !error.includes("409 (Conflict)")).length,
+      0,
+      errors.join("\n"),
+    );
+  },
+);
+test(
+  "offline product form rejects invalid metadata price and dimensions before any write",
+  { timeout: 90000 },
+  async (t) => {
+    const { page } = await setup(t);
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await page.locator("#product-category").fill("bed");
+    await page.locator("#product-brand").fill("品牌");
+    await page.locator("#product-name").fill("床架");
+    await page.locator("#product-sku").fill("BED-1");
+    await page.locator("#product-price").fill("3999.90");
+    await page.locator("#product-width").fill("2000");
+    await page.locator("#product-depth").fill("1800");
+    await page.locator("#product-height").fill("500");
+    let writes = 0;
+    page.on("request", (request) => {
+      if (
+        request.url().endsWith("/api/local") &&
+        /product_(create|update)/.test(request.postData() ?? "")
+      )
+        writes++;
+    });
+    for (const bad of ["{bad}", '{"x":1e400}', '{"nested":[-1e400]}', "[]"]) {
+      await page.locator("#product-metadata").fill(bad);
+      await page
+        .getByRole("button", { name: "新建在售商品", exact: true })
+        .click();
+      await page
+        .locator("#product-message")
+        .filter({ hasText: /JSON|非法数值|对象/ })
+        .waitFor();
+    }
+    await page.locator("#product-metadata").fill("");
+    await page.locator("#product-price").fill("1e400");
+    await page
+      .getByRole("button", { name: "新建在售商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "价格" })
+      .waitFor();
+    await page.locator("#product-price").fill("3999.90");
+    await page.locator("#product-width").fill("0");
+    await page
+      .getByRole("button", { name: "新建在售商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "尺寸" })
+      .waitFor();
+    assert.equal(writes, 0);
+    await page.locator("#product-width").fill("2000");
+    await page
+      .getByRole("button", { name: "新建在售商品", exact: true })
+      .click();
+    await page
+      .locator("#product-detail")
+      .filter({ hasText: "BED-1" })
+      .waitFor();
+    assert.match(await page.locator("#product-detail").textContent(), /\{\}/);
+  },
+);
+test(
+  "product write success survives list refresh failure and paging failure keeps old page",
+  { timeout: 90000 },
+  async (t) => {
+    const { page } = await setup(t);
+    const origin = new URL(page.url()).origin;
+    const call = async (body) =>
+      (
+        await page.request.post(`${origin}/api/local`, {
+          headers: { origin },
+          data: body,
+        })
+      ).json();
+    for (let i = 0; i < 21; i++) {
+      assert.equal(
+        (
+          await call({
+            action: "product_create",
+            category: "bed",
+            brand: "品牌",
+            name: `床${i}`,
+            sku: `B-${i}`,
+            price: "100.00",
+            width_mm: 2000,
+            depth_mm: 1800,
+            height_mm: 400,
+          })
+        ).status,
+        200,
+      );
+    }
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await page
+      .locator("#products-count")
+      .filter({ hasText: "共 21 件" })
+      .waitFor();
+    let failList = false;
+    await page.route("**/api/local", async (route) => {
+      const body = JSON.parse(route.request().postData() ?? "{}");
+      if (body.action === "products" && failList) {
+        failList = false;
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({
+            status: 503,
+            error: "本地资料服务暂时不可用",
+          }),
+        });
+      } else await route.continue();
+    });
+    failList = true;
+    await page
+      .getByRole("button", { name: "下一页", exact: true })
+      .last()
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: /不可用|失败/ })
+      .waitFor();
+    assert.match(
+      await page.locator("#products-count").textContent(),
+      /显示 1–20/,
+    );
+    assert.match(await page.locator("#products-items").textContent(), /床20/);
+    await page
+      .getByRole("button", { name: "下一页", exact: true })
+      .last()
+      .click();
+    await page
+      .locator("#products-count")
+      .filter({ hasText: "显示 21–21" })
+      .waitFor();
+    await page.locator("#product-category").fill("sofa");
+    await page.locator("#product-brand").fill("品牌");
+    await page.locator("#product-name").fill("双人沙发");
+    await page.locator("#product-sku").fill("S-NEW");
+    await page.locator("#product-price").fill("12345.67");
+    await page.locator("#product-width").fill("2100");
+    await page.locator("#product-depth").fill("900");
+    await page.locator("#product-height").fill("800");
+    failList = true;
+    await page
+      .getByRole("button", { name: "新建在售商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: /已保存.*刷新失败/ })
+      .waitFor();
+    assert.match(await page.locator("#product-detail").textContent(), /S-NEW/);
+    assert.equal(await page.locator("#product-price").inputValue(), "12345.67");
+    assert.equal(
+      (await call({ action: "products", search: "S-NEW" })).data.total,
+      1,
+    );
+    await page.locator("#product-price").fill("12346.00");
+    failList = true;
+    await page
+      .getByRole("button", { name: "更新在售商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: /已更新.*刷新失败/ })
+      .waitFor();
+    assert.equal(await page.locator("#product-price").inputValue(), "12346.00");
+    assert.equal(
+      (await call({ action: "products", search: "S-NEW" })).data.items[0].price,
+      "12346.00",
+    );
+    await page.locator("#products-search").fill("不存在的商品");
+    await page.getByRole("button", { name: "搜索商品", exact: true }).click();
+    await page
+      .locator("#products-empty")
+      .filter({ hasText: "没有匹配的商品" })
+      .waitFor();
+  },
+);
+test(
   "customer and project stale edits preserve form values and layout fits landscape width",
   { timeout: 90000 },
   async (t) => {
