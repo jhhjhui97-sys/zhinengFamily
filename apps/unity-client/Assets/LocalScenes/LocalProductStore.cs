@@ -15,6 +15,7 @@ namespace LocalScenes {
   public double DepthMm { get; internal set; }
   public double HeightMm { get; internal set; }
   public string MetadataJson { get; internal set; }
+  public Guid? ActiveAssetId { get; internal set; }
   public long Revision { get; internal set; }
   public string CreatedAt { get; internal set; }
   public string UpdatedAt { get; internal set; }
@@ -56,7 +57,7 @@ namespace LocalScenes {
     Id=Guid.Parse((string)row["id"]),Category=(string)row["category"],Brand=(string)row["brand"],
     Name=(string)row["name"],Sku=(string)row["sku"],Price=(string)row["price"],
     WidthMm=(double)row["width_mm"],DepthMm=(double)row["depth_mm"],HeightMm=(double)row["height_mm"],
-    MetadataJson=(string)row["metadata_json"],Revision=(long)row["revision"],
+    MetadataJson=(string)row["metadata_json"],ActiveAssetId=row["active_asset_id"]==null?(Guid?)null:Guid.Parse((string)row["active_asset_id"]),Revision=(long)row["revision"],
     CreatedAt=(string)row["created_at"],UpdatedAt=(string)row["updated_at"]
    };
   }
@@ -69,25 +70,27 @@ namespace LocalScenes {
    return LocalProduct(id);
   }
   public LocalProduct LocalProduct(Guid id) {
-   var rows=db.Query("SELECT * FROM local_products WHERE workspace_id=? AND id=?",Key(workspace),Key(id));
+   var rows=db.Query(@"SELECT p.*,m.asset_id active_asset_id FROM local_products p
+    LEFT JOIN local_product_active_model m ON m.workspace_id=p.workspace_id AND m.product_id=p.id
+    WHERE p.workspace_id=? AND p.id=?",Key(workspace),Key(id));
    if(rows.Count!=1) throw new LocalStoreError(LocalErrorCode.NotFound);
    return ProductRow(rows[0]);
   }
   public LocalProductPage LocalProducts(int limit=20,int offset=0,string search=null,string category=null) {
    Input(limit>=1&&limit<=100&&offset>=0);
    search=Optional(search,100);category=Optional(category,100);
-   string filter=" WHERE workspace_id=?";var args=new List<object>{Key(workspace)};
-   if(category!=null) { filter+=" AND category=?";args.Add(category); }
+   string filter=" WHERE p.workspace_id=?";var args=new List<object>{Key(workspace)};
+   if(category!=null) { filter+=" AND p.category=?";args.Add(category); }
    if(search!=null) {
     string pattern="%"+search.Replace("\\","\\\\").Replace("%","\\%").Replace("_","\\_")+"%";
-    filter+=" AND (name LIKE ? ESCAPE '\\' OR sku LIKE ? ESCAPE '\\' OR brand LIKE ? ESCAPE '\\')";
+    filter+=" AND (p.name LIKE ? ESCAPE '\\' OR p.sku LIKE ? ESCAPE '\\' OR p.brand LIKE ? ESCAPE '\\')";
     args.Add(pattern);args.Add(pattern);args.Add(pattern);
    }
    LocalProductPage page=null;
    db.Transaction(()=>{
-    long total=(long)db.Query("SELECT COUNT(*) n FROM local_products"+filter,args.ToArray())[0]["n"];
+    long total=(long)db.Query("SELECT COUNT(*) n FROM local_products p"+filter,args.ToArray())[0]["n"];
     var items=new List<LocalProduct>();var pageArgs=new List<object>(args);pageArgs.Add(limit);pageArgs.Add(offset);
-    foreach(var row in db.Query("SELECT * FROM local_products"+filter+" ORDER BY updated_at DESC,id ASC LIMIT ? OFFSET ?",pageArgs.ToArray()))
+    foreach(var row in db.Query("SELECT p.*,m.asset_id active_asset_id FROM local_products p LEFT JOIN local_product_active_model m ON m.workspace_id=p.workspace_id AND m.product_id=p.id"+filter+" ORDER BY p.updated_at DESC,p.id ASC LIMIT ? OFFSET ?",pageArgs.ToArray()))
      items.Add(ProductRow(row));
     page=new LocalProductPage {Total=total,Items=items};
    });

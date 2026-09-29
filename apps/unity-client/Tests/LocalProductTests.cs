@@ -22,6 +22,8 @@ public static class LocalProductTests {
     scene=store.CreateForProject(project,"客厅设计");
    }
    using(var db=new SqliteConnection(path)) {
+    db.Execute("DROP TABLE IF EXISTS local_product_active_model");
+    db.Execute("DROP TABLE IF EXISTS local_model_assets");
     db.Execute("DROP TABLE IF EXISTS local_products");
     db.Execute("PRAGMA user_version=2");
    }
@@ -71,6 +73,8 @@ public static class LocalProductTests {
    Guid workspace=Guid.NewGuid(),actor=Guid.NewGuid(),customer;
    using(var store=new LocalSceneStore(path,workspace,actor,validator)) customer=store.CreateCustomer("李女士").Id;
    using(var db=new SqliteConnection(path)) {
+    db.Execute("DROP TABLE IF EXISTS local_product_active_model");
+    db.Execute("DROP TABLE IF EXISTS local_model_assets");
     db.Execute("DROP TABLE local_products");
     db.Execute("PRAGMA user_version=2");
     db.Execute("CREATE TABLE local_products(broken INTEGER)");

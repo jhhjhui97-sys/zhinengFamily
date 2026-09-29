@@ -8,14 +8,15 @@ namespace LocalScenes {
 public sealed partial class LocalSceneStore : IDisposable {
  readonly SqliteConnection db;
  readonly Guid workspace,actor;
+ readonly string databasePath;
  readonly OfflineSceneValidator validator;
  public LocalSceneStore(string path,Guid workspace,Guid actor,OfflineSceneValidator validator) {
   if(workspace==Guid.Empty||actor==Guid.Empty||validator==null) throw new LocalStoreError(LocalErrorCode.InvalidInput);
-  this.workspace=workspace; this.actor=actor; this.validator=validator;
+  this.workspace=workspace; this.actor=actor; this.validator=validator; this.databasePath=path;
   db=new SqliteConnection(path);
   try {
    long format=(long)db.Query("PRAGMA user_version")[0]["user_version"];
-   if(format!=0&&format!=1&&format!=2&&format!=3) throw new LocalStoreError(LocalErrorCode.Corrupt);
+   if(format!=0&&format!=1&&format!=2&&format!=3&&format!=4) throw new LocalStoreError(LocalErrorCode.Corrupt);
    if(format==1) {
     string backup=path+".pre-v2-"+DateTime.UtcNow.ToString("yyyyMMddHHmmss",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N")+".bak";
     db.BackupTo(backup);
@@ -80,6 +81,26 @@ public sealed partial class LocalSceneStore : IDisposable {
     db.Execute("CREATE INDEX local_products_category ON local_products(workspace_id,category)");
     db.Execute("PRAGMA user_version=3");
    });
+   if(format>=1&&format<=3) {
+    string backup=path+".pre-v4-"+DateTime.UtcNow.ToString("yyyyMMddHHmmss",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N")+".bak";
+    db.BackupTo(backup);
+   }
+   if(format<4) db.Transaction(()=>{
+    db.Execute(@"CREATE TABLE local_model_assets(
+     workspace_id TEXT NOT NULL, id TEXT NOT NULL, product_id TEXT NOT NULL,
+     sha256 TEXT NOT NULL CHECK(length(sha256)=64), byte_count INTEGER NOT NULL CHECK(byte_count>0),
+     created_at TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,id), UNIQUE(workspace_id,product_id,id),
+     FOREIGN KEY(workspace_id,product_id) REFERENCES local_products(workspace_id,id))");
+    db.Execute(@"CREATE TABLE local_product_active_model(
+     workspace_id TEXT NOT NULL, product_id TEXT NOT NULL, asset_id TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,product_id),
+     FOREIGN KEY(workspace_id,product_id) REFERENCES local_products(workspace_id,id),
+     FOREIGN KEY(workspace_id,product_id,asset_id) REFERENCES local_model_assets(workspace_id,product_id,id))");
+    db.Execute("CREATE TRIGGER local_model_assets_no_update BEFORE UPDATE ON local_model_assets BEGIN SELECT RAISE(ABORT,'immutable asset'); END");
+    db.Execute("CREATE TRIGGER local_model_assets_no_delete BEFORE DELETE ON local_model_assets BEGIN SELECT RAISE(ABORT,'immutable asset'); END");
+    db.Execute("PRAGMA user_version=4");
+   });
   } catch { db.Dispose(); throw; }
  }
  static string Key(Guid id) { return id.ToString("D"); }
@@ -112,7 +133,14 @@ public sealed partial class LocalSceneStore : IDisposable {
    string value=(string)item["product_id"];
    if(value.StartsWith("urn:uuid:",StringComparison.Ordinal)) value=value.Substring(9);
    Guid product=Guid.Parse(value); // Already checked by the authoritative offline validator.
-   Input(db.Query("SELECT product_id FROM local_catalog WHERE workspace_id=? AND product_id=?",Key(workspace),Key(product)).Count==1);
+   string assetText=(string)item["asset_id"];
+   if(assetText==null) {
+    Input(db.Query("SELECT product_id FROM local_catalog WHERE workspace_id=? AND product_id=?",Key(workspace),Key(product)).Count==1);
+   } else {
+    if(assetText.StartsWith("urn:uuid:",StringComparison.Ordinal)) assetText=assetText.Substring(9);
+    Guid asset;Input(Guid.TryParse(assetText,out asset)&&asset!=Guid.Empty);
+    Input(db.Query("SELECT id FROM local_model_assets WHERE workspace_id=? AND product_id=? AND id=?",Key(workspace),Key(product),Key(asset)).Count==1);
+   }
   }
  }
  public LocalSceneVersion Put(Guid document,long baseRevision,string scene) {
