@@ -29,13 +29,14 @@ public static class LocalBridge {
  static void RequireSceneScope(LocalSceneStore store,JObject input) {store.RequireSceneAccess(Id(input),SceneProject(store,input));}
  public static int Main(string[] args) {
   Console.InputEncoding=Encoding.UTF8;Console.OutputEncoding=new UTF8Encoding(false);
+  string action=null;
   try {
    if(args.Length<3||args.Length>4) throw new LocalStoreError(LocalErrorCode.InvalidInput);
    string text=Console.In.ReadToEnd();if(text.Length>1024*1024) throw new LocalStoreError(LocalErrorCode.InvalidInput);
    JObject input=JObject.Parse(text);
    string[] allowed={"action","id","customer_id","project_id","name","phone","wechat","source","address","budget","status","notes","base_revision","revision","scene","limit","offset","search","category","brand","sku","price","width_mm","depth_mm","height_mm","metadata"};
    if(input.Properties().Any(x=>!allowed.Contains(x.Name))) throw new LocalStoreError(LocalErrorCode.InvalidInput);
-   string action=(string)input["action"];
+   action=(string)input["action"];
    if(!new[]{"list","create","sample","current","save","versions","restore","validate","catalog","customers","customer_create","customer","customer_update","projects","project_create","project","project_update","products","product_create","product","product_update"}.Contains(action)) throw new LocalStoreError(LocalErrorCode.InvalidInput);
    var validator=new OfflineSceneValidator(File.ReadAllText(args[1]));
    var identity=LocalIdentity.Open(args[0]);object data=null;
@@ -79,7 +80,12 @@ public static class LocalBridge {
    int status=500;var local=error as LocalStoreError;
    if(error is SceneValidationError||error is JsonException||error is FormatException||error is OverflowException)status=422;
    if(local!=null) switch(local.Code){case LocalErrorCode.InvalidInput:status=422;break;case LocalErrorCode.Conflict:status=409;break;case LocalErrorCode.NotFound:status=404;break;case LocalErrorCode.Busy:status=503;break;}
-   string message=status==422?"填写的内容不符合场景要求，请检查后重试。":LocalSceneSession.Friendly(error);
+   bool productAction=action!=null&&action.StartsWith("product",StringComparison.Ordinal);
+   string message;
+   if(productAction&&status==409)message=action=="product_create"?"商品 SKU 已存在，请换一个 SKU。":"商品 SKU 冲突或资料已变化，你的修改已保留，请刷新后重试。";
+   else if(productAction&&status==404)message="商品不存在，可能已被其他操作移除。";
+   else if(productAction&&status==422)message="商品资料不合法，请检查价格、尺寸和属性后重试。";
+   else message=status==422?"填写的内容不符合场景要求，请检查后重试。":LocalSceneSession.Friendly(error);
    Console.Write(JsonConvert.SerializeObject(new{status=status,error=message}));
   }
   return 0;

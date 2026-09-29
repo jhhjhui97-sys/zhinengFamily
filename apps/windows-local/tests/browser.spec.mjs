@@ -369,6 +369,123 @@ test(
   },
 );
 test(
+  "product write success survives list refresh failure and paging failure keeps old page",
+  { timeout: 90000 },
+  async (t) => {
+    const { page } = await setup(t);
+    const origin = new URL(page.url()).origin;
+    const call = async (body) =>
+      (
+        await page.request.post(`${origin}/api/local`, {
+          headers: { origin },
+          data: body,
+        })
+      ).json();
+    for (let i = 0; i < 21; i++) {
+      assert.equal(
+        (
+          await call({
+            action: "product_create",
+            category: "bed",
+            brand: "品牌",
+            name: `床${i}`,
+            sku: `B-${i}`,
+            price: "100.00",
+            width_mm: 2000,
+            depth_mm: 1800,
+            height_mm: 400,
+          })
+        ).status,
+        200,
+      );
+    }
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await page
+      .locator("#products-count")
+      .filter({ hasText: "共 21 件" })
+      .waitFor();
+    let failList = false;
+    await page.route("**/api/local", async (route) => {
+      const body = JSON.parse(route.request().postData() ?? "{}");
+      if (body.action === "products" && failList) {
+        failList = false;
+        await route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({
+            status: 503,
+            error: "本地资料服务暂时不可用",
+          }),
+        });
+      } else await route.continue();
+    });
+    failList = true;
+    await page
+      .getByRole("button", { name: "下一页", exact: true })
+      .last()
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: /不可用|失败/ })
+      .waitFor();
+    assert.match(
+      await page.locator("#products-count").textContent(),
+      /显示 1–20/,
+    );
+    assert.match(await page.locator("#products-items").textContent(), /床20/);
+    await page
+      .getByRole("button", { name: "下一页", exact: true })
+      .last()
+      .click();
+    await page
+      .locator("#products-count")
+      .filter({ hasText: "显示 21–21" })
+      .waitFor();
+    await page.locator("#product-category").fill("sofa");
+    await page.locator("#product-brand").fill("品牌");
+    await page.locator("#product-name").fill("双人沙发");
+    await page.locator("#product-sku").fill("S-NEW");
+    await page.locator("#product-price").fill("12345.67");
+    await page.locator("#product-width").fill("2100");
+    await page.locator("#product-depth").fill("900");
+    await page.locator("#product-height").fill("800");
+    failList = true;
+    await page
+      .getByRole("button", { name: "新建在售商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: /已保存.*刷新失败/ })
+      .waitFor();
+    assert.match(await page.locator("#product-detail").textContent(), /S-NEW/);
+    assert.equal(await page.locator("#product-price").inputValue(), "12345.67");
+    assert.equal(
+      (await call({ action: "products", search: "S-NEW" })).data.total,
+      1,
+    );
+    await page.locator("#product-price").fill("12346.00");
+    failList = true;
+    await page
+      .getByRole("button", { name: "更新在售商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: /已更新.*刷新失败/ })
+      .waitFor();
+    assert.equal(await page.locator("#product-price").inputValue(), "12346.00");
+    assert.equal(
+      (await call({ action: "products", search: "S-NEW" })).data.items[0].price,
+      "12346.00",
+    );
+    await page.locator("#products-search").fill("不存在的商品");
+    await page.getByRole("button", { name: "搜索商品", exact: true }).click();
+    await page
+      .locator("#products-empty")
+      .filter({ hasText: "没有匹配的商品" })
+      .waitFor();
+  },
+);
+test(
   "customer and project stale edits preserve form values and layout fits landscape width",
   { timeout: 90000 },
   async (t) => {

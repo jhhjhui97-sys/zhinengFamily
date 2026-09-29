@@ -103,13 +103,19 @@ export function mountProducts({ api }) {
     $("product-detail").textContent =
       `${product.name} · ${product.sku}\n${product.brand} / ${product.category}\n${formatMoney(product.price)} · ${product.width_mm} × ${product.depth_mm} × ${product.height_mm} mm\n商品属性：${JSON.stringify(product.metadata)}\n暂无与该 SKU 对应的真实 3D 模型。`;
   }
-  async function list() {
-    const page = await api("products", {
-      limit: 20,
-      offset,
-      search: $("products-search").value.trim(),
-      category: $("products-category-filter").value.trim(),
-    });
+  async function list(nextOffset = offset) {
+    let page;
+    try {
+      page = await api("products", {
+        limit: 20,
+        offset: nextOffset,
+        search: $("products-search").value.trim(),
+        category: $("products-category-filter").value.trim(),
+      });
+    } catch {
+      throw Error("商品查询失败，仍显示上次结果；请重试。");
+    }
+    offset = nextOffset;
     total = page.total;
     const tbody = $("products-items");
     tbody.replaceChildren();
@@ -142,7 +148,12 @@ export function mountProducts({ api }) {
       row.append(cell);
       tbody.append(row);
     }
-    $("products-empty").hidden = total > 0;
+    $("products-empty").hidden = page.items.length > 0;
+    $("products-empty").textContent =
+      $("products-search").value.trim() ||
+      $("products-category-filter").value.trim()
+        ? "没有匹配的商品，请调整搜索或分类条件。"
+        : "暂无在售商品，可在右侧新建。";
     $("products-count").textContent = total
       ? `显示 ${offset + 1}–${offset + page.items.length} / 共 ${total} 件`
       : "共 0 件商品";
@@ -196,19 +207,16 @@ export function mountProducts({ api }) {
   }
   $("products-search-button").onclick = () =>
     operate(async () => {
-      offset = 0;
-      await list();
+      await list(0);
       note("");
     });
   $("products-prev").onclick = () =>
     operate(async () => {
-      offset = Math.max(0, offset - 20);
-      await list();
+      await list(Math.max(0, offset - 20));
     });
   $("products-next").onclick = () =>
     operate(async () => {
-      offset += 20;
-      await list();
+      await list(offset + 20);
     });
   $("product-reset").onclick = () => {
     if (canLeave()) reset();
@@ -216,9 +224,14 @@ export function mountProducts({ api }) {
   $("product-create").onclick = () =>
     operate(async () => {
       const product = await api("product_create", validate(form()));
-      await list();
-      detail(product);
-      note("商品已保存在本机。");
+      try {
+        await list();
+        detail(product);
+        note("商品已保存在本机。");
+      } catch {
+        detail(product);
+        note("商品已保存，但列表刷新失败，请重试搜索。", true);
+      }
     });
   $("product-update").onclick = () =>
     operate(async () => {
@@ -228,9 +241,14 @@ export function mountProducts({ api }) {
         base_revision: selected.revision,
         ...validate(form()),
       });
-      await list();
-      detail(product);
-      note("商品资料已更新。");
+      try {
+        await list();
+        detail(product);
+        note("商品资料已更新。");
+      } catch {
+        detail(product);
+        note("商品已更新，但列表刷新失败，请重试搜索。", true);
+      }
     });
   return { open: () => operate(list), dirty, canLeave };
 }

@@ -369,7 +369,9 @@ test("offline sellable products create search filter edit and keep exact price s
   assert.equal(w({ action: "products", search: "SOFA" }).data.total, 1);
   assert.equal(w({ action: "products", search: "示例品牌" }).data.total, 1);
   assert.equal(w({ action: "products", category: "bed" }).data.total, 0);
-  assert.equal(w({ action: "product_create", ...fields }).status, 409);
+  const duplicate = w({ action: "product_create", ...fields });
+  assert.equal(duplicate.status, 409);
+  assert.match(duplicate.error, /SKU/);
   const updated = w({
     action: "product_update",
     id,
@@ -385,10 +387,12 @@ test("offline sellable products create search filter edit and keep exact price s
     409,
   );
   assert.equal(w({ action: "product", id }).data.price, "12345.67");
-  assert.equal(
-    w({ action: "product", id: "99999999-0000-4000-8000-000000000001" }).status,
-    404,
-  );
+  const missing = w({
+    action: "product",
+    id: "99999999-0000-4000-8000-000000000001",
+  });
+  assert.equal(missing.status, 404);
+  assert.match(missing.error, /商品/);
 });
 test("offline product bridge rejects invalid metadata dimensions and client identity", () => {
   const w = workspace();
@@ -402,10 +406,9 @@ test("offline product bridge rejects invalid metadata dimensions and client iden
     depth_mm: 900,
     height_mm: 850,
   };
-  assert.equal(
-    w({ action: "product_create", ...fields, metadata: [] }).status,
-    422,
-  );
+  const invalid = w({ action: "product_create", ...fields, metadata: [] });
+  assert.equal(invalid.status, 422);
+  assert.match(invalid.error, /商品/);
   assert.equal(
     w({ action: "product_create", ...fields, price: "1e400" }).status,
     422,
