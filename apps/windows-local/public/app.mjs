@@ -652,7 +652,7 @@ run(async () => {
   try {
     await loadCatalog();
   } catch (error) {
-    message(`演示家具目录暂不可用：${error.message}`, true);
+    message(`家具目录暂不可用：${error.message}`, true);
   }
   await library();
   await customers();
