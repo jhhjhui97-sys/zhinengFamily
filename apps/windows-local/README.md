@@ -14,6 +14,8 @@
 
 真实本机商品页画面：[1024px 横屏商品管理](../../docs/images/windows-offline-products.png)。图中商品为自动化测试在真实本机 SQLite 创建的示例资料，产品页面、筛选、金额和详情均由实际 Edge 客户端渲染。
 
+导入商品模型后的[实际场景画面](../../docs/images/windows-offline-sku-model.png)由 Edge 在真实本机 SQLite 上生成；前方为关联 SKU 的导入 GLB，后方为内置演示家具。
+
 当前限制：内置目录只有四款演示模型；实际在售商品须由门店提供合法且画质合格的 GLB 文件，软件不能凭 SKU 自动生成逼真的模型。摆放仍是简单位置/角度调整。房间地面、墙面为基础材质，没有铺装或丰富灯具；报价/订单、自动 AI 布局和原生 CAD/VR 尚未实现。这是可用的本地客户→项目→场景和商品管理体验版，**不是完整门店交付系统**。Unity 6000.3.0f1 工程保留，但本机官方 Editor 下载重定向到返回 404 的节点，因此 Unity Editor/Player 未验收；Windows 版采用不依赖 Unity 许可的本地浏览器渲染。
 
 开发构建：先运行 `npm ci --prefix apps/windows-local`，准备 Node24、Newtonsoft.Json 13.0.2 `net45` DLL 和对应许可证，再运行 `tools/package_windows_local.ps1`。该脚本拒绝覆盖已有输出目录。运行 `npm test --prefix apps/windows-local`、`npm run check --prefix apps/windows-local`、`npm run format:check --prefix apps/windows-local` 验证。证据见 [Windows 验证记录](../../docs/windows-local-verification.md)。
