@@ -22,10 +22,14 @@
         <span class="brand-mark">家</span>
         <div><strong>智能家居</strong><small>本地设计工作室</small></div>
       </div>
-      <span class="local-tag">● 本地运行 · 无需联网</span
-      ><span class="header-note">Windows 体验版</span>
+      <span class="local-tag">● 本地运行 · 无需联网</span>
+      <nav class="main-nav" aria-label="主导航">
+        <button id="nav-design">设计工作台</button
+        ><button id="nav-products">商品管理</button>
+      </nav>
+      <span class="header-note">Windows 体验版</span>
     </header>
-    <main>
+    <main id="design-page">
       <aside class="library">
         <div class="section-title">门店客户</div>
         <div id="selected-customer" class="selection-note">尚未选择客户</div>
@@ -237,6 +241,109 @@
         </details>
       </aside>
     </main>
+    <section id="products-page" class="products-page" hidden>
+      <div class="products-heading">
+        <div>
+          <h1>在售商品管理</h1>
+          <p>
+            价格与尺寸保存在本机；内置四款 3D 模型仅供演示，不代表这些在售 SKU。
+          </p>
+        </div>
+        <span>本地商品目录</span>
+      </div>
+      <div id="product-message" role="status" aria-live="polite"></div>
+      <div class="products-grid">
+        <div class="product-card">
+          <h2>商品列表</h2>
+          <div class="product-filters">
+            <label
+              >搜索名称 / SKU / 品牌<input
+                id="products-search"
+                maxlength="100"
+                placeholder="例如 SOFA-001" /></label
+            ><label
+              >分类<input
+                id="products-category-filter"
+                maxlength="100"
+                placeholder="例如 sofa 或 床" /></label
+            ><button id="products-search-button">搜索商品</button>
+          </div>
+          <div class="products-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>商品</th>
+                  <th>品牌 / 分类</th>
+                  <th>SKU</th>
+                  <th>价格</th>
+                  <th>尺寸</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="products-items"></tbody>
+            </table>
+          </div>
+          <div id="products-empty" class="product-empty">
+            暂无在售商品，可在右侧新建。
+          </div>
+          <div class="products-pagination">
+            <span id="products-count">共 0 件</span
+            ><button id="products-prev">上一页</button
+            ><button id="products-next">下一页</button>
+          </div>
+        </div>
+        <div class="product-card product-editor">
+          <h2>商品资料</h2>
+          <div id="product-detail" class="product-detail">
+            选择商品查看详情，或新建在售商品。<br />暂无与该 SKU 对应的真实 3D
+            模型。
+          </div>
+          <label>分类 *<input id="product-category" maxlength="100" /></label>
+          <label>品牌 *<input id="product-brand" maxlength="100" /></label>
+          <label>名称 *<input id="product-name" maxlength="200" /></label>
+          <label>SKU *<input id="product-sku" maxlength="100" /></label>
+          <label
+            >售价 / 元 *<input
+              id="product-price"
+              inputmode="decimal"
+              placeholder="例如 6800.50"
+          /></label>
+          <div class="product-dimensions">
+            <label
+              >宽 / mm *<input
+                id="product-width"
+                type="number"
+                min="0"
+                step="any" /></label
+            ><label
+              >深 / mm *<input
+                id="product-depth"
+                type="number"
+                min="0"
+                step="any" /></label
+            ><label
+              >高 / mm *<input
+                id="product-height"
+                type="number"
+                min="0"
+                step="any"
+            /></label>
+          </div>
+          <label
+            >商品属性 JSON<textarea
+              id="product-metadata"
+              spellcheck="false"
+              placeholder='{"color":"浅灰"}'
+            ></textarea>
+          </label>
+          <div class="product-actions">
+            <button id="product-create" class="primary">新建在售商品</button
+            ><button id="product-update">更新在售商品</button
+            ><button id="product-reset">清空表单</button>
+          </div>
+        </div>
+      </div>
+    </section>
     <dialog id="restore-dialog">
       <h2>恢复历史版本</h2>
       <p>将创建一个新版本，原历史版本仍保留。未保存的修改将被替换。</p>
