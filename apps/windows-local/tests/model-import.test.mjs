@@ -1,19 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile, mkdtemp, unlink } from "node:fs/promises";
+import { readFile, mkdtemp, unlink, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { request } from "node:http";
 import { createLocalServer } from "../server.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 const source = join(root, "apps/windows-local/public/assets/sofa.glb");
-async function setup(t) {
+async function setup(t, options = {}) {
   const dataDirectory = await mkdtemp(join(tmpdir(), "family-model-import-"));
   const server = createLocalServer({
     bridgePath: join(root, ".local/windows-bridge/LocalBridge.exe"),
     dataDirectory,
     protocolDirectory: join(root, "apps/unity-client/Assets/StreamingAssets"),
     publicDirectory: join(root, "apps/windows-local/public"),
+    ...options,
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
@@ -131,6 +133,7 @@ test("missing model file is reported without erasing the saved SKU link", async 
     headers: { cookie: s.cookie },
   });
   assert.equal(model.status, 404);
+  assert.match((await model.json()).error, /模型文件已丢失|模型文件已损坏/);
   assert.equal(
     (await s.call({ action: "product", id: s.id })).data.active_asset_id,
     id,
@@ -145,5 +148,62 @@ test("oversized model is rejected without updating product", async (t) => {
   assert.equal(
     (await s.call({ action: "product", id: s.id })).data.revision,
     1,
+  );
+});
+test("chunked oversized model returns 413 and does not update the product", async (t) => {
+  const s = await setup(t);
+  const response = await fetch(`${s.url}/api/product-models/${s.id}`, {
+    method: "POST",
+    headers: {
+      origin: s.url,
+      cookie: s.cookie,
+      "content-type": "model/gltf-binary",
+      "x-base-revision": "1",
+    },
+    duplex: "half",
+    body: new ReadableStream({
+      start(controller) {
+        controller.enqueue(Buffer.alloc(16 * 1024 * 1024));
+        controller.enqueue(Buffer.alloc(15 * 1024 * 1024));
+        controller.close();
+      },
+    }),
+  });
+  assert.equal(response.status, 413);
+  assert.equal(
+    (await s.call({ action: "product", id: s.id })).data.revision,
+    1,
+  );
+});
+test("slow model upload connection is closed and temporary file removed", async (t) => {
+  const s = await setup(t, { modelUploadIdleMs: 100, modelUploadTotalMs: 400 });
+  await new Promise((resolve, reject) => {
+    const req = request(`${s.url}/api/product-models/${s.id}`, {
+      method: "POST",
+      headers: {
+        origin: s.url,
+        cookie: s.cookie,
+        "content-type": "model/gltf-binary",
+        "x-base-revision": "1",
+        "transfer-encoding": "chunked",
+      },
+    });
+    req.on("response", (res) => {
+      res.resume();
+      res.on("end", resolve);
+    });
+    req.on("error", resolve);
+    req.write(Buffer.from("glTF"));
+    setTimeout(() => reject(Error("slow upload was not closed")), 2000).unref();
+  });
+  assert.equal(
+    (await s.call({ action: "product", id: s.id })).data.revision,
+    1,
+  );
+  assert.deepEqual(
+    (await readdir(join(s.dataDirectory, "models"))).filter((file) =>
+      file.startsWith(".upload-"),
+    ),
+    [],
   );
 });

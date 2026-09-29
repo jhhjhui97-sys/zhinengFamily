@@ -35,7 +35,11 @@ namespace LocalScenes {
    var products=new List<LocalProduct>();
    foreach(var row in db.Query(@"SELECT p.*,m.asset_id active_asset_id FROM local_products p
     INNER JOIN local_product_active_model m ON m.workspace_id=p.workspace_id AND m.product_id=p.id
-    WHERE p.workspace_id=? ORDER BY p.name,p.id",Key(workspace))) products.Add(ProductRow(row));
+    WHERE p.workspace_id=? ORDER BY p.name,p.id",Key(workspace))) {
+    var product=ProductRow(row);
+    try { VerifiedModelPath(product.ActiveAssetId.Value); products.Add(product); }
+    catch(LocalStoreError error) { if(error.Code!=LocalErrorCode.NotFound) throw; }
+   }
    return products;
   }
   public string VerifiedModelPath(Guid id) {

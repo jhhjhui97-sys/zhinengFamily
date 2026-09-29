@@ -451,6 +451,10 @@ test(
     await page
       .locator('canvas[data-model-loaded="true"]')
       .waitFor({ timeout: 90000 });
+    await mkdir(join(root, ".local/windows-evidence"), { recursive: true });
+    await page.screenshot({
+      path: join(root, ".local/windows-evidence/offline-sku-model.png"),
+    });
     await page.getByRole("button", { name: "保存新版本", exact: true }).click();
     await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
     await page.getByRole("button", { name: "商品管理", exact: true }).click();
@@ -530,6 +534,106 @@ test(
       0,
     );
     assert.equal(errors.length, 0, errors.join("\n"));
+  },
+);
+test(
+  "invalid and stale SKU model uploads keep the chosen file and saved product",
+  { timeout: 90000 },
+  async (t) => {
+    const { page } = await setup(t);
+    const origin = new URL(page.url()).origin;
+    const call = async (body) =>
+      (
+        await (
+          await page.request.post(`${origin}/api/local`, {
+            headers: { origin },
+            data: body,
+          })
+        ).json()
+      ).data;
+    const product = await call({
+      action: "product_create",
+      category: "chair",
+      brand: "门店",
+      name: "测试椅",
+      sku: "CHAIR-UI-1",
+      price: "1200.00",
+      width_mm: 700,
+      depth_mm: 700,
+      height_mm: 900,
+    });
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await page
+      .getByRole("button", { name: "查看 测试椅", exact: true })
+      .click();
+    await page
+      .locator("#product-detail")
+      .filter({ hasText: "CHAIR-UI-1" })
+      .waitFor();
+    const picker = page.locator("#product-model-file");
+    await page.locator("#product-price").fill("1300.00");
+    await picker.setInputFiles(
+      join(root, "apps/windows-local/public/assets/sofa.glb"),
+    );
+    await page
+      .getByRole("button", { name: "导入当前商品 3D 模型", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "商品资料有未保存的修改" })
+      .waitFor();
+    assert.equal(await page.locator("#product-price").inputValue(), "1300.00");
+    assert.equal(
+      (await call({ action: "product", id: product.id })).active_asset_id,
+      null,
+    );
+    await page.locator("#product-price").fill("1200.00");
+    await picker.setInputFiles({
+      name: "broken.glb",
+      mimeType: "model/gltf-binary",
+      buffer: Buffer.from("not-a-glb"),
+    });
+    await page
+      .getByRole("button", { name: "导入当前商品 3D 模型", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: /GLB.*不完整|GLB.*格式/ })
+      .waitFor();
+    assert.equal(
+      (await call({ action: "product", id: product.id })).active_asset_id,
+      null,
+    );
+    assert.equal((await picker.inputValue()).endsWith("broken.glb"), true);
+    await picker.setInputFiles(
+      join(root, "apps/windows-local/public/assets/sofa.glb"),
+    );
+    await call({
+      action: "product_update",
+      id: product.id,
+      base_revision: product.revision,
+      category: "chair",
+      brand: "门店",
+      name: "测试椅",
+      sku: "CHAIR-UI-1",
+      price: "1200.00",
+      width_mm: 700,
+      depth_mm: 700,
+      height_mm: 900,
+      metadata: {},
+    });
+    await page
+      .getByRole("button", { name: "导入当前商品 3D 模型", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "商品信息已变化" })
+      .waitFor();
+    assert.equal(
+      (await call({ action: "product", id: product.id })).active_asset_id,
+      null,
+    );
+    assert.equal((await picker.inputValue()).endsWith("sofa.glb"), true);
   },
 );
 test(

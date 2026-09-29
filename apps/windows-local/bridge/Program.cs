@@ -86,6 +86,7 @@ public static class LocalBridge {
    bool productAction=action!=null&&(action.StartsWith("product",StringComparison.Ordinal)||action.StartsWith("model",StringComparison.Ordinal));
    string message;
    if(productAction&&status==409)message=action=="product_create"?"商品 SKU 已存在，请换一个 SKU。":"商品 SKU 冲突或资料已变化，你的修改已保留，请刷新后重试。";
+   else if(action=="model_asset"&&status==404)message="本机模型文件已丢失、损坏或无权访问，请重新导入。";
    else if(productAction&&status==404)message="商品不存在，可能已被其他操作移除。";
    else if(productAction&&status==422)message="商品资料不合法，请检查价格、尺寸和属性后重试。";
    else message=status==422?"填写的内容不符合场景要求，请检查后重试。":LocalSceneSession.Friendly(error);

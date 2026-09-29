@@ -129,15 +129,25 @@ export function createLocalServer(options) {
         directory,
         `.upload-${randomBytes(16).toString("hex")}`,
       );
+      const uploadTimeout = setTimeout(
+        () => req.destroy(new Error("model upload timeout")),
+        config.modelUploadTotalMs ?? 60000,
+      );
+      req.setTimeout(config.modelUploadIdleMs ?? 15000, () =>
+        req.destroy(new Error("model upload idle timeout")),
+      );
       let handle;
       try {
         await mkdir(directory, { recursive: true });
         handle = await open(temporary, "wx");
         let size = 0;
         const digest = createHash("sha256");
-        for await (const chunk of req) {
+        for await (const chunk of req.iterator({ destroyOnReturn: false })) {
           size += chunk.length;
-          if (size > MODEL_LIMIT) break;
+          if (size > MODEL_LIMIT) {
+            req.resume();
+            return reply(413, { error: "GLB 模型不能超过 30 MiB。" });
+          }
           digest.update(chunk);
           for (let cursor = 0; cursor < chunk.length; ) {
             const { bytesWritten } = await handle.write(
@@ -172,6 +182,8 @@ export function createLocalServer(options) {
           error: "GLB 文件不完整、格式不受支持或引用了外部资源，请检查后重试。",
         });
       } finally {
+        clearTimeout(uploadTimeout);
+        req.setTimeout(0);
         if (handle) await handle.close().catch(() => {});
         await unlink(temporary).catch(() => {});
       }

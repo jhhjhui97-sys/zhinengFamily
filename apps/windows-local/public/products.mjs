@@ -79,9 +79,9 @@ export function mountProducts({ api }) {
     $("product-message").textContent = message;
     $("product-message").classList.toggle("error", error);
   };
+  const formChanged = () => JSON.stringify(form()) !== baseline;
   const dirty = () =>
-    JSON.stringify(form()) !== baseline ||
-    Boolean($("product-model-file").files?.length);
+    formChanged() || Boolean($("product-model-file").files?.length);
   const canLeave = () =>
     !dirty() || confirm("商品资料有未保存的修改，确定放弃吗？");
   const reset = () => {
@@ -259,6 +259,8 @@ export function mountProducts({ api }) {
   $("product-model-upload").onclick = () =>
     operate(async () => {
       if (!selected) throw Error("请先选择已保存的商品。 ");
+      if (formChanged())
+        throw Error("商品资料有未保存的修改，请先更新商品，再导入模型。 ");
       const file = $("product-model-file").files?.[0];
       if (!file) throw Error("请先选择 GLB 模型文件。 ");
       if (file.size > 30 * 1024 * 1024)

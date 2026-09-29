@@ -68,6 +68,22 @@ public static class LocalMigrationTests {
    }
    Check(Backups(path).Length==1,"migration failure did not leave recovery backup");
   });
+  Test("v1 to v4 failure rolls back every stage and preserves an original backup",()=>{
+   string path=Path.Combine(directory,"migration-v1-v4-failure.sqlite");Guid workspace=Guid.NewGuid(),actor=Guid.NewGuid(),document;
+   using(var store=new LocalSceneStore(path,workspace,actor,validator)) document=store.Create("原有方案");
+   Legacy(path);
+   using(var db=new SqliteConnection(path)) db.Execute("CREATE TABLE local_model_assets(broken INTEGER)");
+   bool rejected=false;try { using(var ignored=new LocalSceneStore(path,workspace,actor,validator)) {} } catch { rejected=true; }
+   Check(rejected,"broken final migration was accepted");
+   using(var db=new SqliteConnection(path)) {
+    Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==1,"final migration failure advanced original format");
+    Check(db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name='local_customers'").Count==0,"failed final stage left customer table");
+    Check(db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name='local_products'").Count==0,"failed final stage left product table");
+    Check((long)db.Query("SELECT COUNT(*) n FROM scene_documents WHERE id=?",document.ToString("D"))[0]["n"]==1,"original scene lost");
+   }
+   string[] backups=Directory.GetFiles(directory,"migration-v1-v4-failure.sqlite.pre-v4-*.bak");Check(backups.Length==1,"original pre-v4 backup missing");
+   using(var db=new SqliteConnection(backups[0])) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==1,"pre-v4 backup was not original v1");
+  });
   Test("fresh database starts at v4 without a recovery backup",()=>{
    string path=Path.Combine(directory,"migration-fresh.sqlite"); Guid workspace=Guid.NewGuid(),actor=Guid.NewGuid();
    using(var store=new LocalSceneStore(path,workspace,actor,validator)) Check(store.Documents().Total==0,"fresh library not empty");

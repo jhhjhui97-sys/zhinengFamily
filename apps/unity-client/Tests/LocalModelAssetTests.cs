@@ -91,6 +91,7 @@ public static class LocalModelAssetTests {
     var asset=store.AttachLocalModel(product,1,hash,bytes);
     File.WriteAllBytes(Path.Combine(directory,"models",hash+".glb"),new byte[]{1,2,3});
     Reject(()=>store.VerifiedModelPath(asset.Id),LocalErrorCode.NotFound);
+    Check(store.LocalModelProducts().Count==0,"damaged active model remained available for placement");
    }
   });
   Test("independent transactions race to attach at one product revision",()=>{
