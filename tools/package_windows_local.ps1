@@ -29,7 +29,7 @@ Copy-Item -LiteralPath "$taskApp/ASSET-LICENSES.md" -Destination "$taskOutput/li
 $taskCompiler=Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 & $taskCompiler /nologo /target:winexe /r:System.Windows.Forms.dll "/out:$taskOutput/智能家居.exe" ([IO.Path]::GetFullPath("$taskApp/launcher/Program.cs"))
 if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
-$taskInstructions=@('智能家居 Windows 本地体验版','双击「智能家居.exe」启动，无需联网或后台服务器。','运行条件：Windows10/11、Microsoft Edge、.NET Framework4.8。','新建客户 → 新建设计项目 → 新建方案 → 载入两室一厅 → 放入演示家具 → 保存和恢复版本。','点顶部「商品管理」可新建、搜索、筛选和编辑本机在售商品；商品价格及属性保存到同一 SQLite 数据库。','旧版未关联项目的场景可从「旧方案入口」打开；升级时数据库会先自动生成不覆盖的迁移备份。','用户资料保存在 %LOCALAPPDATA%\ZhinengFamily；升级前建议自行备份整个目录，切勿删除原资料。','本机资料与在线后台不会自动同步；四款已授权演示 3D 模型不代表门店在售商品，录入 SKU 不会自动生成对应模型。','目前不包含报价、CAD、AI 自动布局或 VR。','可执行文件未购买商业代码签名，企业安全软件可能要求确认来源。')
+$taskInstructions=@('智能家居 Windows 本地体验版','双击「智能家居.exe」启动，无需联网或后台服务器。','运行条件：Windows10/11、Microsoft Edge、.NET Framework4.8。','新建客户 → 新建设计项目 → 新建方案 → 载入两室一厅 → 放入家具 → 保存和恢复版本。','点顶部「商品管理」可新建、搜索、筛选和编辑本机在售商品；为已保存商品选择本机 GLB 文件并点击「导入当前商品 3D 模型」，单个文件最大 30 MiB。','导入后可在设计工作台摆放该 SKU；每次场景保存会固定当时模型版本，后来替换商品模型不会更改旧方案。','旧版未关联项目的场景可从「旧方案入口」打开；升级时数据库会先自动生成不覆盖的迁移备份。','用户资料及导入模型保存在 %LOCALAPPDATA%\ZhinengFamily；升级前建议自行备份整个目录，切勿删除原资料。','本机资料与在线后台不会自动同步；四款已授权演示 3D 模型不代表门店在售商品。要展示某件在售商品的真实外观，须导入该商品获授权的 GLB 模型。','目前不包含报价、CAD、AI 自动布局或 VR。','可执行文件未购买商业代码签名，企业安全软件可能要求确认来源。')
 $taskInstructions | Set-Content -Encoding UTF8 "$taskOutput/使用说明.txt"
 $taskFiles=Get-ChildItem -LiteralPath $taskOutput -Recurse -File | ForEach-Object { @{path=$_.FullName.Substring($taskOutput.Length+1).Replace('\','/');sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()} }
 $taskRevision=git rev-parse HEAD

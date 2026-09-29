@@ -10,10 +10,10 @@
 
 内置四款 Khronos glTF 示例模型：复古三人沙发、织物单人椅、丝绒沙发和商用冰箱，含真实纹理与材质；物理光照、阴影与场景中毫米尺寸放缩均使用本地资源。模型创作者、许可和文件哈希见 [第三方素材清单](ASSET-LICENSES.md)。这些是演示商品，不能代表商家实际库存。[这张图](../../docs/images/windows-local-catalog-room.png)来自实际 Edge 离线客户端，画面中的沙发与单人椅不是 AI 生成的效果概念图。
 
-商品管理：点顶部“商品管理”，录入分类、品牌、名称、SKU、价格、毫米尺寸及可选 JSON 属性。可按名称/SKU/品牌搜索、任意分类筛选并每页查看 20 条；修改过期时提示冲突并保留表单。价格按原始十进制字符串显示，不经浮点重新计算。商品和设计工作台共用本机 SQLite，但新建在售商品**不会自动生成与该 SKU 对应的 3D 模型**。
+商品管理：点顶部“商品管理”，录入分类、品牌、名称、SKU、价格、毫米尺寸及可选 JSON 属性。可按名称/SKU/品牌搜索、任意分类筛选并每页查看 20 条；修改过期时提示冲突并保留表单。价格按原始十进制字符串显示，不经浮点重新计算。保存商品后，可选择获授权的 `.glb` 文件（最大 30 MiB），点“导入当前商品 3D 模型”；导入后该 SKU 出现在设计工作台的“在售”目录。新建 SKU 本身**不会自动生成 3D 模型**。场景版本固定导入模型的资产 ID，后来替换商品模型不会改变旧版场景。导入文件和 SQLite 都在 `%LOCALAPPDATA%\ZhinengFamily`，备份时须复制整个目录。
 
 真实本机商品页画面：[1024px 横屏商品管理](../../docs/images/windows-offline-products.png)。图中商品为自动化测试在真实本机 SQLite 创建的示例资料，产品页面、筛选、金额和详情均由实际 Edge 客户端渲染。
 
-当前限制：3D 家具目录只有四款演示模型，摆放仍是简单位置/角度调整。房间地面、墙面为基础材质，没有铺装或丰富灯具；报价/订单、自动 AI 布局和原生 CAD/VR 尚未实现。这是可用的本地客户→项目→场景和商品管理体验版，**不是完整门店交付系统**。Unity 6000.3.0f1 工程保留，但本机官方 Editor 下载重定向到返回 404 的节点，因此 Unity Editor/Player 未验收；Windows 版采用不依赖 Unity 许可的本地浏览器渲染。
+当前限制：内置目录只有四款演示模型；实际在售商品须由门店提供合法且画质合格的 GLB 文件，软件不能凭 SKU 自动生成逼真的模型。摆放仍是简单位置/角度调整。房间地面、墙面为基础材质，没有铺装或丰富灯具；报价/订单、自动 AI 布局和原生 CAD/VR 尚未实现。这是可用的本地客户→项目→场景和商品管理体验版，**不是完整门店交付系统**。Unity 6000.3.0f1 工程保留，但本机官方 Editor 下载重定向到返回 404 的节点，因此 Unity Editor/Player 未验收；Windows 版采用不依赖 Unity 许可的本地浏览器渲染。
 
 开发构建：先运行 `npm ci --prefix apps/windows-local`，准备 Node24、Newtonsoft.Json 13.0.2 `net45` DLL 和对应许可证，再运行 `tools/package_windows_local.ps1`。该脚本拒绝覆盖已有输出目录。运行 `npm test --prefix apps/windows-local`、`npm run check --prefix apps/windows-local`、`npm run format:check --prefix apps/windows-local` 验证。证据见 [Windows 验证记录](../../docs/windows-local-verification.md)。
