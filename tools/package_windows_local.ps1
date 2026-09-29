@@ -15,6 +15,7 @@ $taskClient=Join-Path $taskOutput 'runtime/client'
 New-Item -ItemType Directory -Force $taskClient,"$taskOutput/runtime/bridge","$taskOutput/licenses","$taskClient/protocol","$taskClient/node_modules/three" | Out-Null
 Copy-Item -LiteralPath $NodeExe -Destination "$taskOutput/runtime/node.exe"
 Copy-Item -LiteralPath "$taskApp/server.mjs" -Destination "$taskClient/server.mjs"
+Copy-Item -LiteralPath "$taskApp/glb.mjs" -Destination "$taskClient/glb.mjs"
 Copy-Item -LiteralPath "$taskApp/package.json" -Destination "$taskClient/package.json"
 Copy-Item -LiteralPath "$taskApp/public" -Destination "$taskClient/public" -Recurse
 foreach($file in @('LocalBridge.exe','LocalScenes.dll','SceneConsumer.Core.dll','Newtonsoft.Json.dll')){Copy-Item -LiteralPath "$taskRepo/.local/windows-bridge/$file" -Destination "$taskOutput/runtime/bridge/$file"}

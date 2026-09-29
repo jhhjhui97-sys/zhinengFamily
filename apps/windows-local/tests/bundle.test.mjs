@@ -12,6 +12,7 @@ test("portable Windows bundle contains executable runtime protocol model and lic
     "智能家居.exe",
     "runtime/node.exe",
     "runtime/client/server.mjs",
+    "runtime/client/glb.mjs",
     "runtime/bridge/LocalBridge.exe",
     "runtime/bridge/LocalScenes.dll",
     "runtime/bridge/Newtonsoft.Json.dll",

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
+using System.Collections.Generic;
 
 namespace LocalScenes {
  public sealed class LocalModelAsset {
@@ -29,6 +30,13 @@ namespace LocalScenes {
    if(rows.Count!=1)throw new LocalStoreError(LocalErrorCode.NotFound);
    var row=rows[0];
    return new LocalModelAsset {Id=id,ProductId=Guid.Parse((string)row["product_id"]),Sha256=(string)row["sha256"],ByteCount=(long)row["byte_count"],CreatedAt=(string)row["created_at"]};
+  }
+  public List<LocalProduct> LocalModelProducts() {
+   var products=new List<LocalProduct>();
+   foreach(var row in db.Query(@"SELECT p.*,m.asset_id active_asset_id FROM local_products p
+    INNER JOIN local_product_active_model m ON m.workspace_id=p.workspace_id AND m.product_id=p.id
+    WHERE p.workspace_id=? ORDER BY p.name,p.id",Key(workspace))) products.Add(ProductRow(row));
+   return products;
   }
   public string VerifiedModelPath(Guid id) {
    var asset=ModelAsset(id);string path=ModelPath(asset.Sha256);
