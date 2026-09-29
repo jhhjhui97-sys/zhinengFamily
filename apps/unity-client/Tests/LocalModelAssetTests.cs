@@ -20,16 +20,16 @@ public static class LocalModelAssetTests {
  public static void Run(string schema,string sample,string directory) {
   var validator=new OfflineSceneValidator(File.ReadAllText(schema));
   string sofa="apps/windows-local/public/assets/sofa.glb",chair="apps/windows-local/public/assets/chair.glb";
-  Test("fresh v4 database does not create a recovery backup",()=>{
+  Test("fresh current database does not create a recovery backup",()=>{
    string path=Path.Combine(directory,"model-fresh.sqlite");Guid ws=Guid.NewGuid();
    using(var store=new LocalSceneStore(path,ws,Guid.NewGuid(),validator)) Check(store.LocalProducts().Total==0,"fresh catalog not empty");
-   using(var db=new SqliteConnection(path)) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==4,"fresh model format wrong");
+   using(var db=new SqliteConnection(path)) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==5,"fresh model format wrong");
    Check(Directory.GetFiles(directory,"model-fresh.sqlite.pre-v*.bak").Length==0,"fresh DB made recovery backup");
   });
   Test("v3 model migration preserves products and creates restorable pre-v4 backup",()=>{
    string path=Path.Combine(directory,"model-v3.sqlite");Guid ws=Guid.NewGuid(),actor=Guid.NewGuid(),product;
    using(var store=new LocalSceneStore(path,ws,actor,validator)) product=store.CreateLocalProduct("sofa","品牌","三人沙发","S1","6800.50",2400,950,850).Id;
-   using(var db=new SqliteConnection(path)) { db.Execute("DROP TABLE IF EXISTS local_product_active_model");db.Execute("DROP TABLE IF EXISTS local_model_assets");db.Execute("PRAGMA user_version=3"); }
+   using(var db=new SqliteConnection(path)) { db.Execute("DROP TABLE IF EXISTS local_quotation_lines");db.Execute("DROP TABLE IF EXISTS local_quotations");db.Execute("DROP TABLE IF EXISTS local_product_active_model");db.Execute("DROP TABLE IF EXISTS local_model_assets");db.Execute("PRAGMA user_version=3"); }
    using(var upgraded=new LocalSceneStore(path,ws,actor,validator)) Check(upgraded.LocalProduct(product).Sku=="S1"&&upgraded.LocalProduct(product).ActiveAssetId==null,"v3 product lost");
    string[] backups=Directory.GetFiles(directory,"model-v3.sqlite.pre-v4-*.bak");Check(backups.Length==1,"pre-v4 backup absent");
    string copy=Path.Combine(directory,"model-v3-restored.sqlite");File.Copy(backups[0],copy);
@@ -39,6 +39,7 @@ public static class LocalModelAssetTests {
    string path=Path.Combine(directory,"model-failed-v4.sqlite");Guid ws=Guid.NewGuid(),actor=Guid.NewGuid(),product;
    using(var store=new LocalSceneStore(path,ws,actor,validator)) product=store.CreateLocalProduct("sofa","品牌","沙发","S1","100.00",2400,950,850).Id;
    using(var db=new SqliteConnection(path)) {
+    db.Execute("DROP TABLE IF EXISTS local_quotation_lines");db.Execute("DROP TABLE IF EXISTS local_quotations");
     db.Execute("DROP TABLE local_product_active_model");db.Execute("DROP TABLE local_model_assets");
     db.Execute("PRAGMA user_version=3");db.Execute("CREATE TABLE local_model_assets(broken INTEGER)");
    }
