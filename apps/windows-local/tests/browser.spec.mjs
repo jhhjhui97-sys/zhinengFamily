@@ -63,6 +63,10 @@ async function setup(t, { trackFrames = false } = {}) {
     await new Promise((r) => server.close(r));
   });
   await page.goto(url);
+  await page
+    .locator("#customer-count")
+    .filter({ hasText: /共 \d+ 位客户/ })
+    .waitFor();
   const restart = async () => {
     await new Promise((r) => server.close(r));
     server = createLocalServer(config);
@@ -373,10 +377,6 @@ test(
   { timeout: 180000 },
   async (t) => {
     const { page, restart, errors } = await setup(t);
-    await page
-      .locator("#customer-count")
-      .filter({ hasText: "共 0 位客户" })
-      .waitFor();
     const origin = new URL(page.url()).origin;
     const call = async (body) =>
       await (
