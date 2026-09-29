@@ -226,6 +226,17 @@ test(
       .locator("#products-count")
       .filter({ hasText: "共 22 件" })
       .waitFor();
+    await page.setViewportSize({ width: 1024, height: 768 });
+    assert.ok(
+      await page.evaluate(() => document.documentElement.scrollWidth <= 1024),
+    );
+    await page.locator("#products-page").evaluate((element) => {
+      element.scrollTop = 0;
+    });
+    await mkdir(join(root, ".local/windows-evidence"), { recursive: true });
+    await page.screenshot({
+      path: join(root, ".local/windows-evidence/offline-products.png"),
+    });
     await page
       .getByRole("button", { name: "下一页", exact: true })
       .last()
