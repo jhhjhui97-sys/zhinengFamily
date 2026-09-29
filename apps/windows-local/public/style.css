@@ -56,12 +56,15 @@ header {
 main {
   display: grid;
   grid-template-columns: 260px minmax(380px, 1fr) 270px;
-  min-height: calc(100vh - 76px);
+  height: calc(100vh - 76px);
+  overflow: hidden;
 }
 aside {
   padding: 24px 18px;
   background: #fff;
   border-right: 1px solid #e1e6df;
+  overflow-y: auto;
+  min-height: 0;
 }
 .inspector {
   border-left: 1px solid #e1e6df;
@@ -192,6 +195,8 @@ button:disabled {
 .workspace {
   padding: 25px 26px;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 .toolbar {
   display: flex;
@@ -390,6 +395,12 @@ a {
 @media (max-width: 900px) {
   main {
     grid-template-columns: 180px 1fr;
+    height: auto;
+    overflow: visible;
+  }
+  aside,
+  .workspace {
+    overflow: visible;
   }
   .inspector {
     grid-column: 1/3;

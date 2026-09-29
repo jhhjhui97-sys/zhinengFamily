@@ -15,7 +15,9 @@ let active = null,
   selectedCustomer = null,
   selectedProject = null,
   customerOffset = 0,
-  projectOffset = 0;
+  projectOffset = 0,
+  customerFormBaseline = null,
+  projectFormBaseline = null;
 const view = new RoomRenderer($("viewport"), $("render-status"));
 function message(value, error = false) {
   $("message").textContent = value;
@@ -36,17 +38,26 @@ function pendingFurniture() {
     )
   );
 }
-function hasUnsavedChanges() {
+function sceneUnsaved() {
   return Boolean(dirty() || pendingJson() || pendingFurniture());
+}
+function hasUnsavedChanges({ customer = true, project = true } = {}) {
+  return (
+    sceneUnsaved() ||
+    (customer && JSON.stringify(customerForm()) !== customerFormBaseline) ||
+    (project && JSON.stringify(projectForm()) !== projectFormBaseline)
+  );
 }
 function refreshRevision() {
   $("revision").textContent = active
     ? (baseline ? `当前 v${baseline}` : "未保存") +
-      (hasUnsavedChanges() ? " · 有未保存修改" : "")
+      (sceneUnsaved() ? " · 有未保存修改" : "")
     : "未保存";
 }
-function discard() {
-  return !hasUnsavedChanges() || confirm("还有未保存的修改，确定放弃吗？");
+function discard(options) {
+  return (
+    !hasUnsavedChanges(options) || confirm("还有未保存的修改，确定放弃吗？")
+  );
 }
 function sceneScope() {
   return selectedProject
@@ -61,6 +72,7 @@ function clearScene() {
   $("history-items").replaceChildren();
   $("history-json").textContent = "";
   $("history-json-panel").open = false;
+  $("project-name").value = "";
   $("project-title").textContent = selectedProject?.name ?? "开始你的家居方案";
   refreshDraft();
 }
@@ -183,6 +195,8 @@ function projectForm() {
     status: $("sales-project-status").value,
   };
 }
+customerFormBaseline = JSON.stringify(customerForm());
+projectFormBaseline = JSON.stringify(projectForm());
 function showCustomer(customer) {
   selectedCustomer = customer;
   selectedProject = null;
@@ -193,6 +207,8 @@ function showCustomer(customer) {
   $("sales-project-name").value = "";
   $("sales-project-address").value = "";
   $("sales-project-status").value = "draft";
+  customerFormBaseline = JSON.stringify(customerForm());
+  projectFormBaseline = JSON.stringify(projectForm());
   $("scene-scope-label").textContent = "请先选择项目";
   clearScene();
 }
@@ -234,6 +250,7 @@ async function projects() {
         $("sales-project-name").value = item.name;
         $("sales-project-address").value = item.address ?? "";
         $("sales-project-status").value = item.status;
+        projectFormBaseline = JSON.stringify(projectForm());
         $("scene-scope-label").textContent = "项目方案";
         clearScene();
         await library();
@@ -300,7 +317,7 @@ function adopt(version) {
 }
 $("customer-create").onclick = () =>
   run(async () => {
-    if (!discard()) return;
+    if (!discard({ customer: false })) return;
     const values = customerForm();
     if (!values.name) throw Error("请填写客户姓名。");
     const customer = await api("customer_create", values);
@@ -322,6 +339,7 @@ $("customer-edit").onclick = () =>
       ...values,
     });
     selectedCustomer = customer;
+    customerFormBaseline = JSON.stringify(customerForm());
     $("selected-customer").textContent = customer.name;
     await customers();
     message(`客户 ${customer.name} 已更新。`);
@@ -329,7 +347,7 @@ $("customer-edit").onclick = () =>
 $("sales-project-create").onclick = () =>
   run(async () => {
     if (!selectedCustomer) throw Error("请先选择客户，再创建设计项目。");
-    if (!discard()) return;
+    if (!discard({ project: false })) return;
     const values = projectForm();
     if (!values.name) throw Error("请填写项目名称。");
     const project = await api("project_create", {
@@ -337,6 +355,7 @@ $("sales-project-create").onclick = () =>
       ...values,
     });
     selectedProject = project;
+    projectFormBaseline = JSON.stringify(projectForm());
     projectOffset = 0;
     $("selected-project").textContent = project.name;
     $("scene-scope-label").textContent = "项目方案";
@@ -356,6 +375,7 @@ $("sales-project-edit").onclick = () =>
       ...values,
     });
     selectedProject = project;
+    projectFormBaseline = JSON.stringify(projectForm());
     $("selected-project").textContent = project.name;
     if (!active) $("project-title").textContent = project.name;
     await projects();
@@ -366,6 +386,10 @@ $("legacy").onclick = () =>
     if (!discard()) return;
     selectedProject = null;
     $("selected-project").textContent = "正在查看旧方案";
+    $("sales-project-name").value = "";
+    $("sales-project-address").value = "";
+    $("sales-project-status").value = "draft";
+    projectFormBaseline = JSON.stringify(projectForm());
     $("scene-scope-label").textContent = "旧方案";
     clearScene();
     await library();

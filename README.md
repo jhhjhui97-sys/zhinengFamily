@@ -10,6 +10,8 @@
 
 ![实际运行的沙发与单人椅场景](docs/images/windows-local-catalog-room.png)
 
+![Windows 离线客户、项目与场景实际运行画面](docs/images/windows-offline-sales-room.png)
+
 ## 原 iPad 独立离线方向（暂缓）
 
 先前目标是 iPad 本机独立使用；用户现将 Windows 本地版设为首要交付，iPad 安装包暂缓。Phase 3-2A 提供 SQLite 本地场景库、完整离线校验和不可变版本核心；已有 Web 后台不作为 iPad 运行依赖。本阶段未完成本地业务界面及 iOS 安装包，Unity Editor、IL2CPP 和 iPad 实机未执行。详见 [客户端说明](apps/unity-client/README.md) 和 [验证记录](docs/phase-3-2a-verification.md)。

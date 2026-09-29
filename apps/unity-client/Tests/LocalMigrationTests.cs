@@ -40,6 +40,10 @@ public static class LocalMigrationTests {
     Check((long)old.Query("PRAGMA user_version")[0]["user_version"]==1,"backup was upgraded in place");
     Check((long)old.Query("SELECT COUNT(*) n FROM scene_versions WHERE document_id=?",document.ToString("D"))[0]["n"]==2,"backup lost scene history");
    }
+   string restored=Path.Combine(directory,"migration-restored-v1.sqlite");
+   File.Copy(Backups(path)[0],restored);
+   using(var copy=new LocalSceneStore(restored,identity.WorkspaceId,identity.ActorId,validator))
+    Check(copy.Current(document).Revision==2&&copy.Versions(document).Count==2,"restored v1 backup could not reopen with full history");
    Check(LocalIdentity.Open(path).WorkspaceId==identity.WorkspaceId,"v2 identity refused existing workspace");
    using(var reopened=new LocalSceneStore(path,identity.WorkspaceId,identity.ActorId,validator)) Check(reopened.Current(document).Revision==2,"v2 reopen lost scene");
    Check(Backups(path).Length==1,"v2 reopen created redundant backup");

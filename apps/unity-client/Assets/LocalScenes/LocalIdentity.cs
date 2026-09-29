@@ -10,7 +10,7 @@ namespace LocalScenes {
     long format=(long)db.Query("PRAGMA user_version")[0]["user_version"];
     if(format!=0&&format!=1&&format!=2) throw new LocalStoreError(LocalErrorCode.Corrupt);
     var workspaces=new HashSet<Guid>();
-    foreach(string table in new[]{"scene_documents","local_catalog","local_customers","local_projects"}) {
+    foreach(string table in new[]{"scene_documents","local_catalog","local_customers","local_projects","project_scenes"}) {
      if(db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name=?",table).Count==0) continue;
      foreach(var row in db.Query("SELECT DISTINCT workspace_id FROM "+table)) {
       Guid id; if(!Guid.TryParse((string)row["workspace_id"],out id)||id==Guid.Empty) throw new LocalStoreError(LocalErrorCode.Corrupt);
