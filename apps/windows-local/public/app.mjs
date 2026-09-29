@@ -93,8 +93,14 @@ async function api(action, fields = {}) {
   return body.data;
 }
 const productsView = mountProducts({ api });
-$("nav-design").onclick = () => {
+$("nav-design").onclick = async () => {
   if (!productsView.canLeave()) return;
+  try {
+    await loadCatalog();
+  } catch (error) {
+    message(error.message || "商品目录加载失败，请重试。", true);
+    return;
+  }
   $("products-page").hidden = true;
   $("design-page").hidden = false;
 };
@@ -177,15 +183,18 @@ function refreshDraft() {
   else view.clear();
 }
 async function loadCatalog() {
+  const selected = $("catalog-select").value;
   catalogItems = await api("catalog");
   view.configureCatalog(catalogItems);
   $("catalog-select").replaceChildren();
   for (const product of catalogItems) {
     const option = document.createElement("option");
     option.value = product.id;
-    option.textContent = product.name;
+    option.textContent = `${product.asset_id ? "在售" : "演示"} · ${product.name}`;
     $("catalog-select").append(option);
   }
+  if (selected && catalogItems.some((product) => product.id === selected))
+    $("catalog-select").value = selected;
 }
 function customerForm() {
   return Object.fromEntries(
@@ -643,7 +652,7 @@ run(async () => {
   try {
     await loadCatalog();
   } catch (error) {
-    message(`演示家具目录暂不可用：${error.message}`, true);
+    message(`家具目录暂不可用：${error.message}`, true);
   }
   await library();
   await customers();

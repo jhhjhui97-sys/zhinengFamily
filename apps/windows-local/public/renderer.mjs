@@ -72,19 +72,28 @@ export class RoomRenderer {
   configureCatalog(products) {
     this.catalog = new Map(products.map((product) => [product.id, product]));
   }
-  modelFor(productId) {
+  modelFor(productId, assetId = null) {
     const id = productId.replace(/^urn:uuid:/i, "");
     const product = this.catalog.get(id);
-    if (!product || !/^\/assets\/[a-z-]+\.glb$/.test(product.model))
+    const asset = assetId?.replace(/^urn:uuid:/i, "");
+    const imported =
+      asset && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(asset);
+    if (assetId && !imported) return Promise.reject(Error("模型标识不合法"));
+    const modelPath = imported ? `/local-models/${asset}.glb` : product?.model;
+    if (
+      !modelPath ||
+      (!imported && !/^\/assets\/[a-z-]+\.glb$/.test(modelPath))
+    )
       return Promise.reject(Error("模型不在本地目录中"));
-    if (!this.modelPromises.has(id)) {
+    const key = imported ? asset : id;
+    if (!this.modelPromises.has(key)) {
       const promise = new GLTFLoader()
-        .loadAsync(product.model)
+        .loadAsync(modelPath)
         .then((g) => g.scene);
-      this.modelPromises.set(id, promise);
-      promise.catch(() => this.modelPromises.delete(id));
+      this.modelPromises.set(key, promise);
+      promise.catch(() => this.modelPromises.delete(key));
     }
-    return this.modelPromises.get(id);
+    return this.modelPromises.get(key);
   }
   size() {
     const w = this.host.clientWidth,
@@ -223,7 +232,7 @@ export class RoomRenderer {
     let failed = 0;
     for (const item of document.furniture_instances) {
       try {
-        const source = await this.modelFor(item.product_id);
+        const source = await this.modelFor(item.product_id, item.asset_id);
         if (serial !== this.renderSerial) return;
         const model = source.clone(true),
           bounds = new THREE.Box3().setFromObject(model),

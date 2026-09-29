@@ -79,11 +79,14 @@ export function mountProducts({ api }) {
     $("product-message").textContent = message;
     $("product-message").classList.toggle("error", error);
   };
-  const dirty = () => JSON.stringify(form()) !== baseline;
+  const formChanged = () => JSON.stringify(form()) !== baseline;
+  const dirty = () =>
+    formChanged() || Boolean($("product-model-file").files?.length);
   const canLeave = () =>
     !dirty() || confirm("商品资料有未保存的修改，确定放弃吗？");
   const reset = () => {
     selected = null;
+    $("product-model-file").value = "";
     put(empty());
     baseline = JSON.stringify(form());
     $("product-detail").textContent =
@@ -91,6 +94,7 @@ export function mountProducts({ api }) {
     note("");
   };
   function detail(product) {
+    if (selected?.id !== product.id) $("product-model-file").value = "";
     selected = product;
     put({
       ...product,
@@ -101,7 +105,7 @@ export function mountProducts({ api }) {
     });
     baseline = JSON.stringify(form());
     $("product-detail").textContent =
-      `${product.name} · ${product.sku}\n${product.brand} / ${product.category}\n${formatMoney(product.price)} · ${product.width_mm} × ${product.depth_mm} × ${product.height_mm} mm\n商品属性：${JSON.stringify(product.metadata)}\n暂无与该 SKU 对应的真实 3D 模型。`;
+      `${product.name} · ${product.sku}\n${product.brand} / ${product.category}\n${formatMoney(product.price)} · ${product.width_mm} × ${product.depth_mm} × ${product.height_mm} mm\n商品属性：${JSON.stringify(product.metadata)}\n${product.active_asset_id ? "已有本机 3D 模型" : "暂无与该 SKU 对应的真实 3D 模型。"}`;
   }
   async function list(nextOffset = offset) {
     let page;
@@ -171,6 +175,7 @@ export function mountProducts({ api }) {
       "product-create",
       "product-update",
       "product-reset",
+      "product-model-upload",
       "products-search-button",
       "products-prev",
       "products-next",
@@ -192,6 +197,7 @@ export function mountProducts({ api }) {
         "product-create",
         "product-update",
         "product-reset",
+        "product-model-upload",
         "products-search-button",
       ])
         $(id).disabled = false;
@@ -250,5 +256,45 @@ export function mountProducts({ api }) {
         note("商品已更新，但列表刷新失败，请重试搜索。", true);
       }
     });
+  $("product-model-upload").onclick = () =>
+    operate(async () => {
+      if (!selected) throw Error("请先选择已保存的商品。 ");
+      if (formChanged())
+        throw Error("商品资料有未保存的修改，请先更新商品，再导入模型。 ");
+      const file = $("product-model-file").files?.[0];
+      if (!file) throw Error("请先选择 GLB 模型文件。 ");
+      if (file.size > 30 * 1024 * 1024)
+        throw Error("模型文件不能超过 30 MiB。 ");
+      let response;
+      try {
+        response = await fetch(`/api/product-models/${selected.id}`, {
+          method: "POST",
+          headers: {
+            "content-type": "model/gltf-binary",
+            "x-base-revision": String(selected.revision),
+          },
+          body: file,
+        });
+      } catch {
+        throw Error("本地模型服务暂时不可用，请重试。 ");
+      }
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        if (response.status === 409)
+          throw Error(
+            "商品信息已变化，请重新打开商品后重试；所选文件已保留。 ",
+          );
+        throw Error(body?.error ?? "模型导入失败，请检查 GLB 文件后重试。 ");
+      }
+      $("product-model-file").value = "";
+      detail(body.data);
+      note("模型已导入本机，并关联当前商品。 ");
+      try {
+        await list();
+      } catch {
+        note("模型已导入，但列表刷新失败。 ", true);
+      }
+    });
+  $("product-model-file").onchange = () => note("");
   return { open: () => operate(list), dirty, canLeave };
 }

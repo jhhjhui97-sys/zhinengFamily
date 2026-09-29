@@ -1,11 +1,16 @@
 import http from "node:http";
-import { randomBytes } from "node:crypto";
-import { readFile, mkdir } from "node:fs/promises";
+import { randomBytes, createHash } from "node:crypto";
+import { readFile, mkdir, open, rename, unlink } from "node:fs/promises";
 import { join, resolve, sep, extname } from "node:path";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { validateGlb } from "./glb.mjs";
 const here = import.meta.dirname;
 const BODY_LIMIT = 1024 * 1024;
+const MODEL_LIMIT = 30 * 1024 * 1024;
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const uploadPattern = new RegExp(`^/api/product-models/(${UUID})$`, "i");
+const modelPattern = new RegExp(`^/local-models/(${UUID})\\.glb$`, "i");
 const types = {
   ".html": "text/html; charset=utf-8",
   ".mjs": "text/javascript; charset=utf-8",
@@ -87,6 +92,12 @@ export function createLocalServer(options) {
       });
       res.end(JSON.stringify(data));
     };
+    const authorized = (write) =>
+      (!write || req.headers.origin === origin) &&
+      (req.headers.cookie ?? "")
+        .split(";")
+        .map((x) => x.trim())
+        .includes(`local_session=${token}`);
     if (req.headers.host !== `127.0.0.1:${port}`) {
       reply(403, { error: "此服务仅允许本机访问。" });
       return;
@@ -98,18 +109,117 @@ export function createLocalServer(options) {
       reply(404, { error: "找不到该页面。" });
       return;
     }
+    const upload = pathname.match(uploadPattern);
+    if (upload) {
+      if (req.method !== "POST")
+        return reply(405, { error: "请求方式不支持。" });
+      if (!authorized(true))
+        return reply(403, { error: "请求来源无效，请重新打开本地软件。" });
+      if (
+        !/^model\/gltf-binary(?:;|$)/i.test(req.headers["content-type"] ?? "")
+      )
+        return reply(415, { error: "请选择 GLB 格式的家具模型。" });
+      const revision = req.headers["x-base-revision"];
+      if (!/^[1-9]\d{0,14}$/.test(revision ?? ""))
+        return reply(422, { error: "商品版本无效，请重新打开商品。" });
+      if (Number(req.headers["content-length"] ?? 0) > MODEL_LIMIT)
+        return reply(413, { error: "GLB 模型不能超过 30 MiB。" });
+      const directory = join(config.dataDirectory, "models");
+      const temporary = join(
+        directory,
+        `.upload-${randomBytes(16).toString("hex")}`,
+      );
+      const uploadTimeout = setTimeout(
+        () => req.destroy(new Error("model upload timeout")),
+        config.modelUploadTotalMs ?? 60000,
+      );
+      req.setTimeout(config.modelUploadIdleMs ?? 15000, () =>
+        req.destroy(new Error("model upload idle timeout")),
+      );
+      let handle;
+      try {
+        await mkdir(directory, { recursive: true });
+        handle = await open(temporary, "wx");
+        let size = 0;
+        const digest = createHash("sha256");
+        for await (const chunk of req.iterator({ destroyOnReturn: false })) {
+          size += chunk.length;
+          if (size > MODEL_LIMIT) {
+            req.resume();
+            return reply(413, { error: "GLB 模型不能超过 30 MiB。" });
+          }
+          digest.update(chunk);
+          for (let cursor = 0; cursor < chunk.length; ) {
+            const { bytesWritten } = await handle.write(
+              chunk,
+              cursor,
+              chunk.length - cursor,
+            );
+            if (!bytesWritten) throw Error("write failed");
+            cursor += bytesWritten;
+          }
+        }
+        await handle.close();
+        handle = null;
+        if (size > MODEL_LIMIT)
+          return reply(413, { error: "GLB 模型不能超过 30 MiB。" });
+        validateGlb(await readFile(temporary));
+        const sha256 = digest.digest("hex");
+        await rename(temporary, join(directory, `${sha256}.glb`));
+        const result = await bridge(
+          config,
+          JSON.stringify({
+            action: "model_attach",
+            id: upload[1],
+            base_revision: Number(revision),
+            sha256,
+            byte_count: size,
+          }),
+        );
+        return reply(result.status, result);
+      } catch {
+        return reply(422, {
+          error: "GLB 文件不完整、格式不受支持或引用了外部资源，请检查后重试。",
+        });
+      } finally {
+        clearTimeout(uploadTimeout);
+        req.setTimeout(0);
+        if (handle) await handle.close().catch(() => {});
+        await unlink(temporary).catch(() => {});
+      }
+    }
+    const model = pathname.match(modelPattern);
+    if (model) {
+      if (req.method !== "GET" && req.method !== "HEAD")
+        return reply(405, { error: "请求方式不支持。" });
+      if (!authorized(false))
+        return reply(403, { error: "请从本地软件打开模型。" });
+      const result = await bridge(
+        config,
+        JSON.stringify({ action: "model_asset", id: model[1] }),
+      );
+      if (result.status !== 200) return reply(result.status, result);
+      try {
+        const content = await readFile(
+          join(config.dataDirectory, "models", `${result.data.sha256}.glb`),
+        );
+        res.writeHead(200, {
+          "content-type": "model/gltf-binary",
+          "content-length": content.length,
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+        });
+        return res.end(req.method === "HEAD" ? undefined : content);
+      } catch {
+        return reply(404, { error: "本机模型文件已丢失，请重新导入。" });
+      }
+    }
     if (pathname === "/api/local") {
       if (req.method !== "POST") {
         reply(405, { error: "请求方式不支持。" });
         return;
       }
-      if (
-        req.headers.origin !== origin ||
-        !(req.headers.cookie ?? "")
-          .split(";")
-          .map((x) => x.trim())
-          .includes(`local_session=${token}`)
-      ) {
+      if (!authorized(true)) {
         reply(403, { error: "请求来源无效，请重新打开本地软件。" });
         return;
       }

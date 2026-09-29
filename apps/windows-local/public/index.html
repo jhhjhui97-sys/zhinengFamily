@@ -158,14 +158,15 @@
         </details>
       </section>
       <aside class="inspector">
-        <div class="section-title">演示家具目录</div>
-        <label for="catalog-select">选择真实模型</label>
+        <div class="section-title">家具目录</div>
+        <label for="catalog-select">选择本机模型</label>
         <select id="catalog-select"></select>
         <label for="room-select">放入房间</label>
         <select id="room-select"></select>
         <button id="add-furniture">放入场景</button>
         <p class="muted">
-          这些是已授权的演示模型，不代表门店在售商品；添加后可调整位置并保存版本。
+          “演示”是内置示例，不代表门店库存；“在售”是已导入 GLB
+          的真实商品。添加后可调整位置并保存版本。
         </p>
         <hr />
         <div class="section-title">家具调整</div>
@@ -189,7 +190,7 @@
           更新家具位置
         </button>
         <p class="muted">
-          位置调整后请保存新版本。所有模型来自本机资源；尺寸为演示参考值。
+          位置调整后请保存新版本。所有模型来自本机资源；在售商品尺寸按录入的毫米值显示。
         </p>
         <hr />
         <div class="section-title">版本历史</div>
@@ -340,6 +341,17 @@
             <button id="product-create" class="primary">新建在售商品</button
             ><button id="product-update">更新在售商品</button
             ><button id="product-reset">清空表单</button>
+          </div>
+          <div class="product-model-import">
+            <label
+              >商品 3D 模型（GLB，最大 30 MiB）
+              <input
+                id="product-model-file"
+                type="file"
+                accept=".glb,model/gltf-binary"
+              />
+            </label>
+            <button id="product-model-upload">导入当前商品 3D 模型</button>
           </div>
         </div>
       </div>
