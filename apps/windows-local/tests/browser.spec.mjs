@@ -15,7 +15,7 @@ const { createLocalServer } = await import(
 const root = resolve(import.meta.dirname, "../../..");
 async function setup(t, { trackFrames = false } = {}) {
   const data = await mkdtemp(join(tmpdir(), "family-browser-"));
-  const server = createLocalServer({
+  const config = {
     bridgePath: process.env.FAMILY_BUNDLE
       ? join(process.env.FAMILY_BUNDLE, "runtime/bridge/LocalBridge.exe")
       : join(root, ".local/windows-bridge/LocalBridge.exe"),
@@ -29,9 +29,10 @@ async function setup(t, { trackFrames = false } = {}) {
     vendorDirectory: process.env.FAMILY_BUNDLE
       ? join(process.env.FAMILY_BUNDLE, "runtime/client/node_modules/three")
       : join(root, "apps/windows-local/node_modules/three"),
-  });
+  };
+  let server = createLocalServer(config);
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  const url = `http://127.0.0.1:${server.address().port}`;
+  let url = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch({ channel: "msedge", headless: true });
   const context = await browser.newContext({
     viewport: { width: 1500, height: 1000 },
@@ -62,7 +63,14 @@ async function setup(t, { trackFrames = false } = {}) {
     await new Promise((r) => server.close(r));
   });
   await page.goto(url);
-  return { page, errors };
+  const restart = async () => {
+    await new Promise((r) => server.close(r));
+    server = createLocalServer(config);
+    await new Promise((r) => server.listen(0, "127.0.0.1", r));
+    url = `http://127.0.0.1:${server.address().port}`;
+    await page.goto(url);
+  };
+  return { page, errors, restart };
 }
 async function project(page, requireModel = false) {
   await page.locator("#project-name").fill("张先生 · 龙湖小区120㎡");
@@ -74,6 +82,214 @@ async function project(page, requireModel = false) {
       .locator('canvas[data-model-loaded="true"]')
       .waitFor({ timeout: 90000 });
 }
+test(
+  "offline customer to project to scene survives service restart and keeps legacy scenes separate",
+  { timeout: 120000 },
+  async (t) => {
+    const { page, errors, restart } = await setup(t);
+    await page.locator("#project-name").fill("旧方案");
+    await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    await page.locator("#customer-name").fill("张先生");
+    await page.locator("#customer-phone").fill("13800000000");
+    await page.locator("#customer-budget").fill("80000.50");
+    await page.getByRole("button", { name: "保存客户", exact: true }).click();
+    await page
+      .locator("#selected-customer")
+      .filter({ hasText: "张先生" })
+      .waitFor();
+    assert.equal(await page.locator("#project-name").inputValue(), "");
+    await page.locator("#sales-project-name").fill("龙湖小区120㎡");
+    await page.locator("#sales-project-address").fill("杭州龙湖小区");
+    await page.getByRole("button", { name: "保存项目", exact: true }).click();
+    await page
+      .locator("#selected-project")
+      .filter({ hasText: "龙湖小区120㎡" })
+      .waitFor();
+    await page
+      .locator("#message")
+      .filter({ hasText: "可以新建方案" })
+      .waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: "旧方案", exact: true }).count(),
+      0,
+    );
+    await page.locator("#project-name").fill("客厅设计");
+    await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    await page
+      .getByRole("button", { name: "载入两室一厅", exact: true })
+      .click();
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    await page.locator("#furniture-x").fill("3500");
+    await page
+      .getByRole("button", { name: "更新家具位置", exact: true })
+      .click();
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v2" }).waitFor();
+    await page.getByRole("button", { name: "查看 v1", exact: true }).click();
+    await page.getByRole("button", { name: "恢复此版本", exact: true }).click();
+    await page.getByRole("button", { name: "确认恢复", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v3" }).waitFor();
+    await restart();
+    await page.getByRole("button", { name: "张先生", exact: true }).click();
+    await page
+      .getByRole("button", { name: "龙湖小区120㎡", exact: true })
+      .click();
+    await page.getByRole("button", { name: "客厅设计", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v3" }).waitFor();
+    await page.getByRole("button", { name: "查看 v1", exact: true }).waitFor();
+    await mkdir(join(root, ".local/windows-evidence"), { recursive: true });
+    await page.screenshot({
+      path: join(root, ".local/windows-evidence/offline-sales-room.png"),
+    });
+    assert.equal(
+      await page.getByRole("button", { name: "查看 v1", exact: true }).count(),
+      1,
+    );
+    assert.equal(
+      await page.getByRole("button", { name: "查看 v2", exact: true }).count(),
+      1,
+    );
+    await page.getByRole("button", { name: "旧方案入口", exact: true }).click();
+    await page.getByRole("button", { name: "旧方案", exact: true }).waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: "客厅设计", exact: true }).count(),
+      0,
+    );
+    assert.equal(errors.length, 0, errors.join("\n"));
+    assert.equal(
+      await page.evaluate(() => localStorage.length + sessionStorage.length),
+      0,
+    );
+  },
+);
+test(
+  "customer and project stale edits preserve form values and layout fits landscape width",
+  { timeout: 90000 },
+  async (t) => {
+    const { page } = await setup(t);
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.locator("#customer-name").fill("李女士");
+    await page.getByRole("button", { name: "保存客户", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "已保存在本机" })
+      .waitFor();
+    await page.locator("#sales-project-name").fill("江景苑");
+    await page.getByRole("button", { name: "保存项目", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "可以新建方案" })
+      .waitFor();
+    const origin = new URL(page.url()).origin;
+    const call = async (body) =>
+      (
+        await page.request.post(`${origin}/api/local`, {
+          headers: { origin },
+          data: body,
+        })
+      ).json();
+    const customers = await call({ action: "customers" });
+    assert.equal(customers.status, 200, JSON.stringify(customers));
+    const customer = customers.data.items[0];
+    await call({
+      action: "customer_update",
+      id: customer.id,
+      base_revision: 1,
+      name: "其他窗口修改",
+      status: "following",
+    });
+    await page.locator("#customer-name").fill("我的未保存修改");
+    await page.getByRole("button", { name: "更新客户", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: /修改已保留|数据已变化/ })
+      .waitFor();
+    assert.equal(
+      await page.locator("#customer-name").inputValue(),
+      "我的未保存修改",
+    );
+    const project = (
+      await call({ action: "projects", customer_id: customer.id })
+    ).data.items[0];
+    await call({
+      action: "project_update",
+      id: project.id,
+      base_revision: 1,
+      name: "其他项目名",
+      status: "active",
+    });
+    await page.locator("#sales-project-name").fill("我的项目改动");
+    await page.getByRole("button", { name: "更新项目", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: /修改已保留|数据已变化/ })
+      .waitFor();
+    assert.equal(
+      await page.locator("#sales-project-name").inputValue(),
+      "我的项目改动",
+    );
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      true,
+    );
+  },
+);
+test(
+  "unsaved customer and project forms ask before navigation or close",
+  { timeout: 90000 },
+  async (t) => {
+    const { page } = await setup(t);
+    await page.locator("#customer-name").fill("甲客户");
+    await page.getByRole("button", { name: "保存客户", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "已保存在本机" })
+      .waitFor();
+    await page.locator("#sales-project-name").fill("甲项目");
+    await page.getByRole("button", { name: "保存项目", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "可以新建方案" })
+      .waitFor();
+    await page.locator("#sales-project-name").fill("未保存的项目名");
+    assert.equal(
+      await page.evaluate(() => {
+        const event = new Event("beforeunload", { cancelable: true });
+        dispatchEvent(event);
+        return event.defaultPrevented;
+      }),
+      true,
+    );
+    page.once("dialog", (dialog) => dialog.dismiss());
+    await page.getByRole("button", { name: "旧方案入口", exact: true }).click();
+    assert.equal(
+      await page.locator("#sales-project-name").inputValue(),
+      "未保存的项目名",
+    );
+    await page.locator("#sales-project-name").fill("甲项目");
+    await page.locator("#customer-name").fill("乙客户");
+    await page.getByRole("button", { name: "保存客户", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "已保存在本机" })
+      .waitFor();
+    await page.getByRole("button", { name: "甲客户", exact: true }).click();
+    await page.locator("#customer-name").fill("未保存的客户名");
+    page.once("dialog", (dialog) => dialog.dismiss());
+    await page.getByRole("button", { name: "乙客户", exact: true }).click();
+    assert.equal(
+      await page.locator("#selected-customer").textContent(),
+      "甲客户",
+    );
+    assert.equal(
+      await page.locator("#customer-name").inputValue(),
+      "未保存的客户名",
+    );
+  },
+);
 test(
   "actual offline render, furniture edit v2, immutable restore v3 and page reload",
   { timeout: 120000 },

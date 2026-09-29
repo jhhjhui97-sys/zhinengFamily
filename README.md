@@ -6,9 +6,11 @@
 
 ## Windows 本地体验版（当前首要交付）
 
-可在 Windows 10/11 双击便携包的 `智能家居.exe` 使用本机离线 3D 场景：内置沙发、单人椅、丝绒沙发和冰箱四款有纹理的演示模型，可选房间放置、调整位置/角度，并用 SQLite 保存和恢复版本。无需 Mac 或云端 API。这些演示模型不等于门店在售商品；客户/商品业务仍由原 Web 后台提供，完整离线门店软件尚未完成。实际运行画面及启动方式见 [Windows 客户端说明](apps/windows-local/README.md)，验证见 [记录](docs/windows-local-verification.md)。
+可在 Windows 10/11 双击便携包的 `智能家居.exe` 使用本机离线客户→设计项目→3D 场景流程：客户与项目资料保存在 SQLite 中，项目场景可保存与恢复版本。内置沙发、单人椅、丝绒沙发和冰箱四款有纹理的演示模型，可选房间放置、调整位置/角度。无需 Mac 或云端 API。旧版未关联项目的方案仍可从“旧方案入口”访问，首次数据库升级前会生成备份。本地数据与原 Web 后台不会自动同步；演示模型不等于门店在售商品，离线商品管理、报价和高级设计功能仍未完成。实际运行画面及启动方式见 [Windows 客户端说明](apps/windows-local/README.md)，验证见 [记录](docs/windows-local-verification.md)。
 
 ![实际运行的沙发与单人椅场景](docs/images/windows-local-catalog-room.png)
+
+![Windows 离线客户、项目与场景实际运行画面](docs/images/windows-offline-sales-room.png)
 
 ## 原 iPad 独立离线方向（暂缓）
 

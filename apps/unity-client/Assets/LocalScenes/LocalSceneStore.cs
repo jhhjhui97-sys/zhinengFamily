@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 using SmartHome.SceneConsumer;
 namespace LocalScenes {
 /// <summary>Offline library. Workspace and actor are local provenance, never remote authentication.</summary>
-public sealed class LocalSceneStore : IDisposable {
+public sealed partial class LocalSceneStore : IDisposable {
  readonly SqliteConnection db;
  readonly Guid workspace,actor;
  readonly OfflineSceneValidator validator;
@@ -13,9 +13,14 @@ public sealed class LocalSceneStore : IDisposable {
   if(workspace==Guid.Empty||actor==Guid.Empty||validator==null) throw new LocalStoreError(LocalErrorCode.InvalidInput);
   this.workspace=workspace; this.actor=actor; this.validator=validator;
   db=new SqliteConnection(path);
-  try { db.Transaction(()=>{
+  try {
    long format=(long)db.Query("PRAGMA user_version")[0]["user_version"];
-   if(format!=0&&format!=1) throw new LocalStoreError(LocalErrorCode.Corrupt);
+   if(format!=0&&format!=1&&format!=2) throw new LocalStoreError(LocalErrorCode.Corrupt);
+   if(format==1) {
+    string backup=path+".pre-v2-"+DateTime.UtcNow.ToString("yyyyMMddHHmmss",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N")+".bak";
+    db.BackupTo(backup);
+   }
+   if(format<2) db.Transaction(()=>{
    if(format==0) {
     db.Execute(@"CREATE TABLE scene_documents(
      id TEXT PRIMARY KEY NOT NULL, workspace_id TEXT NOT NULL, name TEXT NOT NULL,
@@ -35,9 +40,31 @@ public sealed class LocalSceneStore : IDisposable {
      height_mm REAL NOT NULL CHECK(height_mm>0), PRIMARY KEY(workspace_id,product_id))");
     db.Execute("CREATE TRIGGER scene_versions_no_update BEFORE UPDATE ON scene_versions BEGIN SELECT RAISE(ABORT,'immutable history'); END");
     db.Execute("CREATE TRIGGER scene_versions_no_delete BEFORE DELETE ON scene_versions BEGIN SELECT RAISE(ABORT,'immutable history'); END");
-    db.Execute("PRAGMA user_version=1");
    }
-  }); } catch { db.Dispose(); throw; }
+    db.Execute(@"CREATE TABLE local_customers(
+     workspace_id TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL,
+     phone TEXT, wechat TEXT, source TEXT, address TEXT, budget TEXT,
+     status TEXT NOT NULL CHECK(status IN ('new','following','won','lost')),
+     notes TEXT, revision INTEGER NOT NULL CHECK(revision>=1),
+     created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,id))");
+    db.Execute("CREATE UNIQUE INDEX local_customers_phone ON local_customers(workspace_id,phone) WHERE phone IS NOT NULL AND phone<>''");
+    db.Execute(@"CREATE TABLE local_projects(
+     workspace_id TEXT NOT NULL, id TEXT NOT NULL, customer_id TEXT NOT NULL,
+     sales_actor_id TEXT NOT NULL, name TEXT NOT NULL, address TEXT,
+     status TEXT NOT NULL CHECK(status IN ('draft','active','archived')),
+     revision INTEGER NOT NULL CHECK(revision>=1),
+     created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,id), UNIQUE(workspace_id,customer_id,name),
+     FOREIGN KEY(workspace_id,customer_id) REFERENCES local_customers(workspace_id,id))");
+    db.Execute(@"CREATE TABLE project_scenes(
+     workspace_id TEXT NOT NULL, project_id TEXT NOT NULL, document_id TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,project_id,document_id), UNIQUE(workspace_id,document_id),
+     FOREIGN KEY(workspace_id,project_id) REFERENCES local_projects(workspace_id,id),
+     FOREIGN KEY(workspace_id,document_id) REFERENCES scene_documents(workspace_id,id))");
+    db.Execute("PRAGMA user_version=2");
+   });
+  } catch { db.Dispose(); throw; }
  }
  static string Key(Guid id) { return id.ToString("D"); }
  static string Now() { return DateTime.UtcNow.ToString("o",CultureInfo.InvariantCulture); }

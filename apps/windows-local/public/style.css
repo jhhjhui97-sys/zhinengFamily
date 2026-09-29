@@ -55,13 +55,16 @@ header {
 }
 main {
   display: grid;
-  grid-template-columns: 230px minmax(380px, 1fr) 270px;
-  min-height: calc(100vh - 76px);
+  grid-template-columns: 260px minmax(380px, 1fr) 270px;
+  height: calc(100vh - 76px);
+  overflow: hidden;
 }
 aside {
   padding: 24px 18px;
   background: #fff;
   border-right: 1px solid #e1e6df;
+  overflow-y: auto;
+  min-height: 0;
 }
 .inspector {
   border-left: 1px solid #e1e6df;
@@ -131,9 +134,36 @@ button:disabled {
   background: #e8efe5;
 }
 .library-items {
-  margin-top: 25px;
+  margin-top: 12px;
   display: grid;
   gap: 8px;
+}
+.selection-note {
+  border-left: 3px solid #5c8c72;
+  padding: 8px 10px;
+  background: #f0f5ed;
+  color: #305343;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.form-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+.form-actions button {
+  flex: 1;
+  padding: 8px;
+  font-size: 12px;
+}
+#customer-notes {
+  height: 78px;
+  font-family: inherit;
+  font-size: 13px;
+}
+#legacy {
+  width: 100%;
+  margin-bottom: 18px;
 }
 .library-items button {
   text-align: left;
@@ -165,6 +195,8 @@ button:disabled {
 .workspace {
   padding: 25px 26px;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 .toolbar {
   display: flex;
@@ -343,7 +375,7 @@ a {
 }
 @media (max-width: 1200px) {
   main {
-    grid-template-columns: 190px minmax(380px, 1fr) 230px;
+    grid-template-columns: 220px minmax(380px, 1fr) 230px;
   }
   .workspace {
     padding: 20px 15px;
@@ -363,6 +395,12 @@ a {
 @media (max-width: 900px) {
   main {
     grid-template-columns: 180px 1fr;
+    height: auto;
+    overflow: visible;
+  }
+  aside,
+  .workspace {
+    overflow: visible;
   }
   .inspector {
     grid-column: 1/3;

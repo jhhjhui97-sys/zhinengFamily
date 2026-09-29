@@ -11,7 +11,13 @@ let active = null,
   historyOffset = 0,
   restoreIntent = null,
   furnitureFieldsBaseline = null,
-  catalogItems = [];
+  catalogItems = [],
+  selectedCustomer = null,
+  selectedProject = null,
+  customerOffset = 0,
+  projectOffset = 0,
+  customerFormBaseline = null,
+  projectFormBaseline = null;
 const view = new RoomRenderer($("viewport"), $("render-status"));
 function message(value, error = false) {
   $("message").textContent = value;
@@ -32,17 +38,43 @@ function pendingFurniture() {
     )
   );
 }
-function hasUnsavedChanges() {
+function sceneUnsaved() {
   return Boolean(dirty() || pendingJson() || pendingFurniture());
+}
+function hasUnsavedChanges({ customer = true, project = true } = {}) {
+  return (
+    sceneUnsaved() ||
+    (customer && JSON.stringify(customerForm()) !== customerFormBaseline) ||
+    (project && JSON.stringify(projectForm()) !== projectFormBaseline)
+  );
 }
 function refreshRevision() {
   $("revision").textContent = active
     ? (baseline ? `当前 v${baseline}` : "未保存") +
-      (hasUnsavedChanges() ? " · 有未保存修改" : "")
+      (sceneUnsaved() ? " · 有未保存修改" : "")
     : "未保存";
 }
-function discard() {
-  return !hasUnsavedChanges() || confirm("还有未保存的修改，确定放弃吗？");
+function discard(options) {
+  return (
+    !hasUnsavedChanges(options) || confirm("还有未保存的修改，确定放弃吗？")
+  );
+}
+function sceneScope() {
+  return selectedProject
+    ? { customer_id: selectedCustomer.id, project_id: selectedProject.id }
+    : {};
+}
+function clearScene() {
+  active = null;
+  baseline = 0;
+  draft = saved = history = restoreIntent = null;
+  libraryOffset = historyOffset = 0;
+  $("history-items").replaceChildren();
+  $("history-json").textContent = "";
+  $("history-json-panel").open = false;
+  $("project-name").value = "";
+  $("project-title").textContent = selectedProject?.name ?? "开始你的家居方案";
+  refreshDraft();
 }
 async function api(action, fields = {}) {
   const response = await fetch("/api/local", {
@@ -142,14 +174,103 @@ async function loadCatalog() {
     $("catalog-select").append(option);
   }
 }
+function customerForm() {
+  return Object.fromEntries(
+    [
+      "name",
+      "phone",
+      "wechat",
+      "source",
+      "address",
+      "budget",
+      "status",
+      "notes",
+    ].map((key) => [key, $("customer-" + key).value.trim()]),
+  );
+}
+function projectForm() {
+  return {
+    name: $("sales-project-name").value.trim(),
+    address: $("sales-project-address").value.trim(),
+    status: $("sales-project-status").value,
+  };
+}
+customerFormBaseline = JSON.stringify(customerForm());
+projectFormBaseline = JSON.stringify(projectForm());
+function showCustomer(customer) {
+  selectedCustomer = customer;
+  selectedProject = null;
+  $("selected-customer").textContent = customer.name;
+  $("selected-project").textContent = "尚未选择项目";
+  for (const [key, value] of Object.entries(customerForm()))
+    $("customer-" + key).value = customer[key] ?? "";
+  $("sales-project-name").value = "";
+  $("sales-project-address").value = "";
+  $("sales-project-status").value = "draft";
+  customerFormBaseline = JSON.stringify(customerForm());
+  projectFormBaseline = JSON.stringify(projectForm());
+  $("scene-scope-label").textContent = "请先选择项目";
+  clearScene();
+}
+async function customers() {
+  const page = await api("customers", { limit: 20, offset: customerOffset });
+  $("customer-count").textContent = `共 ${page.total} 位客户`;
+  $("customer-items").replaceChildren();
+  for (const item of page.items) {
+    $("customer-items").append(
+      button(item.name, async () => {
+        if (!discard()) return;
+        showCustomer(item);
+        projectOffset = 0;
+        await projects();
+        await library();
+        message(`已选择客户：${item.name}。`);
+      }),
+    );
+  }
+}
+async function projects() {
+  $("sales-project-items").replaceChildren();
+  if (!selectedCustomer) {
+    $("sales-project-count").textContent = "请先选择客户";
+    return;
+  }
+  const page = await api("projects", {
+    customer_id: selectedCustomer.id,
+    limit: 20,
+    offset: projectOffset,
+  });
+  $("sales-project-count").textContent = `共 ${page.total} 个项目`;
+  for (const item of page.items) {
+    $("sales-project-items").append(
+      button(item.name, async () => {
+        if (!discard()) return;
+        selectedProject = item;
+        $("selected-project").textContent = item.name;
+        $("sales-project-name").value = item.name;
+        $("sales-project-address").value = item.address ?? "";
+        $("sales-project-status").value = item.status;
+        projectFormBaseline = JSON.stringify(projectForm());
+        $("scene-scope-label").textContent = "项目方案";
+        clearScene();
+        await library();
+        message(`已打开项目：${item.name}。`);
+      }),
+    );
+  }
+}
 async function library() {
-  const page = await api("list", { limit: 20, offset: libraryOffset });
+  const page = await api("list", {
+    ...sceneScope(),
+    limit: 20,
+    offset: libraryOffset,
+  });
   $("library-count").textContent = `共 ${page.total} 个`;
   $("library-items").replaceChildren();
   for (const item of page.items) {
     const element = button(item.name, async () => {
       if (!discard()) return;
-      const current = await api("current", { id: item.id });
+      const current = await api("current", { ...sceneScope(), id: item.id });
       active = item;
       baseline = current?.revision ?? 0;
       draft = current?.scene ?? null;
@@ -169,6 +290,7 @@ async function library() {
 async function versions() {
   if (!active) return;
   const list = await api("versions", {
+    ...sceneScope(),
     id: active.id,
     limit: 20,
     offset: historyOffset,
@@ -193,6 +315,106 @@ function adopt(version) {
   $("history-json-panel").open = false;
   refreshDraft();
 }
+$("customer-create").onclick = () =>
+  run(async () => {
+    if (!discard({ customer: false })) return;
+    const values = customerForm();
+    if (!values.name) throw Error("请填写客户姓名。");
+    const customer = await api("customer_create", values);
+    customerOffset = projectOffset = 0;
+    showCustomer(customer);
+    await customers();
+    await projects();
+    await library();
+    message(`客户 ${customer.name} 已保存在本机。`);
+  });
+$("customer-edit").onclick = () =>
+  run(async () => {
+    if (!selectedCustomer) throw Error("请先选择要更新的客户。");
+    const values = customerForm();
+    if (!values.name) throw Error("请填写客户姓名。");
+    const customer = await api("customer_update", {
+      id: selectedCustomer.id,
+      base_revision: selectedCustomer.revision,
+      ...values,
+    });
+    selectedCustomer = customer;
+    customerFormBaseline = JSON.stringify(customerForm());
+    $("selected-customer").textContent = customer.name;
+    await customers();
+    message(`客户 ${customer.name} 已更新。`);
+  });
+$("sales-project-create").onclick = () =>
+  run(async () => {
+    if (!selectedCustomer) throw Error("请先选择客户，再创建设计项目。");
+    if (!discard({ project: false })) return;
+    const values = projectForm();
+    if (!values.name) throw Error("请填写项目名称。");
+    const project = await api("project_create", {
+      customer_id: selectedCustomer.id,
+      ...values,
+    });
+    selectedProject = project;
+    projectFormBaseline = JSON.stringify(projectForm());
+    projectOffset = 0;
+    $("selected-project").textContent = project.name;
+    $("scene-scope-label").textContent = "项目方案";
+    clearScene();
+    await projects();
+    await library();
+    message(`项目 ${project.name} 已建立，可以新建方案。`);
+  });
+$("sales-project-edit").onclick = () =>
+  run(async () => {
+    if (!selectedProject) throw Error("请先选择要更新的项目。");
+    const values = projectForm();
+    if (!values.name) throw Error("请填写项目名称。");
+    const project = await api("project_update", {
+      id: selectedProject.id,
+      base_revision: selectedProject.revision,
+      ...values,
+    });
+    selectedProject = project;
+    projectFormBaseline = JSON.stringify(projectForm());
+    $("selected-project").textContent = project.name;
+    if (!active) $("project-title").textContent = project.name;
+    await projects();
+    message(`项目 ${project.name} 已更新。`);
+  });
+$("legacy").onclick = () =>
+  run(async () => {
+    if (!discard()) return;
+    selectedProject = null;
+    $("selected-project").textContent = "正在查看旧方案";
+    $("sales-project-name").value = "";
+    $("sales-project-address").value = "";
+    $("sales-project-status").value = "draft";
+    projectFormBaseline = JSON.stringify(projectForm());
+    $("scene-scope-label").textContent = "旧方案";
+    clearScene();
+    await library();
+    message("正在查看迁移前的旧方案；原资料未改变。");
+  });
+$("customer-prev").onclick = () =>
+  run(async () => {
+    customerOffset = Math.max(0, customerOffset - 20);
+    await customers();
+  });
+$("customer-next").onclick = () =>
+  run(async () => {
+    customerOffset += 20;
+    await customers();
+  });
+$("sales-project-prev").onclick = () =>
+  run(async () => {
+    projectOffset = Math.max(0, projectOffset - 20);
+    await projects();
+  });
+$("sales-project-next").onclick = () =>
+  run(async () => {
+    projectOffset += 20;
+    await projects();
+  });
 $("new").onclick = () =>
   run(async () => {
     if (!discard()) return;
@@ -201,7 +423,7 @@ $("new").onclick = () =>
       message("请填写方案名称。", true);
       return;
     }
-    const created = await api("create", { name });
+    const created = await api("create", { ...sceneScope(), name });
     active = { id: created.id, name };
     baseline = 0;
     draft = saved = null;
@@ -222,7 +444,7 @@ $("sample").onclick = () =>
       return;
     }
     if (!discard()) return;
-    draft = (await api("sample", { id: active.id })).scene;
+    draft = (await api("sample", { ...sceneScope(), id: active.id })).scene;
     refreshDraft();
     message("示例已载入，尚未保存。");
   });
@@ -241,6 +463,7 @@ $("save").onclick = () =>
       return;
     }
     const version = await api("save", {
+      ...sceneScope(),
       id: active.id,
       base_revision: baseline,
       scene: draft,
@@ -333,6 +556,7 @@ $("restore").onclick = () => {
     return;
   }
   restoreIntent = {
+    ...sceneScope(),
     id: active.id,
     base_revision: baseline,
     revision: history.revision,
@@ -409,4 +633,5 @@ run(async () => {
     message(`演示家具目录暂不可用：${error.message}`, true);
   }
   await library();
+  await customers();
 });

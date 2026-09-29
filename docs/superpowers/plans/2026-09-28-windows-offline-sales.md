@@ -1,0 +1,11 @@
+# Windows offline sales workflow plan
+
+Base: `7f9ee1524564dea198b84a25c3c0981b7cdfccb4` on an isolated `codex/windows-offline-sales` branch. Follow [design](../specs/2026-09-28-windows-offline-sales-design.md). Use tests before production changes and small commits; retain PR #6 as draft and unmerged.
+
+1. Add failing real-SQLite migration tests for v1 scene/version preservation, automatic unique backup, v2 reopen, failed migration rollback, and empty fresh v2. Implement additive v2 migration in `LocalSceneStore` and update `LocalIdentity`; verify all existing offline-core tests.
+2. Add failing customer/project store tests for CRUD, workspace isolation, unique phone, per-customer project names, immutable customer linkage, stale edit 409, validation, and timestamps. Implement in a `LocalSceneStore` partial file with a Unity `.meta` file; add the C# bridge actions and JSON integration tests.
+3. Add failing scene association tests: project-scoped creation/list/current/save/restore, wrong project/customer 404, linked scene inaccessible via legacy route, old unlinked v1 scene still usable. Implement transactional `project_scenes` writes and scoped bridge checks. Do not change SceneModel protocol or history immutability.
+4. Add real Edge tests first for the complete Chinese customer → project → scene flow, restart persistence, edit and conflict input preservation, legacy scene access, and 1024px layout. Implement compact sidebar navigation and forms while retaining the current renderer and four demo models.
+5. Rebuild a new portable Windows package, run full `npm test`, `format:check`, `check`, complete `test_offline_core.ps1`, and a visible app-window smoke. Verify backup restoration on a copy, ZIP manifest hashes, and no secrets in package. Request one independent branch review, fix Important findings, push, wait for exact-SHA Actions, and create a **draft** PR based on `codex/windows-realistic-client`. Do not merge PR #3–#6.
+
+Acceptance boundary: customer/project/scene workflow works offline. Sellable product management, quotation/order, CAD, automatic layout, Unity/iPad installation, and final room-material quality remain separate work and must be reported as unfinished.
