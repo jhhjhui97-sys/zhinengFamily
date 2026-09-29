@@ -369,6 +369,170 @@ test(
   },
 );
 test(
+  "imported SKU model stays pinned through scene save restore and service restart",
+  { timeout: 180000 },
+  async (t) => {
+    const { page, restart, errors } = await setup(t);
+    await page
+      .locator("#customer-count")
+      .filter({ hasText: "共 0 位客户" })
+      .waitFor();
+    const origin = new URL(page.url()).origin;
+    const call = async (body) =>
+      await (
+        await page.request.post(`${origin}/api/local`, {
+          headers: { origin },
+          data: body,
+        })
+      ).json();
+    const created = await call({
+      action: "product_create",
+      category: "sofa",
+      brand: "门店品牌",
+      name: "门店三人沙发",
+      sku: "SHOP-SOFA-1",
+      price: "6800.50",
+      width_mm: 2400,
+      depth_mm: 950,
+      height_mm: 850,
+    });
+    assert.equal(created.status, 200);
+    const productId = created.data.id;
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await page
+      .getByRole("button", { name: "查看 门店三人沙发", exact: true })
+      .click();
+    await page
+      .locator("#product-detail")
+      .filter({ hasText: "SHOP-SOFA-1" })
+      .waitFor();
+    await page
+      .locator("#product-model-file")
+      .setInputFiles(join(root, "apps/windows-local/public/assets/sofa.glb"));
+    await page
+      .getByRole("button", { name: "导入当前商品 3D 模型", exact: true })
+      .click();
+    await page
+      .locator("#product-detail")
+      .filter({ hasText: "已有本机 3D 模型" })
+      .waitFor();
+    const firstAsset = (await call({ action: "product", id: productId })).data
+      .active_asset_id;
+    assert.ok(firstAsset);
+    await page.getByRole("button", { name: "设计工作台", exact: true }).click();
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll("#catalog-select option")].some((option) =>
+        option.textContent.includes("门店三人沙发"),
+      ),
+    );
+    await page.locator("#customer-name").fill("张先生");
+    await page.getByRole("button", { name: "保存客户", exact: true }).click();
+    await page
+      .locator("#selected-customer")
+      .filter({ hasText: "张先生" })
+      .waitFor();
+    await page.locator("#sales-project-name").fill("龙湖小区120㎡");
+    await page.getByRole("button", { name: "保存项目", exact: true }).click();
+    await page
+      .locator("#selected-project")
+      .filter({ hasText: "龙湖小区120㎡" })
+      .waitFor();
+    await page.locator("#project-name").fill("客厅设计");
+    await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    await page
+      .getByRole("button", { name: "载入两室一厅", exact: true })
+      .click();
+    await page.locator("#catalog-select").selectOption(productId);
+    await page.getByRole("button", { name: "放入场景", exact: true }).click();
+    await page.waitForFunction(
+      (asset) => document.getElementById("scene-json").value.includes(asset),
+      firstAsset,
+    );
+    await page
+      .locator('canvas[data-model-loaded="true"]')
+      .waitFor({ timeout: 90000 });
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await page
+      .getByRole("button", { name: "查看 门店三人沙发", exact: true })
+      .click();
+    await page
+      .locator("#product-detail")
+      .filter({ hasText: "SHOP-SOFA-1" })
+      .waitFor();
+    await page
+      .locator("#product-model-file")
+      .setInputFiles(
+        join(root, "apps/windows-local/public/assets/velvet-sofa.glb"),
+      );
+    await page
+      .getByRole("button", { name: "导入当前商品 3D 模型", exact: true })
+      .click();
+    await page.waitForFunction(
+      async ({ productId, firstAsset }) => {
+        const response = await fetch("/api/local", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "product", id: productId }),
+        });
+        return (
+          response.ok &&
+          (await response.json()).data.active_asset_id !== firstAsset
+        );
+      },
+      { productId, firstAsset },
+    );
+    const secondAsset = (await call({ action: "product", id: productId })).data
+      .active_asset_id;
+    assert.notEqual(secondAsset, firstAsset);
+    await page.getByRole("button", { name: "设计工作台", exact: true }).click();
+    await page.locator("#catalog-select").selectOption(productId);
+    await page.getByRole("button", { name: "放入场景", exact: true }).click();
+    await page.waitForFunction(
+      (asset) => document.getElementById("scene-json").value.includes(asset),
+      secondAsset,
+    );
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v2" }).waitFor();
+    await page.getByRole("button", { name: "查看 v1", exact: true }).click();
+    assert.match(
+      await page.locator("#history-json").textContent(),
+      new RegExp(firstAsset),
+    );
+    assert.doesNotMatch(
+      await page.locator("#history-json").textContent(),
+      new RegExp(secondAsset),
+    );
+    await page.getByRole("button", { name: "恢复此版本", exact: true }).click();
+    await page.getByRole("button", { name: "确认恢复", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v3" }).waitFor();
+    await restart();
+    await page.getByRole("button", { name: "张先生", exact: true }).click();
+    await page
+      .getByRole("button", { name: "龙湖小区120㎡", exact: true })
+      .click();
+    await page.getByRole("button", { name: "客厅设计", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v3" }).waitFor();
+    await page
+      .locator('canvas[data-model-loaded="true"]')
+      .waitFor({ timeout: 90000 });
+    assert.match(
+      await page.locator("#scene-json").inputValue(),
+      new RegExp(firstAsset),
+    );
+    assert.doesNotMatch(
+      await page.locator("#scene-json").inputValue(),
+      new RegExp(secondAsset),
+    );
+    assert.equal(
+      await page.evaluate(() => localStorage.length + sessionStorage.length),
+      0,
+    );
+    assert.equal(errors.length, 0, errors.join("\n"));
+  },
+);
+test(
   "product write success survives list refresh failure and paging failure keeps old page",
   { timeout: 90000 },
   async (t) => {

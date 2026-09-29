@@ -144,12 +144,12 @@ export function addFurniture(scene, product, roomId, instanceId) {
     );
   const copy = structuredClone(scene);
   copy.furniture_instances.push({
-    metadata: { name: product.name, offline_catalog_only: true },
+    metadata: { name: product.name, offline_catalog_only: !product.asset_id },
     id: instanceId,
     floor_id: room.floor_id,
     room_id: room.id,
     product_id: product.id,
-    asset_id: null,
+    asset_id: product.asset_id ?? null,
     position: { ...position, z: 0 },
     width_mm: product.width_mm,
     depth_mm: product.depth_mm,
