@@ -117,11 +117,18 @@ public sealed partial class LocalSceneStore : IDisposable {
      line_cents INTEGER NOT NULL CHECK(line_cents>=0),
      PRIMARY KEY(workspace_id,quotation_id,product_id),
      FOREIGN KEY(workspace_id,quotation_id) REFERENCES local_quotations(workspace_id,id))");
+    db.Execute(@"CREATE TABLE local_quotation_exclusions(
+     workspace_id TEXT NOT NULL,quotation_id TEXT NOT NULL,instance_id TEXT NOT NULL,
+     product_id TEXT NOT NULL,name TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,quotation_id,instance_id),
+     FOREIGN KEY(workspace_id,quotation_id) REFERENCES local_quotations(workspace_id,id))");
     db.Execute("CREATE INDEX local_quotations_project ON local_quotations(workspace_id,project_id,created_at DESC,id)");
     db.Execute("CREATE TRIGGER local_quotations_no_update BEFORE UPDATE ON local_quotations BEGIN SELECT RAISE(ABORT,'immutable quotation'); END");
     db.Execute("CREATE TRIGGER local_quotations_no_delete BEFORE DELETE ON local_quotations BEGIN SELECT RAISE(ABORT,'immutable quotation'); END");
     db.Execute("CREATE TRIGGER local_quotation_lines_no_update BEFORE UPDATE ON local_quotation_lines BEGIN SELECT RAISE(ABORT,'immutable quotation line'); END");
     db.Execute("CREATE TRIGGER local_quotation_lines_no_delete BEFORE DELETE ON local_quotation_lines BEGIN SELECT RAISE(ABORT,'immutable quotation line'); END");
+    db.Execute("CREATE TRIGGER local_quotation_exclusions_no_update BEFORE UPDATE ON local_quotation_exclusions BEGIN SELECT RAISE(ABORT,'immutable quotation exclusion'); END");
+    db.Execute("CREATE TRIGGER local_quotation_exclusions_no_delete BEFORE DELETE ON local_quotation_exclusions BEGIN SELECT RAISE(ABORT,'immutable quotation exclusion'); END");
     db.Execute("PRAGMA user_version=5");
    }
    });

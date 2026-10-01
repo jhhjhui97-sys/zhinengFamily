@@ -9,6 +9,7 @@ public static class LocalMigrationTests {
  static void Test(string name,Action body) { body(); passed++; Console.WriteLine("PASS "+name); }
  static void Legacy(string path) {
   using(var db=new SqliteConnection(path)) {
+   db.Execute("DROP TABLE IF EXISTS local_quotation_exclusions");
    db.Execute("DROP TABLE IF EXISTS local_quotation_lines");
    db.Execute("DROP TABLE IF EXISTS local_quotations");
    db.Execute("DROP TABLE IF EXISTS local_product_active_model");

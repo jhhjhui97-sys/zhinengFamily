@@ -451,6 +451,10 @@ test(
       .locator("#quote-exclusions")
       .filter({ hasText: "1 件演示家具" })
       .waitFor();
+    assert.match(
+      await page.locator("#quote-exclusions").textContent(),
+      /离线示例沙发/,
+    );
     await page.locator("#quote-items button").first().waitFor();
     assert.equal(await page.locator("#quote-items button").count(), 1);
     await page.locator("#customer-name").fill("尚未保存的新姓名");
@@ -510,6 +514,21 @@ test(
       .filter({ hasText: "¥6,800.50" })
       .waitFor();
     assert.match(await page.locator("#quote-total").textContent(), /¥6,800.50/);
+    await page.getByRole("button", { name: "生成报价", exact: true }).click();
+    await page
+      .locator("#quote-items button")
+      .filter({ hasText: "¥9,999.99" })
+      .waitFor();
+    await page.route("**/api/local", failQuote);
+    await page.getByRole("button", { name: /¥9,999.99/ }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "本地服务暂时不可用" })
+      .waitFor();
+    assert.equal(await page.locator("#quote-detail").isVisible(), false);
+    assert.equal(await page.locator("#quote-print").isEnabled(), false);
+    await page.unroute("**/api/local", failQuote);
+    errors.length = 0;
     await restart();
     await page.getByRole("button", { name: "张先生", exact: true }).click();
     await page

@@ -20,11 +20,13 @@ export function mountQuotes({ api, notify, scope, hasUnsavedChanges }) {
     $("quote-items").replaceChildren();
     $("quote-detail").hidden = true;
     $("quote-print-view").replaceChildren();
+    $("quote-print").disabled = true;
     $("quote-count").textContent = "请先选择客户项目";
   }
 
   function show(quote) {
     $("quote-detail").hidden = false;
+    $("quote-print").disabled = false;
     $("quote-summary").textContent =
       `${quote.customer_name} · ${quote.project_name} · ${quote.scene_name} v${quote.scene_version}\n${new Date(quote.created_at).toLocaleString("zh-CN")}`;
     $("quote-lines").replaceChildren();
@@ -38,8 +40,8 @@ export function mountQuotes({ api, notify, scope, hasUnsavedChanges }) {
       );
     }
     $("quote-total").textContent = `合计 ${formatMoney(quote.total)}`;
-    $("quote-exclusions").textContent = quote.excluded_demo_count
-      ? `${quote.excluded_demo_count} 件演示家具未计价。`
+    $("quote-exclusions").textContent = quote.exclusions.length
+      ? `${quote.exclusions.length} 件演示家具未计价：${quote.exclusions.map((item) => item.name).join("、")}。`
       : "无未计价演示家具。";
 
     const print = $("quote-print-view");
@@ -69,9 +71,12 @@ export function mountQuotes({ api, notify, scope, hasUnsavedChanges }) {
       table.append(row);
     }
     print.append(table, make("h2", `合计 ${formatMoney(quote.total)}`));
-    if (quote.excluded_demo_count)
+    if (quote.exclusions.length)
       print.append(
-        make("p", `${quote.excluded_demo_count} 件演示家具未计价。`),
+        make(
+          "p",
+          `${quote.exclusions.length} 件演示家具未计价：${quote.exclusions.map((item) => item.name).join("、")}。`,
+        ),
       );
     print.append(make("p", "商品参考价；运费、安装费和税费以最终约定为准。"));
   }
@@ -97,6 +102,9 @@ export function mountQuotes({ api, notify, scope, hasUnsavedChanges }) {
       );
       button.onclick = () =>
         operate(async () => {
+          $("quote-detail").hidden = true;
+          $("quote-print-view").replaceChildren();
+          $("quote-print").disabled = true;
           const item = await api("quotation", {
             customer_id: current.customer_id,
             project_id: current.project_id,
@@ -130,7 +138,8 @@ export function mountQuotes({ api, notify, scope, hasUnsavedChanges }) {
       notify(error?.message || "本地报价服务暂时不可用，请重试。", true);
     } finally {
       busy = false;
-      for (const id of ["quote-create", "quote-print"]) $(id).disabled = false;
+      $("quote-create").disabled = false;
+      $("quote-print").disabled = $("quote-detail").hidden;
       $("quote-prev").disabled = offset === 0;
       $("quote-next").disabled = offset + 20 >= total;
     }

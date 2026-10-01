@@ -29,7 +29,7 @@ public static class LocalModelAssetTests {
   Test("v3 model migration preserves products and creates restorable pre-v4 backup",()=>{
    string path=Path.Combine(directory,"model-v3.sqlite");Guid ws=Guid.NewGuid(),actor=Guid.NewGuid(),product;
    using(var store=new LocalSceneStore(path,ws,actor,validator)) product=store.CreateLocalProduct("sofa","品牌","三人沙发","S1","6800.50",2400,950,850).Id;
-   using(var db=new SqliteConnection(path)) { db.Execute("DROP TABLE IF EXISTS local_quotation_lines");db.Execute("DROP TABLE IF EXISTS local_quotations");db.Execute("DROP TABLE IF EXISTS local_product_active_model");db.Execute("DROP TABLE IF EXISTS local_model_assets");db.Execute("PRAGMA user_version=3"); }
+   using(var db=new SqliteConnection(path)) { db.Execute("DROP TABLE IF EXISTS local_quotation_exclusions");db.Execute("DROP TABLE IF EXISTS local_quotation_lines");db.Execute("DROP TABLE IF EXISTS local_quotations");db.Execute("DROP TABLE IF EXISTS local_product_active_model");db.Execute("DROP TABLE IF EXISTS local_model_assets");db.Execute("PRAGMA user_version=3"); }
    using(var upgraded=new LocalSceneStore(path,ws,actor,validator)) Check(upgraded.LocalProduct(product).Sku=="S1"&&upgraded.LocalProduct(product).ActiveAssetId==null,"v3 product lost");
    string[] backups=Directory.GetFiles(directory,"model-v3.sqlite.pre-v4-*.bak");Check(backups.Length==1,"pre-v4 backup absent");
    string copy=Path.Combine(directory,"model-v3-restored.sqlite");File.Copy(backups[0],copy);
@@ -39,7 +39,7 @@ public static class LocalModelAssetTests {
    string path=Path.Combine(directory,"model-failed-v4.sqlite");Guid ws=Guid.NewGuid(),actor=Guid.NewGuid(),product;
    using(var store=new LocalSceneStore(path,ws,actor,validator)) product=store.CreateLocalProduct("sofa","品牌","沙发","S1","100.00",2400,950,850).Id;
    using(var db=new SqliteConnection(path)) {
-    db.Execute("DROP TABLE IF EXISTS local_quotation_lines");db.Execute("DROP TABLE IF EXISTS local_quotations");
+    db.Execute("DROP TABLE IF EXISTS local_quotation_exclusions");db.Execute("DROP TABLE IF EXISTS local_quotation_lines");db.Execute("DROP TABLE IF EXISTS local_quotations");
     db.Execute("DROP TABLE local_product_active_model");db.Execute("DROP TABLE local_model_assets");
     db.Execute("PRAGMA user_version=3");db.Execute("CREATE TABLE local_model_assets(broken INTEGER)");
    }

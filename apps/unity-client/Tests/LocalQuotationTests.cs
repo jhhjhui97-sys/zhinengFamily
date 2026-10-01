@@ -35,6 +35,7 @@ public static class LocalQuotationTests {
     Check(quote.Total=="13601.00"&&quote.TotalCents==1360100,"cent arithmetic lost precision");
     Check(quote.Lines.Count==1&&quote.Lines[0].Quantity==2&&quote.Lines[0].UnitPrice=="6800.50","SKU quantity or unit snapshot wrong");
     Check(quote.ExcludedDemoCount==1,"demo furniture silently priced");
+    Check(quote.Exclusions.Count==1&&quote.Exclusions[0].Name=="离线示例沙发","demo exclusion details were not snapshotted");
     store.UpdateLocalProduct(product,2,"sofa","门店品牌","三人沙发","SOFA-1","9999.99",2400,950,850,"{}");
     Check(store.Quotation(quote.Id).Total=="13601.00","old quote changed after product edit");
     Check(store.Quotations(project).Total==1&&store.Quotations(project).Items[0].Id==quote.Id,"quote list wrong");
@@ -43,6 +44,8 @@ public static class LocalQuotationTests {
      Check(!changed,"quotation header was mutable");
      changed=false;try { db.Execute("DELETE FROM local_quotation_lines WHERE quotation_id=?",quote.Id.ToString("D"));changed=true; } catch(LocalStoreError) {}
      Check(!changed,"quotation lines were mutable");
+     changed=false;try { db.Execute("UPDATE local_quotation_exclusions SET name='伪造' WHERE quotation_id=?",quote.Id.ToString("D"));changed=true; } catch(LocalStoreError) {}
+     Check(!changed,"quotation exclusions were mutable");
     }
     using(var other=new LocalSceneStore(path,Guid.NewGuid(),Guid.NewGuid(),validator)) {
      SqliteTests.Error(()=>other.Quotation(quote.Id),LocalErrorCode.NotFound);
@@ -69,7 +72,7 @@ public static class LocalQuotationTests {
    string path=Path.Combine(directory,"quotation-migration.sqlite");Guid ws=Guid.NewGuid(),actor=Guid.NewGuid(),product;
    using(var store=new LocalSceneStore(path,ws,actor,validator))product=store.CreateLocalProduct("sofa","品牌","沙发","S-1","12345.67",2400,950,850).Id;
    using(var db=new SqliteConnection(path)) {
-    db.Execute("DROP TABLE local_quotation_lines");db.Execute("DROP TABLE local_quotations");db.Execute("DROP INDEX local_projects_quote_scope");db.Execute("PRAGMA user_version=4");
+    db.Execute("DROP TABLE local_quotation_exclusions");db.Execute("DROP TABLE local_quotation_lines");db.Execute("DROP TABLE local_quotations");db.Execute("DROP INDEX local_projects_quote_scope");db.Execute("PRAGMA user_version=4");
    }
    using(var upgraded=new LocalSceneStore(path,ws,actor,validator))Check(upgraded.LocalProduct(product).Price=="12345.67","v4 product changed after quote upgrade");
    string[] backups=Directory.GetFiles(directory,"quotation-migration.sqlite.pre-v5-*.bak");Check(backups.Length==1,"v4 backup missing");

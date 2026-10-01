@@ -14,6 +14,11 @@ namespace LocalScenes {
   public long LineCents { get; internal set; }
   public string LineTotal { get { return LocalSceneStore.Money(LineCents); } }
  }
+ public sealed class LocalQuotationExclusion {
+  public Guid InstanceId { get; internal set; }
+  public Guid ProductId { get; internal set; }
+  public string Name { get; internal set; }
+ }
  public sealed class LocalQuotation {
   public Guid Id { get; internal set; }
   public Guid CustomerId { get; internal set; }
@@ -30,6 +35,7 @@ namespace LocalScenes {
   public Guid CreatedBy { get; internal set; }
   public string CreatedAt { get; internal set; }
   public List<LocalQuotationLine> Lines { get; internal set; }
+  public List<LocalQuotationExclusion> Exclusions { get; internal set; }
  }
  public sealed class LocalQuotationPage {
   public long Total { get; internal set; }
@@ -55,9 +61,18 @@ namespace LocalScenes {
     string sceneJson=Version(documentId,sceneRevision).SceneJson;
     validator.Validate(sceneJson);
     var furniture=(JArray)JObject.Parse(sceneJson)["furniture_instances"];
-    var lines=new Dictionary<Guid,LocalQuotationLine>();long excluded=0,total=0;
+    var lines=new Dictionary<Guid,LocalQuotationLine>();var exclusions=new List<LocalQuotationExclusion>();long total=0;
     foreach(JObject item in furniture) {
-     if(item["asset_id"]==null||item["asset_id"].Type==JTokenType.Null) { excluded++;continue; }
+     if(item["asset_id"]==null||item["asset_id"].Type==JTokenType.Null) {
+      Guid demoProduct=SceneReference((string)item["product_id"]);
+      var catalog=db.Query("SELECT name FROM local_catalog WHERE workspace_id=? AND product_id=?",Key(workspace),Key(demoProduct));
+      Input(catalog.Count==1);
+      string name=(string)catalog[0]["name"];
+      var metadata=item["metadata"] as JObject;
+      if(metadata!=null&&metadata["name"]!=null&&metadata["name"].Type==JTokenType.String&&!String.IsNullOrWhiteSpace((string)metadata["name"]))name=(string)metadata["name"];
+      exclusions.Add(new LocalQuotationExclusion {InstanceId=SceneReference((string)item["id"]),ProductId=demoProduct,Name=name});
+      continue;
+     }
      Guid productId=SceneReference((string)item["product_id"]),assetId=SceneReference((string)item["asset_id"]);
      if(ModelAsset(assetId).ProductId!=productId)throw new LocalStoreError(LocalErrorCode.InvalidInput);
      LocalQuotationLine line;
@@ -73,9 +88,10 @@ namespace LocalScenes {
     foreach(var line in lines.Values)total=checked(total+line.LineCents);
     string stamp=Now(),sceneName=(string)Document(documentId)["name"];
     db.Execute(@"INSERT INTO local_quotations(workspace_id,id,customer_id,project_id,document_id,scene_revision,customer_name,project_name,scene_name,currency,total_cents,excluded_demo_count,created_by,created_at)
-     VALUES(?,?,?,?,?,?,?,?,?,'CNY',?,?,?,?)",Key(workspace),Key(id),Key(customerId),Key(projectId),Key(documentId),sceneRevision,customer.Name,project.Name,sceneName,total,excluded,Key(actor),stamp);
+     VALUES(?,?,?,?,?,?,?,?,?,'CNY',?,?,?,?)",Key(workspace),Key(id),Key(customerId),Key(projectId),Key(documentId),sceneRevision,customer.Name,project.Name,sceneName,total,exclusions.Count,Key(actor),stamp);
     foreach(var line in lines.Values)db.Execute(@"INSERT INTO local_quotation_lines(workspace_id,quotation_id,product_id,product_name,sku,unit_price,unit_cents,quantity,line_cents)
      VALUES(?,?,?,?,?,?,?,?,?)",Key(workspace),Key(id),Key(line.ProductId),line.ProductName,line.Sku,line.UnitPrice,line.UnitCents,line.Quantity,line.LineCents);
+    foreach(var exclusion in exclusions)db.Execute("INSERT INTO local_quotation_exclusions(workspace_id,quotation_id,instance_id,product_id,name) VALUES(?,?,?,?,?)",Key(workspace),Key(id),Key(exclusion.InstanceId),Key(exclusion.ProductId),exclusion.Name);
    });
    return Quotation(id);
   }
@@ -83,10 +99,12 @@ namespace LocalScenes {
    var quotation=new LocalQuotation {
     Id=Guid.Parse((string)row["id"]),CustomerId=Guid.Parse((string)row["customer_id"]),ProjectId=Guid.Parse((string)row["project_id"]),DocumentId=Guid.Parse((string)row["document_id"]),
     SceneRevision=(long)row["scene_revision"],CustomerName=(string)row["customer_name"],ProjectName=(string)row["project_name"],SceneName=(string)row["scene_name"],
-    Currency=(string)row["currency"],TotalCents=(long)row["total_cents"],ExcludedDemoCount=(long)row["excluded_demo_count"],CreatedBy=Guid.Parse((string)row["created_by"]),CreatedAt=(string)row["created_at"],Lines=new List<LocalQuotationLine>()
+    Currency=(string)row["currency"],TotalCents=(long)row["total_cents"],ExcludedDemoCount=(long)row["excluded_demo_count"],CreatedBy=Guid.Parse((string)row["created_by"]),CreatedAt=(string)row["created_at"],Lines=new List<LocalQuotationLine>(),Exclusions=new List<LocalQuotationExclusion>()
    };
    foreach(var line in db.Query("SELECT * FROM local_quotation_lines WHERE workspace_id=? AND quotation_id=? ORDER BY sku,product_id",Key(workspace),Key(quotation.Id)))
     quotation.Lines.Add(new LocalQuotationLine {ProductId=Guid.Parse((string)line["product_id"]),ProductName=(string)line["product_name"],Sku=(string)line["sku"],UnitPrice=(string)line["unit_price"],UnitCents=(long)line["unit_cents"],Quantity=(long)line["quantity"],LineCents=(long)line["line_cents"]});
+   foreach(var exclusion in db.Query("SELECT * FROM local_quotation_exclusions WHERE workspace_id=? AND quotation_id=? ORDER BY instance_id",Key(workspace),Key(quotation.Id)))
+    quotation.Exclusions.Add(new LocalQuotationExclusion {InstanceId=Guid.Parse((string)exclusion["instance_id"]),ProductId=Guid.Parse((string)exclusion["product_id"]),Name=(string)exclusion["name"]});
    return quotation;
   }
   public LocalQuotation Quotation(Guid id) {
