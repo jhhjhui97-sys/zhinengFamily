@@ -17,6 +17,7 @@ public static class OfflineTests {
    LocalProductTests.Run(args[0],directory);
    LocalModelAssetTests.Run(args[0],args[2],directory);
    LocalQuotationTests.Run(args[0],args[2],directory);
+   LocalOrderTests.Run(args[0],args[2],directory);
    ReviewRegressionTests.Run(args[0],args[2]);
    Console.WriteLine("All offline core suites passed on real SQLite");
    return 0;

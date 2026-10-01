@@ -22,7 +22,7 @@ public static class LocalProductTests {
     scene=store.CreateForProject(project,"客厅设计");
    }
    using(var db=new SqliteConnection(path)) {
-    db.Execute("DROP TABLE IF EXISTS local_quotation_exclusions");db.Execute("DROP TABLE IF EXISTS local_quotation_lines");db.Execute("DROP TABLE IF EXISTS local_quotations");
+    foreach(string table in new[]{"local_order_events","local_order_state","local_order_exclusions","local_order_lines","local_orders"})db.Execute("DROP TABLE IF EXISTS "+table);db.Execute("DROP TABLE IF EXISTS local_quotation_exclusions");db.Execute("DROP TABLE IF EXISTS local_quotation_lines");db.Execute("DROP TABLE IF EXISTS local_quotations");
     db.Execute("DROP TABLE IF EXISTS local_product_active_model");
     db.Execute("DROP TABLE IF EXISTS local_model_assets");
     db.Execute("DROP TABLE IF EXISTS local_products");
@@ -74,7 +74,7 @@ public static class LocalProductTests {
    Guid workspace=Guid.NewGuid(),actor=Guid.NewGuid(),customer;
    using(var store=new LocalSceneStore(path,workspace,actor,validator)) customer=store.CreateCustomer("李女士").Id;
    using(var db=new SqliteConnection(path)) {
-    db.Execute("DROP TABLE IF EXISTS local_quotation_exclusions");db.Execute("DROP TABLE IF EXISTS local_quotation_lines");db.Execute("DROP TABLE IF EXISTS local_quotations");
+    foreach(string table in new[]{"local_order_events","local_order_state","local_order_exclusions","local_order_lines","local_orders"})db.Execute("DROP TABLE IF EXISTS "+table);db.Execute("DROP TABLE IF EXISTS local_quotation_exclusions");db.Execute("DROP TABLE IF EXISTS local_quotation_lines");db.Execute("DROP TABLE IF EXISTS local_quotations");
     db.Execute("DROP TABLE IF EXISTS local_product_active_model");
     db.Execute("DROP TABLE IF EXISTS local_model_assets");
     db.Execute("DROP TABLE local_products");

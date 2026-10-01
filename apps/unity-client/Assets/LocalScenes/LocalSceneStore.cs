@@ -16,14 +16,14 @@ public sealed partial class LocalSceneStore : IDisposable {
   db=new SqliteConnection(path);
   try {
    long format=(long)db.Query("PRAGMA user_version")[0]["user_version"];
-   if(format!=0&&format!=1&&format!=2&&format!=3&&format!=4&&format!=5) throw new LocalStoreError(LocalErrorCode.Corrupt);
+   if(format<0||format>6) throw new LocalStoreError(LocalErrorCode.Corrupt);
    // Capture the original database before any schema change. All upgrade stages
    // then commit together, so a later failure cannot leave a partly upgraded v1/v2 file.
-   for(int target=2;target<=5;target++) if(format>=1&&format<target) {
+   for(int target=2;target<=6;target++) if(format>=1&&format<target) {
     string backup=path+".pre-v"+target+"-"+DateTime.UtcNow.ToString("yyyyMMddHHmmss",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N")+".bak";
     db.BackupTo(backup);
    }
-   if(format<5) db.Transaction(()=>{
+   if(format<6) db.Transaction(()=>{
    if(format<2) {
    if(format==0) {
     db.Execute(@"CREATE TABLE scene_documents(
@@ -130,6 +130,48 @@ public sealed partial class LocalSceneStore : IDisposable {
     db.Execute("CREATE TRIGGER local_quotation_exclusions_no_update BEFORE UPDATE ON local_quotation_exclusions BEGIN SELECT RAISE(ABORT,'immutable quotation exclusion'); END");
     db.Execute("CREATE TRIGGER local_quotation_exclusions_no_delete BEFORE DELETE ON local_quotation_exclusions BEGIN SELECT RAISE(ABORT,'immutable quotation exclusion'); END");
     db.Execute("PRAGMA user_version=5");
+   }
+   if(format<6) {
+    db.Execute("CREATE UNIQUE INDEX IF NOT EXISTS local_quotations_order_scope ON local_quotations(workspace_id,id,project_id,customer_id)");
+    db.Execute(@"CREATE TABLE local_orders(
+     workspace_id TEXT NOT NULL,id TEXT NOT NULL,order_number TEXT NOT NULL,
+     quotation_id TEXT NOT NULL,customer_id TEXT NOT NULL,project_id TEXT NOT NULL,
+     document_id TEXT NOT NULL,scene_revision INTEGER NOT NULL,
+     customer_name TEXT NOT NULL,project_name TEXT NOT NULL,scene_name TEXT NOT NULL,
+     currency TEXT NOT NULL CHECK(currency='CNY'),total_cents INTEGER NOT NULL CHECK(total_cents>=0),
+     created_by TEXT NOT NULL,created_at TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,id),UNIQUE(workspace_id,quotation_id),UNIQUE(workspace_id,order_number),
+     FOREIGN KEY(workspace_id,quotation_id,project_id,customer_id) REFERENCES local_quotations(workspace_id,id,project_id,customer_id))");
+    db.Execute(@"CREATE TABLE local_order_lines(
+     workspace_id TEXT NOT NULL,order_id TEXT NOT NULL,product_id TEXT NOT NULL,
+     product_name TEXT NOT NULL,sku TEXT NOT NULL,unit_price TEXT NOT NULL,
+     unit_cents INTEGER NOT NULL CHECK(unit_cents>=0),quantity INTEGER NOT NULL CHECK(quantity>0),
+     line_cents INTEGER NOT NULL CHECK(line_cents>=0),
+     PRIMARY KEY(workspace_id,order_id,product_id),
+     FOREIGN KEY(workspace_id,order_id) REFERENCES local_orders(workspace_id,id))");
+    db.Execute(@"CREATE TABLE local_order_exclusions(
+     workspace_id TEXT NOT NULL,order_id TEXT NOT NULL,instance_id TEXT NOT NULL,
+     product_id TEXT NOT NULL,name TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,order_id,instance_id),
+     FOREIGN KEY(workspace_id,order_id) REFERENCES local_orders(workspace_id,id))");
+    db.Execute(@"CREATE TABLE local_order_state(
+     workspace_id TEXT NOT NULL,order_id TEXT NOT NULL,
+     status TEXT NOT NULL CHECK(status IN ('draft','confirmed','cancelled')),
+     revision INTEGER NOT NULL CHECK(revision>=1),updated_at TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,order_id),
+     FOREIGN KEY(workspace_id,order_id) REFERENCES local_orders(workspace_id,id))");
+    db.Execute(@"CREATE TABLE local_order_events(
+     workspace_id TEXT NOT NULL,order_id TEXT NOT NULL,revision INTEGER NOT NULL CHECK(revision>=1),
+     status TEXT NOT NULL CHECK(status IN ('draft','confirmed','cancelled')),
+     actor_id TEXT NOT NULL,created_at TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,order_id,revision),
+     FOREIGN KEY(workspace_id,order_id) REFERENCES local_orders(workspace_id,id))");
+    db.Execute("CREATE INDEX local_orders_project ON local_orders(workspace_id,project_id,created_at DESC,id)");
+    foreach(string table in new[]{"local_orders","local_order_lines","local_order_exclusions","local_order_events"}) {
+     db.Execute("CREATE TRIGGER "+table+"_no_update BEFORE UPDATE ON "+table+" BEGIN SELECT RAISE(ABORT,'immutable order'); END");
+     db.Execute("CREATE TRIGGER "+table+"_no_delete BEFORE DELETE ON "+table+" BEGIN SELECT RAISE(ABORT,'immutable order'); END");
+    }
+    db.Execute("PRAGMA user_version=6");
    }
    });
   } catch { db.Dispose(); throw; }
