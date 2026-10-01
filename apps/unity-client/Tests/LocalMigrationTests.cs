@@ -42,6 +42,7 @@ public static class LocalMigrationTests {
    }
    Check(Backups(path).Length==1,"pre-v2 backup missing");
    Check(Directory.GetFiles(directory,"migration-legacy.sqlite.pre-v3-*.bak").Length==1,"direct v1 to v3 upgrade lacked intermediate backup");
+   Check(Directory.GetFiles(directory,"migration-legacy.sqlite.pre-v5-*.bak").Length==1,"v1 to v5 upgrade lacked original backup");
    using(var old=new SqliteConnection(Backups(path)[0])) {
     Check((long)old.Query("PRAGMA user_version")[0]["user_version"]==1,"backup was upgraded in place");
     Check((long)old.Query("SELECT COUNT(*) n FROM scene_versions WHERE document_id=?",document.ToString("D"))[0]["n"]==2,"backup lost scene history");

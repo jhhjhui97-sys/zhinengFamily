@@ -86,6 +86,34 @@ public static class LocalQuotationTests {
     Check(db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name='local_quotation_lines'").Count==0,"failed v5 migration left partial lines");
    }
   });
+  Test("quotation line failure rolls back header and concurrent snapshots remain complete",()=>{
+   string path=Path.Combine(directory,"quotation-atomic.sqlite");Guid ws=Guid.NewGuid(),actor=Guid.NewGuid(),customer,project,document;
+   string hash=AddModel(path,"apps/windows-local/public/assets/sofa.glb");
+   using(var setup=new LocalSceneStore(path,ws,actor,validator)) {
+    customer=setup.CreateCustomer("张先生").Id;project=setup.CreateProject(customer,"客厅").Id;
+    Guid product=setup.CreateLocalProduct("sofa","品牌","沙发","S-1","12345.67",2400,950,850).Id;
+    var asset=setup.AttachLocalModel(product,1,hash,new FileInfo(Path.Combine(directory,"models",hash+".glb")).Length);
+    document=setup.CreateForProject(project,"客厅方案");
+    var scene=JObject.Parse(File.ReadAllText(sample));var item=(JObject)scene["furniture_instances"][0];
+    item["product_id"]=product.ToString("D");item["asset_id"]=asset.Id.ToString("D");
+    setup.Put(document,0,scene.ToString());
+    using(var db=new SqliteConnection(path))db.Execute("CREATE TRIGGER test_fail_quote BEFORE INSERT ON local_quotation_lines BEGIN SELECT RAISE(ABORT,'test fault'); END");
+    bool rejected=false;try { setup.CreateQuotation(customer,project,document,1); } catch(LocalStoreError) { rejected=true; }
+    Check(rejected&&setup.Quotations(project).Total==0,"failed line insert left partial quotation");
+    using(var db=new SqliteConnection(path))db.Execute("DROP TRIGGER test_fail_quote");
+   }
+   using(var left=new LocalSceneStore(path,ws,actor,validator))using(var right=new LocalSceneStore(path,ws,actor,validator)) {
+    Exception[] errors=new Exception[2];Guid[] ids=new Guid[2];
+    using(var ready=new System.Threading.CountdownEvent(2))using(var start=new System.Threading.ManualResetEvent(false)) {
+     var a=new System.Threading.Thread(()=>{ready.Signal();start.WaitOne();try{ids[0]=left.CreateQuotation(customer,project,document,1).Id;}catch(Exception e){errors[0]=e;}});
+     var b=new System.Threading.Thread(()=>{ready.Signal();start.WaitOne();try{ids[1]=right.CreateQuotation(customer,project,document,1).Id;}catch(Exception e){errors[1]=e;}});
+     a.Start();b.Start();Check(ready.Wait(5000),"quote race not ready");start.Set();Check(a.Join(10000)&&b.Join(10000),"quote race stuck");
+    }
+    Check(errors[0]==null&&errors[1]==null&&ids[0]!=ids[1],"concurrent quote snapshots failed");
+    Check(left.Quotations(project).Total==2,"concurrent quotes left incomplete history");
+    Check(left.Quotation(ids[0]).Lines.Count==1&&left.Quotation(ids[1]).Lines.Count==1,"concurrent quote lines missing");
+   }
+  });
   Console.WriteLine("Local quotations: "+passed+" passed");
  }
 }
