@@ -205,6 +205,25 @@
           <button id="restore">恢复此版本</button>
         </details>
         <hr />
+        <div class="section-title">方案报价</div>
+        <p class="muted">基于已保存版本生成商品价格快照；演示家具不计价。</p>
+        <button id="quote-create" class="primary">生成报价</button>
+        <div id="quote-count" class="muted">请先选择客户项目</div>
+        <div id="quote-items" class="library-items"></div>
+        <div class="pager">
+          <button id="quote-prev">上一页</button
+          ><button id="quote-next">下一页</button>
+        </div>
+        <section id="quote-detail" hidden>
+          <h3>商品报价明细</h3>
+          <div id="quote-summary"></div>
+          <div id="quote-lines"></div>
+          <strong id="quote-total"></strong>
+          <p id="quote-exclusions" class="muted"></p>
+          <p class="muted">商品参考价；运费、安装费和税费以最终约定为准。</p>
+          <button id="quote-print">打印报价 / 存为 PDF</button>
+        </section>
+        <hr />
         <details>
           <summary>模型来源与许可证</summary>
           <p>
@@ -356,6 +375,7 @@
         </div>
       </div>
     </section>
+    <section id="quote-print-view" aria-label="打印报价单"></section>
     <dialog id="restore-dialog">
       <h2>恢复历史版本</h2>
       <p>将创建一个新版本，原历史版本仍保留。未保存的修改将被替换。</p>
