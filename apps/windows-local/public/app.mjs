@@ -58,6 +58,10 @@ function refreshRevision() {
     : "未保存";
 }
 function discard(options) {
+  if (!orders.canLeave()) {
+    message("订单操作尚未完成，请稍候再切换客户或项目。", true);
+    return false;
+  }
   return (
     !hasUnsavedChanges(options) || confirm("还有未保存的修改，确定放弃吗？")
   );

@@ -28,6 +28,7 @@ export function mountOrders({ api, notify, scope }) {
     offset = total = 0;
     $("order-items").replaceChildren();
     $("order-count").textContent = "请先选择客户项目";
+    $("order-refresh").disabled = true;
     $("order-from-quote").disabled = true;
     hideDetail();
   }
@@ -109,9 +110,10 @@ export function mountOrders({ api, notify, scope }) {
       ),
     );
   }
-  async function load(nextOffset = offset) {
+  async function load(nextOffset = offset, { keepNewDetail = false } = {}) {
     const selected = scope();
     if (!selected.customer_id || !selected.project_id) return clear();
+    if (!keepNewDetail) hideDetail();
     const request = ++serial;
     const page = await api("orders", {
       ...selected,
@@ -140,6 +142,7 @@ export function mountOrders({ api, notify, scope }) {
       $("order-items").append(button);
     }
     $("order-count").textContent = `共 ${total} 张订单`;
+    $("order-refresh").disabled = false;
     $("order-prev").disabled = offset === 0;
     $("order-next").disabled = offset + page.items.length >= total;
   }
@@ -148,6 +151,7 @@ export function mountOrders({ api, notify, scope }) {
     busy = true;
     for (const id of [
       "order-from-quote",
+      "order-refresh",
       "order-prev",
       "order-next",
       "order-confirm",
@@ -162,6 +166,7 @@ export function mountOrders({ api, notify, scope }) {
     } finally {
       busy = false;
       $("order-from-quote").disabled = !quoteId;
+      $("order-refresh").disabled = !scope().project_id;
       $("order-prev").disabled = offset === 0;
       $("order-next").disabled = offset + 20 >= total;
       $("order-confirm").disabled = !current || current.status !== "draft";
@@ -172,13 +177,16 @@ export function mountOrders({ api, notify, scope }) {
   $("order-from-quote").onclick = () =>
     operate(async () => {
       const selected = scope();
+      const request = serial;
       if (!quoteId || !selected.project_id)
         throw Error("请先打开一份已保存的报价。");
       const order = await api("order_create", { ...selected, id: quoteId });
+      if (request !== serial || scope().project_id !== selected.project_id)
+        return;
       show(order);
       notify(`已生成订单 ${order.number}。`);
       try {
-        await load(0);
+        await load(0, { keepNewDetail: true });
       } catch {
         notify("订单已保存，但列表刷新失败，请重试。", true);
       }
@@ -190,16 +198,19 @@ export function mountOrders({ api, notify, scope }) {
       return;
     await operate(async () => {
       const selected = scope();
+      const request = serial;
       const next = await api("order_status", {
         ...selected,
         id: current.id,
         base_revision: current.revision,
         status,
       });
+      if (request !== serial || scope().project_id !== selected.project_id)
+        return;
       show(next);
       notify(`订单已${label}。`);
       try {
-        await load(0);
+        await load(0, { keepNewDetail: true });
       } catch {
         notify("订单状态已保存，但列表刷新失败，请重试。", true);
       }
@@ -209,7 +220,8 @@ export function mountOrders({ api, notify, scope }) {
   $("order-cancel").onclick = () => change("cancelled");
   $("order-prev").onclick = () => operate(() => load(Math.max(0, offset - 20)));
   $("order-next").onclick = () => operate(() => load(offset + 20));
+  $("order-refresh").onclick = () => operate(() => load(0));
   $("order-print").onclick = () => window.print();
   clear();
-  return { clear, fromQuote, hideDetail, load };
+  return { clear, fromQuote, hideDetail, load, canLeave: () => !busy };
 }

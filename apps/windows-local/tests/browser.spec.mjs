@@ -598,6 +598,61 @@ test(
     errors.length = 0;
     await page.locator("#order-items button").first().click();
     await page.locator("#order-status").filter({ hasText: "已确认" }).waitFor();
+    const failOrderList = async (route) => {
+      const body = JSON.parse(route.request().postData() ?? "{}");
+      if (body.action === "orders") await route.abort("failed");
+      else await route.continue();
+    };
+    await page.route("**/api/local", failOrderList);
+    await page.getByRole("button", { name: "刷新订单", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "本地服务暂时不可用" })
+      .waitFor();
+    assert.equal(await page.locator("#order-detail").isVisible(), false);
+    assert.equal(await page.locator("#order-print").isEnabled(), false);
+    await page.unroute("**/api/local", failOrderList);
+    errors.length = 0;
+    await page.getByRole("button", { name: "刷新订单", exact: true }).click();
+    await page.locator("#order-items button").first().waitFor();
+    await page.waitForFunction(
+      () => !document.querySelector("#order-refresh").disabled,
+    );
+    await page.locator("#sales-project-name").fill("第二项目");
+    await page.getByRole("button", { name: "保存项目", exact: true }).click();
+    await page
+      .locator("#selected-project")
+      .filter({ hasText: "第二项目" })
+      .waitFor();
+    await page
+      .getByRole("button", { name: "龙湖小区120㎡", exact: true })
+      .click();
+    await page.locator("#order-items button").first().waitFor();
+    let releaseOrderList;
+    const heldOrderList = new Promise((resolve) => {
+      releaseOrderList = resolve;
+    });
+    const slowOrderList = async (route) => {
+      const body = JSON.parse(route.request().postData() ?? "{}");
+      if (body.action === "orders") await heldOrderList;
+      await route.continue();
+    };
+    await page.route("**/api/local", slowOrderList);
+    await page.getByRole("button", { name: "刷新订单", exact: true }).click();
+    await page.getByRole("button", { name: "第二项目", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "订单操作尚未完成" })
+      .waitFor();
+    assert.match(
+      await page.locator("#selected-project").textContent(),
+      /龙湖小区120㎡/,
+    );
+    releaseOrderList();
+    await page.waitForFunction(
+      () => !document.querySelector("#order-refresh").disabled,
+    );
+    await page.unroute("**/api/local", slowOrderList);
     assert.equal(
       await page.evaluate(() => localStorage.length + sessionStorage.length),
       0,
