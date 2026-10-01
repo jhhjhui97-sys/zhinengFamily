@@ -39,7 +39,7 @@ public sealed class SqliteConnection : IDisposable {
         IntPtr statement, tail;
         byte[] bytes = Bytes(sql);
         int code = SqliteNative.sqlite3_prepare_v2(handle, bytes, bytes.Length, out statement, out tail);
-            if (code != 0) { if (statement != IntPtr.Zero) SqliteNative.sqlite3_finalize(statement); Fail(code); }
+        if (code != 0) { if (statement != IntPtr.Zero) SqliteNative.sqlite3_finalize(statement); Fail(code); }
         if (statement == IntPtr.Zero) throw new LocalStoreError(LocalErrorCode.InvalidInput);
         try {
             if (SqliteNative.sqlite3_bind_parameter_count(statement) != args.Length) throw new LocalStoreError(LocalErrorCode.InvalidInput);
