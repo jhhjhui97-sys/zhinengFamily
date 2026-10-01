@@ -457,6 +457,31 @@ test(
     );
     await page.locator("#quote-items button").first().waitFor();
     assert.equal(await page.locator("#quote-items button").count(), 1);
+    await page
+      .getByRole("button", { name: "由此报价创建订单", exact: true })
+      .click();
+    await page
+      .locator("#order-total")
+      .filter({ hasText: "¥6,800.50" })
+      .waitFor();
+    await page.locator("#order-status").filter({ hasText: "草稿" }).waitFor();
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "确认订单", exact: true }).click();
+    await page.locator("#order-status").filter({ hasText: "已确认" }).waitFor();
+    await page.locator("#order-items button").first().waitFor();
+    assert.equal(await page.locator("#order-items button").count(), 1);
+    await mkdir(join(root, ".local/windows-evidence"), { recursive: true });
+    await page.screenshot({
+      path: join(root, ".local/windows-evidence/offline-order.png"),
+    });
+    await page.emulateMedia({ media: "print" });
+    assert.equal(await page.locator("#order-print-view").isVisible(), true);
+    await page.pdf({
+      path: join(root, ".local/windows-evidence/offline-order.pdf"),
+      format: "A4",
+      printBackground: true,
+    });
+    await page.emulateMedia({ media: "screen" });
     await page.locator("#customer-name").fill("尚未保存的新姓名");
     await page.getByRole("button", { name: "生成报价", exact: true }).click();
     await page.locator("#message").filter({ hasText: "先保存" }).waitFor();
@@ -468,14 +493,20 @@ test(
       else await route.continue();
     };
     await page.route("**/api/local", failQuote);
-    await page.getByRole("button", { name: /¥6,800.50/ }).click();
+    await page
+      .locator("#quote-items button")
+      .filter({ hasText: "¥6,800.50" })
+      .click();
     await page
       .locator("#message")
       .filter({ hasText: "本地服务暂时不可用" })
       .waitFor();
     await page.unroute("**/api/local", failQuote);
     errors.length = 0;
-    await page.getByRole("button", { name: /¥6,800.50/ }).click();
+    await page
+      .locator("#quote-items button")
+      .filter({ hasText: "¥6,800.50" })
+      .click();
     await page
       .locator("#message")
       .filter({ hasText: "已打开本机报价" })
@@ -508,7 +539,10 @@ test(
       height_mm: latest.height_mm,
       metadata: latest.metadata,
     });
-    await page.getByRole("button", { name: /¥6,800.50/ }).click();
+    await page
+      .locator("#quote-items button")
+      .filter({ hasText: "¥6,800.50" })
+      .click();
     await page
       .locator("#quote-total")
       .filter({ hasText: "¥6,800.50" })
@@ -535,12 +569,35 @@ test(
       .getByRole("button", { name: "龙湖小区120㎡", exact: true })
       .click();
     await page.getByRole("button", { name: "客厅方案", exact: true }).click();
-    await page.getByRole("button", { name: /¥6,800.50/ }).click();
+    await page
+      .locator("#quote-items button")
+      .filter({ hasText: "¥6,800.50" })
+      .click();
     await page
       .locator("#quote-total")
       .filter({ hasText: "¥6,800.50" })
       .waitFor();
     assert.match(await page.locator("#quote-total").textContent(), /¥6,800.50/);
+    await page.locator("#order-items button").first().click();
+    await page.locator("#order-status").filter({ hasText: "已确认" }).waitFor();
+    assert.match(await page.locator("#order-total").textContent(), /¥6,800.50/);
+    const failOrder = async (route) => {
+      const body = JSON.parse(route.request().postData() ?? "{}");
+      if (body.action === "order") await route.abort("failed");
+      else await route.continue();
+    };
+    await page.route("**/api/local", failOrder);
+    await page.locator("#order-items button").first().click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "本地服务暂时不可用" })
+      .waitFor();
+    assert.equal(await page.locator("#order-detail").isVisible(), false);
+    assert.equal(await page.locator("#order-print").isEnabled(), false);
+    await page.unroute("**/api/local", failOrder);
+    errors.length = 0;
+    await page.locator("#order-items button").first().click();
+    await page.locator("#order-status").filter({ hasText: "已确认" }).waitFor();
     assert.equal(
       await page.evaluate(() => localStorage.length + sessionStorage.length),
       0,

@@ -2,6 +2,7 @@ import { RoomRenderer } from "./renderer.mjs";
 import { addFurniture, editFurniture } from "./scene-tools.mjs";
 import { mountProducts } from "./products.mjs";
 import { mountQuotes } from "./quotes.mjs";
+import { mountOrders } from "./orders.mjs";
 const $ = (id) => document.getElementById(id);
 let active = null,
   baseline = 0,
@@ -77,6 +78,7 @@ function clearScene() {
   $("project-name").value = "";
   $("project-title").textContent = selectedProject?.name ?? "开始你的家居方案";
   quotes.clear();
+  orders.clear();
   refreshDraft();
 }
 async function api(action, fields = {}) {
@@ -100,11 +102,20 @@ async function api(action, fields = {}) {
   return body.data;
 }
 const productsView = mountProducts({ api });
+const orders = mountOrders({ api, notify: message, scope: sceneScope });
 const quotes = mountQuotes({
   api,
   notify: message,
   scope: () => ({ ...sceneScope(), id: active?.id, scene_version: baseline }),
   hasUnsavedChanges,
+  onQuoteShown: (quote) => {
+    orders.hideDetail();
+    orders.fromQuote(quote);
+  },
+  onQuoteCleared: () => {
+    orders.fromQuote(null);
+    orders.hideDetail();
+  },
 });
 $("nav-design").onclick = async () => {
   if (!productsView.canLeave()) return;
@@ -290,6 +301,7 @@ async function projects() {
         clearScene();
         await library();
         await quotes.load();
+        await orders.load();
         message(`已打开项目：${item.name}。`);
       }),
     );
@@ -399,6 +411,7 @@ $("sales-project-create").onclick = () =>
     await projects();
     await library();
     await quotes.load();
+    await orders.load();
     message(`项目 ${project.name} 已建立，可以新建方案。`);
   });
 $("sales-project-edit").onclick = () =>

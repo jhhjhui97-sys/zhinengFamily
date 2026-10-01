@@ -111,6 +111,15 @@ test("quotation bridge lists project snapshots and rejects demo-only scenes or f
     }).status,
     422,
   );
+  assert.deepEqual(w({ action: "orders", ...scope }).data, {
+    total: 0,
+    items: [],
+  });
+  assert.equal(w({ action: "order_create", ...scope, id }).status, 404);
+  assert.equal(
+    w({ action: "order_create", ...scope, id, total: "0.01" }).status,
+    422,
+  );
 });
 function sample(w) {
   const created = w({ action: "create", name: "张先生 / 龙湖小区" });

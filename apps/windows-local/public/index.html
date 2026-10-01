@@ -222,6 +222,30 @@
           <p id="quote-exclusions" class="muted"></p>
           <p class="muted">商品参考价；运费、安装费和税费以最终约定为准。</p>
           <button id="quote-print">打印报价 / 存为 PDF</button>
+          <button id="order-from-quote" class="primary">
+            由此报价创建订单
+          </button>
+        </section>
+        <hr />
+        <div class="section-title">销售订单</div>
+        <p class="muted">订单不代表已付款或锁定库存。</p>
+        <div id="order-count" class="muted">请先选择客户项目</div>
+        <div id="order-items" class="library-items"></div>
+        <div class="pager">
+          <button id="order-prev">上一页</button
+          ><button id="order-next">下一页</button>
+        </div>
+        <section id="order-detail" hidden>
+          <h3>销售订单</h3>
+          <div id="order-summary"></div>
+          <div id="order-status"></div>
+          <div id="order-lines"></div>
+          <strong id="order-total"></strong>
+          <p id="order-exclusions" class="muted"></p>
+          <div id="order-history" class="muted"></div>
+          <button id="order-confirm">确认订单</button>
+          <button id="order-cancel">取消订单</button>
+          <button id="order-print">打印订单 / 存为 PDF</button>
         </section>
         <hr />
         <details>
@@ -376,6 +400,7 @@
       </div>
     </section>
     <section id="quote-print-view" aria-label="打印报价单"></section>
+    <section id="order-print-view" aria-label="打印订单"></section>
     <dialog id="restore-dialog">
       <h2>恢复历史版本</h2>
       <p>将创建一个新版本，原历史版本仍保留。未保存的修改将被替换。</p>
