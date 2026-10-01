@@ -16,14 +16,14 @@ public sealed partial class LocalSceneStore : IDisposable {
   db=new SqliteConnection(path);
   try {
    long format=(long)db.Query("PRAGMA user_version")[0]["user_version"];
-   if(format!=0&&format!=1&&format!=2&&format!=3&&format!=4) throw new LocalStoreError(LocalErrorCode.Corrupt);
+   if(format!=0&&format!=1&&format!=2&&format!=3&&format!=4&&format!=5) throw new LocalStoreError(LocalErrorCode.Corrupt);
    // Capture the original database before any schema change. All upgrade stages
    // then commit together, so a later failure cannot leave a partly upgraded v1/v2 file.
-   for(int target=2;target<=4;target++) if(format>=1&&format<target) {
+   for(int target=2;target<=5;target++) if(format>=1&&format<target) {
     string backup=path+".pre-v"+target+"-"+DateTime.UtcNow.ToString("yyyyMMddHHmmss",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N")+".bak";
     db.BackupTo(backup);
    }
-   if(format<4) db.Transaction(()=>{
+   if(format<5) db.Transaction(()=>{
    if(format<2) {
    if(format==0) {
     db.Execute(@"CREATE TABLE scene_documents(
@@ -95,6 +95,41 @@ public sealed partial class LocalSceneStore : IDisposable {
     db.Execute("CREATE TRIGGER local_model_assets_no_update BEFORE UPDATE ON local_model_assets BEGIN SELECT RAISE(ABORT,'immutable asset'); END");
     db.Execute("CREATE TRIGGER local_model_assets_no_delete BEFORE DELETE ON local_model_assets BEGIN SELECT RAISE(ABORT,'immutable asset'); END");
     db.Execute("PRAGMA user_version=4");
+   }
+   if(format<5) {
+    db.Execute("CREATE UNIQUE INDEX IF NOT EXISTS local_projects_quote_scope ON local_projects(workspace_id,id,customer_id)");
+    db.Execute(@"CREATE TABLE local_quotations(
+     workspace_id TEXT NOT NULL,id TEXT NOT NULL,customer_id TEXT NOT NULL,
+     project_id TEXT NOT NULL,document_id TEXT NOT NULL,scene_revision INTEGER NOT NULL CHECK(scene_revision>=1),
+     customer_name TEXT NOT NULL,project_name TEXT NOT NULL,scene_name TEXT NOT NULL,
+     currency TEXT NOT NULL CHECK(currency='CNY'),total_cents INTEGER NOT NULL CHECK(total_cents>=0),
+     excluded_demo_count INTEGER NOT NULL CHECK(excluded_demo_count>=0),
+     created_by TEXT NOT NULL,created_at TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,id),
+     FOREIGN KEY(workspace_id,customer_id) REFERENCES local_customers(workspace_id,id),
+     FOREIGN KEY(workspace_id,project_id,customer_id) REFERENCES local_projects(workspace_id,id,customer_id),
+     FOREIGN KEY(workspace_id,project_id,document_id) REFERENCES project_scenes(workspace_id,project_id,document_id),
+     FOREIGN KEY(workspace_id,document_id,scene_revision) REFERENCES scene_versions(workspace_id,document_id,revision))");
+    db.Execute(@"CREATE TABLE local_quotation_lines(
+     workspace_id TEXT NOT NULL,quotation_id TEXT NOT NULL,product_id TEXT NOT NULL,
+     product_name TEXT NOT NULL,sku TEXT NOT NULL,unit_price TEXT NOT NULL,
+     unit_cents INTEGER NOT NULL CHECK(unit_cents>=0),quantity INTEGER NOT NULL CHECK(quantity>0),
+     line_cents INTEGER NOT NULL CHECK(line_cents>=0),
+     PRIMARY KEY(workspace_id,quotation_id,product_id),
+     FOREIGN KEY(workspace_id,quotation_id) REFERENCES local_quotations(workspace_id,id))");
+    db.Execute(@"CREATE TABLE local_quotation_exclusions(
+     workspace_id TEXT NOT NULL,quotation_id TEXT NOT NULL,instance_id TEXT NOT NULL,
+     product_id TEXT NOT NULL,name TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,quotation_id,instance_id),
+     FOREIGN KEY(workspace_id,quotation_id) REFERENCES local_quotations(workspace_id,id))");
+    db.Execute("CREATE INDEX local_quotations_project ON local_quotations(workspace_id,project_id,created_at DESC,id)");
+    db.Execute("CREATE TRIGGER local_quotations_no_update BEFORE UPDATE ON local_quotations BEGIN SELECT RAISE(ABORT,'immutable quotation'); END");
+    db.Execute("CREATE TRIGGER local_quotations_no_delete BEFORE DELETE ON local_quotations BEGIN SELECT RAISE(ABORT,'immutable quotation'); END");
+    db.Execute("CREATE TRIGGER local_quotation_lines_no_update BEFORE UPDATE ON local_quotation_lines BEGIN SELECT RAISE(ABORT,'immutable quotation line'); END");
+    db.Execute("CREATE TRIGGER local_quotation_lines_no_delete BEFORE DELETE ON local_quotation_lines BEGIN SELECT RAISE(ABORT,'immutable quotation line'); END");
+    db.Execute("CREATE TRIGGER local_quotation_exclusions_no_update BEFORE UPDATE ON local_quotation_exclusions BEGIN SELECT RAISE(ABORT,'immutable quotation exclusion'); END");
+    db.Execute("CREATE TRIGGER local_quotation_exclusions_no_delete BEFORE DELETE ON local_quotation_exclusions BEGIN SELECT RAISE(ABORT,'immutable quotation exclusion'); END");
+    db.Execute("PRAGMA user_version=5");
    }
    });
   } catch { db.Dispose(); throw; }

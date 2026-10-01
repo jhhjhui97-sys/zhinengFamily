@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { chromium } from "playwright-core";
-import { mkdtemp, mkdir } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -370,6 +370,182 @@ test(
       .filter({ hasText: "BED-1" })
       .waitFor();
     assert.match(await page.locator("#product-detail").textContent(), /\{\}/);
+  },
+);
+test(
+  "saved sellable scene generates an immutable printable local quote",
+  { timeout: 180000 },
+  async (t) => {
+    const { page, restart, errors } = await setup(t);
+    const origin = new URL(page.url()).origin;
+    const call = async (body) =>
+      (
+        await (
+          await page.request.post(`${origin}/api/local`, {
+            headers: { origin },
+            data: body,
+          })
+        ).json()
+      ).data;
+    const product = await call({
+      action: "product_create",
+      category: "sofa",
+      brand: "门店品牌",
+      name: "门店三人沙发",
+      sku: "QUOTE-SOFA-1",
+      price: "6800.50",
+      width_mm: 2400,
+      depth_mm: 950,
+      height_mm: 850,
+    });
+    const upload = await page.request.post(
+      `${origin}/api/product-models/${product.id}`,
+      {
+        headers: {
+          origin,
+          "content-type": "model/gltf-binary",
+          "x-base-revision": "1",
+        },
+        data: await readFile(
+          join(root, "apps/windows-local/public/assets/sofa.glb"),
+        ),
+      },
+    );
+    assert.equal(upload.status(), 200);
+    await page.reload();
+    await page.locator("#customer-name").fill("张先生");
+    await page.getByRole("button", { name: "保存客户", exact: true }).click();
+    await page
+      .locator("#selected-customer")
+      .filter({ hasText: "张先生" })
+      .waitFor();
+    await page.locator("#sales-project-name").fill("龙湖小区120㎡");
+    await page.getByRole("button", { name: "保存项目", exact: true }).click();
+    await page
+      .locator("#selected-project")
+      .filter({ hasText: "龙湖小区120㎡" })
+      .waitFor();
+    await page.locator("#project-name").fill("客厅方案");
+    await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    await page
+      .getByRole("button", { name: "载入两室一厅", exact: true })
+      .click();
+    await page.locator("#catalog-select").selectOption(product.id);
+    await page.getByRole("button", { name: "放入场景", exact: true }).click();
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    await page.locator("#furniture-x").fill("2100");
+    await page.getByRole("button", { name: "生成报价", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "先保存" }).waitFor();
+    await page.locator("#furniture-x").fill("2036");
+    await page.getByRole("button", { name: "生成报价", exact: true }).click();
+    await page
+      .locator("#quote-total")
+      .filter({ hasText: "¥6,800.50" })
+      .waitFor();
+    await page
+      .locator("#quote-lines")
+      .filter({ hasText: "QUOTE-SOFA-1" })
+      .waitFor();
+    await page
+      .locator("#quote-exclusions")
+      .filter({ hasText: "1 件演示家具" })
+      .waitFor();
+    assert.match(
+      await page.locator("#quote-exclusions").textContent(),
+      /离线示例沙发/,
+    );
+    await page.locator("#quote-items button").first().waitFor();
+    assert.equal(await page.locator("#quote-items button").count(), 1);
+    await page.locator("#customer-name").fill("尚未保存的新姓名");
+    await page.getByRole("button", { name: "生成报价", exact: true }).click();
+    await page.locator("#message").filter({ hasText: "先保存" }).waitFor();
+    assert.equal(await page.locator("#quote-items button").count(), 1);
+    await page.locator("#customer-name").fill("张先生");
+    const failQuote = async (route) => {
+      const body = JSON.parse(route.request().postData() ?? "{}");
+      if (body.action === "quotation") await route.abort("failed");
+      else await route.continue();
+    };
+    await page.route("**/api/local", failQuote);
+    await page.getByRole("button", { name: /¥6,800.50/ }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "本地服务暂时不可用" })
+      .waitFor();
+    await page.unroute("**/api/local", failQuote);
+    errors.length = 0;
+    await page.getByRole("button", { name: /¥6,800.50/ }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "已打开本机报价" })
+      .waitFor();
+    await page.emulateMedia({ media: "print" });
+    assert.equal(await page.locator("#quote-print-view").isVisible(), true);
+    assert.equal(await page.locator("#nav-products").isVisible(), false);
+    await mkdir(join(root, ".local/windows-evidence"), { recursive: true });
+    await page.pdf({
+      path: join(root, ".local/windows-evidence/offline-quotation.pdf"),
+      format: "A4",
+      printBackground: true,
+    });
+    await page.emulateMedia({ media: "screen" });
+    await page.screenshot({
+      path: join(root, ".local/windows-evidence/offline-quotation.png"),
+    });
+    const latest = await call({ action: "product", id: product.id });
+    await call({
+      action: "product_update",
+      id: product.id,
+      base_revision: latest.revision,
+      category: latest.category,
+      brand: latest.brand,
+      name: latest.name,
+      sku: latest.sku,
+      price: "9999.99",
+      width_mm: latest.width_mm,
+      depth_mm: latest.depth_mm,
+      height_mm: latest.height_mm,
+      metadata: latest.metadata,
+    });
+    await page.getByRole("button", { name: /¥6,800.50/ }).click();
+    await page
+      .locator("#quote-total")
+      .filter({ hasText: "¥6,800.50" })
+      .waitFor();
+    assert.match(await page.locator("#quote-total").textContent(), /¥6,800.50/);
+    await page.getByRole("button", { name: "生成报价", exact: true }).click();
+    await page
+      .locator("#quote-items button")
+      .filter({ hasText: "¥9,999.99" })
+      .waitFor();
+    await page.route("**/api/local", failQuote);
+    await page.getByRole("button", { name: /¥9,999.99/ }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "本地服务暂时不可用" })
+      .waitFor();
+    assert.equal(await page.locator("#quote-detail").isVisible(), false);
+    assert.equal(await page.locator("#quote-print").isEnabled(), false);
+    await page.unroute("**/api/local", failQuote);
+    errors.length = 0;
+    await restart();
+    await page.getByRole("button", { name: "张先生", exact: true }).click();
+    await page
+      .getByRole("button", { name: "龙湖小区120㎡", exact: true })
+      .click();
+    await page.getByRole("button", { name: "客厅方案", exact: true }).click();
+    await page.getByRole("button", { name: /¥6,800.50/ }).click();
+    await page
+      .locator("#quote-total")
+      .filter({ hasText: "¥6,800.50" })
+      .waitFor();
+    assert.match(await page.locator("#quote-total").textContent(), /¥6,800.50/);
+    assert.equal(
+      await page.evaluate(() => localStorage.length + sessionStorage.length),
+      0,
+    );
+    assert.equal(errors.length, 0, errors.join("\n"));
   },
 );
 test(

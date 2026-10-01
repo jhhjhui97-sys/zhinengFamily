@@ -59,6 +59,59 @@ test("bundled catalog registers only curated products for local scene saves", ()
     "99999999-0000-4000-8000-000000000001";
   assert.equal(w({ action: "save", id, base_revision: 1, scene }).status, 422);
 });
+test("quotation bridge lists project snapshots and rejects demo-only scenes or forged totals", () => {
+  const w = workspace(true);
+  w({ action: "catalog" });
+  const customer = w({ action: "customer_create", name: "张先生" }).data;
+  const project = w({
+    action: "project_create",
+    customer_id: customer.id,
+    name: "龙湖小区",
+  }).data;
+  const created = w({
+    action: "create",
+    customer_id: customer.id,
+    project_id: project.id,
+    name: "客厅方案",
+  });
+  const id = created.data.id;
+  const scene = w({
+    action: "sample",
+    customer_id: customer.id,
+    project_id: project.id,
+    id,
+  }).data.scene;
+  assert.equal(
+    w({
+      action: "save",
+      customer_id: customer.id,
+      project_id: project.id,
+      id,
+      base_revision: 0,
+      scene,
+    }).status,
+    200,
+  );
+  const scope = { customer_id: customer.id, project_id: project.id };
+  assert.deepEqual(w({ action: "quotations", ...scope }).data, {
+    total: 0,
+    items: [],
+  });
+  assert.equal(
+    w({ action: "quotation_create", ...scope, id, scene_version: 1 }).status,
+    422,
+  );
+  assert.equal(
+    w({
+      action: "quotation_create",
+      ...scope,
+      id,
+      scene_version: 1,
+      total: "0.01",
+    }).status,
+    422,
+  );
+});
 function sample(w) {
   const created = w({ action: "create", name: "张先生 / 龙湖小区" });
   assert.equal(created.status, 200);

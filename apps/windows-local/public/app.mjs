@@ -1,6 +1,7 @@
 import { RoomRenderer } from "./renderer.mjs";
 import { addFurniture, editFurniture } from "./scene-tools.mjs";
 import { mountProducts } from "./products.mjs";
+import { mountQuotes } from "./quotes.mjs";
 const $ = (id) => document.getElementById(id);
 let active = null,
   baseline = 0,
@@ -75,14 +76,20 @@ function clearScene() {
   $("history-json-panel").open = false;
   $("project-name").value = "";
   $("project-title").textContent = selectedProject?.name ?? "开始你的家居方案";
+  quotes.clear();
   refreshDraft();
 }
 async function api(action, fields = {}) {
-  const response = await fetch("/api/local", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ action, ...fields }),
-  });
+  let response;
+  try {
+    response = await fetch("/api/local", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action, ...fields }),
+    });
+  } catch {
+    throw Error("本地服务暂时不可用，请检查软件连接后重试。");
+  }
   let body;
   try {
     body = await response.json();
@@ -93,6 +100,12 @@ async function api(action, fields = {}) {
   return body.data;
 }
 const productsView = mountProducts({ api });
+const quotes = mountQuotes({
+  api,
+  notify: message,
+  scope: () => ({ ...sceneScope(), id: active?.id, scene_version: baseline }),
+  hasUnsavedChanges,
+});
 $("nav-design").onclick = async () => {
   if (!productsView.canLeave()) return;
   try {
@@ -276,6 +289,7 @@ async function projects() {
         $("scene-scope-label").textContent = "项目方案";
         clearScene();
         await library();
+        await quotes.load();
         message(`已打开项目：${item.name}。`);
       }),
     );
@@ -384,6 +398,7 @@ $("sales-project-create").onclick = () =>
     clearScene();
     await projects();
     await library();
+    await quotes.load();
     message(`项目 ${project.name} 已建立，可以新建方案。`);
   });
 $("sales-project-edit").onclick = () =>
