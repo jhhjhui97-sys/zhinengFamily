@@ -8,7 +8,14 @@ const make = (tag, text, className) => {
   return element;
 };
 
-export function mountQuotes({ api, notify, scope, hasUnsavedChanges }) {
+export function mountQuotes({
+  api,
+  notify,
+  scope,
+  hasUnsavedChanges,
+  onQuoteShown,
+  onQuoteCleared,
+}) {
   let offset = 0;
   let total = 0;
   let busy = false;
@@ -16,6 +23,7 @@ export function mountQuotes({ api, notify, scope, hasUnsavedChanges }) {
 
   function clear() {
     serial++;
+    onQuoteCleared();
     offset = total = 0;
     $("quote-items").replaceChildren();
     $("quote-detail").hidden = true;
@@ -25,6 +33,8 @@ export function mountQuotes({ api, notify, scope, hasUnsavedChanges }) {
   }
 
   function show(quote) {
+    onQuoteShown(quote);
+    document.body.dataset.printTarget = "quote";
     $("quote-detail").hidden = false;
     $("quote-print").disabled = false;
     $("quote-summary").textContent =
@@ -102,6 +112,7 @@ export function mountQuotes({ api, notify, scope, hasUnsavedChanges }) {
       );
       button.onclick = () =>
         operate(async () => {
+          onQuoteCleared();
           $("quote-detail").hidden = true;
           $("quote-print-view").replaceChildren();
           $("quote-print").disabled = true;

@@ -72,7 +72,7 @@ public static class LocalQuotationTests {
    string path=Path.Combine(directory,"quotation-migration.sqlite");Guid ws=Guid.NewGuid(),actor=Guid.NewGuid(),product;
    using(var store=new LocalSceneStore(path,ws,actor,validator))product=store.CreateLocalProduct("sofa","品牌","沙发","S-1","12345.67",2400,950,850).Id;
    using(var db=new SqliteConnection(path)) {
-    db.Execute("DROP TABLE local_quotation_exclusions");db.Execute("DROP TABLE local_quotation_lines");db.Execute("DROP TABLE local_quotations");db.Execute("DROP INDEX local_projects_quote_scope");db.Execute("PRAGMA user_version=4");
+    foreach(string table in new[]{"local_order_events","local_order_state","local_order_exclusions","local_order_lines","local_orders"})db.Execute("DROP TABLE IF EXISTS "+table);db.Execute("DROP TABLE local_quotation_exclusions");db.Execute("DROP TABLE local_quotation_lines");db.Execute("DROP TABLE local_quotations");db.Execute("DROP INDEX local_projects_quote_scope");db.Execute("PRAGMA user_version=4");
    }
    using(var upgraded=new LocalSceneStore(path,ws,actor,validator))Check(upgraded.LocalProduct(product).Price=="12345.67","v4 product changed after quote upgrade");
    string[] backups=Directory.GetFiles(directory,"quotation-migration.sqlite.pre-v5-*.bak");Check(backups.Length==1,"v4 backup missing");

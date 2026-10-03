@@ -573,7 +573,9 @@ a {
   display: none !important;
 }
 .quote-line,
-#quote-summary {
+#quote-summary,
+#order-summary,
+#order-history {
   white-space: pre-line;
   line-height: 1.6;
 }
@@ -582,13 +584,15 @@ a {
   padding: 9px 0;
   font-size: 12px;
 }
-#quote-total {
+#quote-total,
+#order-total {
   display: block;
   color: #17382f;
   margin-top: 12px;
   font-size: 18px;
 }
-#quote-print-view {
+#quote-print-view,
+#order-print-view {
   display: none;
 }
 @media print {
@@ -612,25 +616,31 @@ a {
   dialog {
     display: none !important;
   }
-  #quote-print-view {
+  body[data-print-target="quote"] #quote-print-view,
+  body[data-print-target="order"] #order-print-view {
     display: block;
   }
-  #quote-print-view h1 {
+  #quote-print-view h1,
+  #order-print-view h1 {
     font-size: 20pt;
     margin-bottom: 20mm;
   }
-  #quote-print-view table {
+  #quote-print-view table,
+  #order-print-view table {
     width: 100%;
     border-collapse: collapse;
     margin: 12mm 0;
   }
   #quote-print-view th,
-  #quote-print-view td {
+  #quote-print-view td,
+  #order-print-view th,
+  #order-print-view td {
     border-bottom: 1px solid #aaa;
     padding: 8px 4px;
     text-align: left;
   }
-  #quote-print-view h2 {
+  #quote-print-view h2,
+  #order-print-view h2 {
     text-align: right;
     font-size: 16pt;
   }
