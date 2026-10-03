@@ -377,16 +377,17 @@ test(
   { timeout: 180000 },
   async (t) => {
     const { page, restart, errors } = await setup(t);
+    let intentionalNetworkAborts = 0;
     const origin = new URL(page.url()).origin;
-    const call = async (body) =>
-      (
-        await (
-          await page.request.post(`${origin}/api/local`, {
-            headers: { origin },
-            data: body,
-          })
-        ).json()
-      ).data;
+    const call = async (body) => {
+      const response = await page.request.post(`${origin}/api/local`, {
+        headers: { origin },
+        data: body,
+      });
+      const result = await response.json();
+      assert.equal(response.status(), 200, JSON.stringify(result));
+      return result.data;
+    };
     const product = await call({
       action: "product_create",
       category: "sofa",
@@ -489,8 +490,10 @@ test(
     await page.locator("#customer-name").fill("张先生");
     const failQuote = async (route) => {
       const body = JSON.parse(route.request().postData() ?? "{}");
-      if (body.action === "quotation") await route.abort("failed");
-      else await route.continue();
+      if (body.action === "quotation") {
+        intentionalNetworkAborts++;
+        await route.abort("failed");
+      } else await route.continue();
     };
     await page.route("**/api/local", failQuote);
     await page
@@ -583,8 +586,10 @@ test(
     assert.match(await page.locator("#order-total").textContent(), /¥6,800.50/);
     const failOrder = async (route) => {
       const body = JSON.parse(route.request().postData() ?? "{}");
-      if (body.action === "order") await route.abort("failed");
-      else await route.continue();
+      if (body.action === "order") {
+        intentionalNetworkAborts++;
+        await route.abort("failed");
+      } else await route.continue();
     };
     await page.route("**/api/local", failOrder);
     await page.locator("#order-items button").first().click();
@@ -600,8 +605,10 @@ test(
     await page.locator("#order-status").filter({ hasText: "已确认" }).waitFor();
     const failOrderList = async (route) => {
       const body = JSON.parse(route.request().postData() ?? "{}");
-      if (body.action === "orders") await route.abort("failed");
-      else await route.continue();
+      if (body.action === "orders") {
+        intentionalNetworkAborts++;
+        await route.abort("failed");
+      } else await route.continue();
     };
     await page.route("**/api/local", failOrderList);
     await page.getByRole("button", { name: "刷新订单", exact: true }).click();
@@ -657,7 +664,14 @@ test(
       await page.evaluate(() => localStorage.length + sessionStorage.length),
       0,
     );
-    assert.equal(errors.length, 0, errors.join("\n"));
+    const unexpectedErrors = errors.filter(
+      (error) => error !== "Failed to load resource: net::ERR_FAILED",
+    );
+    assert.equal(unexpectedErrors.length, 0, unexpectedErrors.join("\n"));
+    assert.ok(
+      errors.length <= intentionalNetworkAborts,
+      `Unexpected failed resources: ${errors.join("\n")}`,
+    );
   },
 );
 test(
