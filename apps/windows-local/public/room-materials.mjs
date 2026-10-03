@@ -38,6 +38,40 @@ export async function loadRoomTextures(renderer) {
   return { floor, wall, complete: Boolean(floor && wall) };
 }
 
+function disposeRoomTextures(sets) {
+  for (const set of [sets?.floor, sets?.wall])
+    for (const texture of Object.values(set ?? {})) texture.dispose();
+}
+
+export class RoomTextureCache {
+  constructor(load) {
+    this.load = load;
+    this.promise = null;
+    this.textures = null;
+    this.disposed = false;
+  }
+
+  get() {
+    if (this.disposed) return Promise.resolve(null);
+    this.promise ??= this.load().then((textures) => {
+      if (this.disposed) {
+        disposeRoomTextures(textures);
+        return null;
+      }
+      this.textures = textures;
+      return textures;
+    });
+    return this.promise;
+  }
+
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    disposeRoomTextures(this.textures);
+    this.textures = null;
+  }
+}
+
 export function tileWallGeometry(geometry, width, height, depth) {
   const faces = [
     [depth, height],

@@ -1425,7 +1425,7 @@ test("missing room texture keeps the design visible and reports a fallback", asy
   await page.locator('canvas[data-room-material-loaded="false"]').waitFor();
   await page
     .locator("#render-status")
-    .filter({ hasText: "房间贴图未能加载" })
+    .filter({ hasText: "房间贴图未能全部加载" })
     .waitFor();
   assert.equal(await page.locator("#viewport canvas").isVisible(), true);
 });

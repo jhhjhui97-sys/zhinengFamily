@@ -3,7 +3,11 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { renderPosition, wallSegments } from "./scene-tools.mjs";
-import { loadRoomTextures, tileWallGeometry } from "./room-materials.mjs";
+import {
+  loadRoomTextures,
+  RoomTextureCache,
+  tileWallGeometry,
+} from "./room-materials.mjs";
 export class RoomRenderer {
   constructor(host, status) {
     this.host = host;
@@ -58,7 +62,9 @@ export class RoomRenderer {
     this.catalog = new Map();
     this.modelPromises = new Map();
     this.roomTextures = null;
-    this.roomTexturesPromise = null;
+    this.roomTextureCache = new RoomTextureCache(() =>
+      loadRoomTextures(this.renderer),
+    );
     this.resize = new ResizeObserver(() => this.size());
     this.resize.observe(host);
     this.interior();
@@ -143,9 +149,9 @@ export class RoomRenderer {
     const serial = this.renderSerial;
     this.status.textContent = "正在加载真实家具材质…";
     this.renderer.domElement.dataset.modelLoaded = "false";
-    this.roomTexturesPromise ??= loadRoomTextures(this.renderer);
-    this.roomTextures = await this.roomTexturesPromise;
-    if (serial !== this.renderSerial || this.disposed) return;
+    this.roomTextures = await this.roomTextureCache.get();
+    if (serial !== this.renderSerial || this.disposed || !this.roomTextures)
+      return;
     this.renderer.domElement.dataset.roomMaterialLoaded = String(
       this.roomTextures.complete,
     );
@@ -286,7 +292,8 @@ export class RoomRenderer {
       this.status.textContent = `${document.furniture_instances.length} 件真实家具模型 · PBR 材质 · 本地渲染`;
     }
     if (!this.roomTextures.complete)
-      this.status.textContent += "；房间贴图未能加载，已改用基础材质";
+      this.status.textContent +=
+        "；房间贴图未能全部加载，缺失表面已改用基础材质";
     this.scheduleFrame();
   }
   capture() {
@@ -303,8 +310,7 @@ export class RoomRenderer {
     this.renderer.dispose();
     this.environment.dispose();
     for (const r of this.resources) r.dispose();
-    for (const set of [this.roomTextures?.floor, this.roomTextures?.wall])
-      for (const texture of Object.values(set ?? {})) texture.dispose();
+    this.roomTextureCache.dispose();
     for (const promise of this.modelPromises.values())
       promise
         .then((model) =>
