@@ -1422,6 +1422,7 @@ test(
   async (t) => {
     const { page, errors } = await setup(t);
     await project(page, true);
+    await page.locator('canvas[data-room-material-loaded="true"]').waitFor();
     assert.equal(await page.locator("#catalog-select option").count(), 4);
     await page
       .locator("#catalog-select")
