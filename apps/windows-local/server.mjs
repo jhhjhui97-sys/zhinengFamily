@@ -20,6 +20,7 @@ const types = {
   ".glb": "model/gltf-binary",
   ".md": "text/plain; charset=utf-8",
   ".svg": "image/svg+xml",
+  ".jpg": "image/jpeg",
 };
 function finite(value) {
   if (typeof value === "number" && !Number.isFinite(value)) return false;

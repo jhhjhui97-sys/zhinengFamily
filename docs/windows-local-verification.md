@@ -1,12 +1,19 @@
 # Windows 本地版验证记录
 
+## 离线房间 PBR 材质（2026-10-03）
+
+木地板采用 Poly Haven `Wood Floor` 的离线 1K Diffuse/Normal/Roughness，墙面采用 `White Plaster 02` 的离线 Normal/Roughness 加明亮浅色底漆。贴图按房间真实米数平铺，不修改 SceneModel、商品、报价或订单内容。官方 CC0 来源和逐文件 SHA256 见 [素材说明](../apps/windows-local/public/assets/room/README.md)。
+
+- 本机真实 Edge 已加载贴图并渲染四款家具；[实际画面](images/windows-offline-room-materials.png)来自运行客户端，不是概念效果图。墙面初版漫反射图在实测中显脏，已移除；最终画面保持明亮。
+- 从功能提交 `1fc59b0` 构建的便携候选包在本机完整 Windows 客户端测试 **64 passed、0 failed**；真实 SQLite 核心套件、语法及格式检查通过。新增测试覆盖贴图本机服务、墙面物理尺度、浏览器加载、缺失贴图时只回退受影响表面，以及关闭窗口前后贴图加载完成的两种显存清理时序。独立审查发现 1 个 Important 显存清理竞态和 1 个 Minor 回退文案问题，均修复并经定向测试与复审确认。最终干净提交的便携包、ZIP 校验和 GitHub Actions 仍待核实；本地测试不等于远端 CI。
+
 ## 本机销售订单（2026-10-01）
 
 订单只由已保存且归属于当前客户项目的报价生成。SQLite v6 保存不可变订单商品/未计价演示项快照、独立状态及追加式状态历史；同一报价重复创建或并发提交只生成一张订单。升级前生成不覆盖的 `pre-v6` 备份，异常迁移回滚。订单不代表付款或锁定库存。
 
 - 真实 SQLite 核心套件已通过，新增用例覆盖报价→订单、商品改价后旧订单不变、跨工作区/项目拒绝、重复与独立连接并发创建、明细及状态事件写入失败回滚、并发状态变更单一胜者、v5→v6 备份和失败迁移回滚。
 - 真实 Edge 定向流程已通过：张先生 → 龙湖小区 → SKU 场景 → ¥6,800.50 报价 → 订单 → 确认 → A4 PDF → 本机服务重启后仍能读取；订单详情网络失败时清除旧打印视图并允许重试。[真实订单画面](images/windows-offline-order.png)来自 Edge 与本机 SQLite，并非效果概念图。
-- 从提交 `e30128c` 构建的便携候选包，本机完整 Windows 客户端测试 **59 passed、0 failed**，含真实 Edge、SQLite、回环服务、离线素材及原生启动器。真实 SQLite 核心套件、语法和格式检查也通过。独立审查发现 2 个 Important 问题：切换项目时旧订单可能恢复为可打印状态，以及列表刷新失败时旧详情仍可打印；均已修复并经定向重测与 reviewer 复核。最终分发包的 SHA、ZIP 校验和对应 GitHub Actions 以最终提交后核实为准；本地通过不等于远端 CI 通过。商品模型品质和房间材质限制仍存在，支付/库存未实现。
+- 从提交 `e30128c` 构建的便携候选包，本机完整 Windows 客户端测试 **59 passed、0 failed**，含真实 Edge、SQLite、回环服务、离线素材及原生启动器。真实 SQLite 核心套件、语法和格式检查也通过。独立审查发现 2 个 Important 问题：切换项目时旧订单可能恢复为可打印状态，以及列表刷新失败时旧详情仍可打印；均已修复并经定向重测与 reviewer 复核。订单阶段最终提交为 `e1538dec17d082245d989b7eb38f6e6a5c78ce5b`，对应 [Windows Local CI](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/37109393914) **59 passed、0 failed**、[Scene consumer core](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/37109394081) success、[Phase 1 backend](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/37109393983) success。本地测试与远端 CI 分开记录。商品模型品质仍取决于门店提供的合法 GLB，支付/库存未实现。
 
 ## 本机报价快照（2026-09-30）
 

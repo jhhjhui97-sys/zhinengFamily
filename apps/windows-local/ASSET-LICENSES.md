@@ -21,4 +21,5 @@ Commercial Refrigerator, source: https://github.com/KhronosGroup/glTF-Sample-Ass
 GLB size: 10131180 bytes. SHA256: ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065.
 
 The four assets are explicitly marked as demo models. They do not imply that a merchant stocks or sells the depicted products. All models are redistributed unmodified; the renderer scales instances to demonstration dimensions in SceneModel.
+Room surface textures: Wood Floor by Dimitrios Savva and White Plaster 02 by Rob Tuytel, from Poly Haven, CC0 1.0. Bundled 1K JPG diffuse, OpenGL normal and roughness maps for the floor, and normal and roughness maps for the wall, are documented with SHA256 in `public/assets/room/README.md`. Source: https://polyhaven.com/a/wood_floor and https://polyhaven.com/a/white_plaster_02. These textures do not represent a merchant's sellable materials.
 Three.js0.180.0: MIT, license included by npm/package delivery.

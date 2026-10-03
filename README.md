@@ -10,6 +10,8 @@
 
 ![实际运行的沙发与单人椅场景](docs/images/windows-local-catalog-room.png)
 
+房间木地板现使用随软件离线提供的 PBR 材质，墙面使用明亮浅色底漆与细节贴图。[实际运行画面](docs/images/windows-offline-room-materials.png)由本机 Edge 渲染。演示材质不代表门店实际铺装商品。
+
 ![Windows 离线客户、项目与场景实际运行画面](docs/images/windows-offline-sales-room.png)
 
 ## 原 iPad 独立离线方向（暂缓）

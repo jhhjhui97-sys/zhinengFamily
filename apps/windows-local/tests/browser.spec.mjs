@@ -134,6 +134,7 @@ test(
     await page.getByRole("button", { name: "恢复此版本", exact: true }).click();
     await page.getByRole("button", { name: "确认恢复", exact: true }).click();
     await page.locator("#revision").filter({ hasText: "当前 v3" }).waitFor();
+    await page.locator('canvas[data-room-material-loaded="true"]').waitFor();
     await restart();
     await page.getByRole("button", { name: "张先生", exact: true }).click();
     await page
@@ -813,6 +814,7 @@ test(
     await page.getByRole("button", { name: "恢复此版本", exact: true }).click();
     await page.getByRole("button", { name: "确认恢复", exact: true }).click();
     await page.locator("#revision").filter({ hasText: "当前 v3" }).waitFor();
+    await page.locator('canvas[data-room-material-loaded="true"]').waitFor();
     await restart();
     await page.getByRole("button", { name: "张先生", exact: true }).click();
     await page
@@ -1416,12 +1418,27 @@ test(
   },
 );
 
+test("missing room texture keeps the design visible and reports a fallback", async (t) => {
+  const { page } = await setup(t);
+  await page.route("**/assets/room/wood-floor-diffuse.jpg", (route) =>
+    route.fulfill({ status: 404, body: "" }),
+  );
+  await project(page, true);
+  await page.locator('canvas[data-room-material-loaded="false"]').waitFor();
+  await page
+    .locator("#render-status")
+    .filter({ hasText: "房间贴图未能全部加载" })
+    .waitFor();
+  assert.equal(await page.locator("#viewport canvas").isVisible(), true);
+});
+
 test(
   "offline catalog loads sofa chair velvet sofa and refrigerator and persists them",
   { timeout: 180000 },
   async (t) => {
     const { page, errors } = await setup(t);
     await project(page, true);
+    await page.locator('canvas[data-room-material-loaded="true"]').waitFor();
     assert.equal(await page.locator("#catalog-select option").count(), 4);
     await page
       .locator("#catalog-select")

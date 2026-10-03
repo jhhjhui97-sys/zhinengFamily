@@ -23,6 +23,12 @@ test("portable Windows bundle contains executable runtime protocol model and lic
     "runtime/client/public/assets/chair.glb",
     "runtime/client/public/assets/velvet-sofa.glb",
     "runtime/client/public/assets/refrigerator.glb",
+    "runtime/client/public/assets/room/wood-floor-diffuse.jpg",
+    "runtime/client/public/assets/room/wood-floor-normal.jpg",
+    "runtime/client/public/assets/room/wood-floor-roughness.jpg",
+    "runtime/client/public/assets/room/white-plaster-normal.jpg",
+    "runtime/client/public/assets/room/white-plaster-roughness.jpg",
+    "runtime/client/public/assets/room/README.md",
     "runtime/client/public/assets/CHAIR-LICENSE.md",
     "runtime/client/public/assets/VELVET-SOFA-LICENSE.md",
     "runtime/client/public/assets/REFRIGERATOR-LICENSE.md",
@@ -42,6 +48,16 @@ test("portable Windows bundle contains executable runtime protocol model and lic
       "67202c74a1a33377771f162dc7fad612a6c9bd51ee15124c488e9851d9ac5266",
     "refrigerator.glb":
       "ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c5bd9551ae8bccb6065",
+    "room/wood-floor-diffuse.jpg":
+      "2a1c07687b6dbb214c4b9213739c6d92d425f1f0fc8ab3ac157f105d78240789",
+    "room/wood-floor-normal.jpg":
+      "452247f0d0d1b7fc7f8324ff3b6ed60bcc6de1405f4284eeb8d9bce90d4939c2",
+    "room/wood-floor-roughness.jpg":
+      "061f1e1293251b2d28c76e3fac1ea9452b0e8648bb8f9b3728e09db386166e5c",
+    "room/white-plaster-normal.jpg":
+      "eb572ca3630d5bfde72e2601b1f02412da23ca005cd19384dced8690be4cb783",
+    "room/white-plaster-roughness.jpg":
+      "4ff1fe957cd161b07f721fe6c28a9459c8c2e8ec65627a26c16e483a07c80d85",
   };
   for (const [file, hash] of Object.entries(models)) {
     const model = await readFile(
@@ -65,6 +81,9 @@ test("portable Windows bundle contains executable runtime protocol model and lic
     .split("GLB size:")[0];
   assert.match(sofaCredits, /Eric Chadwick/);
   assert.match(fridgeCredits, /Eric Chadwick/);
+  assert.match(credits, /Wood Floor by Dimitrios Savva/);
+  assert.match(credits, /White Plaster 02 by Rob Tuytel/);
+  assert.match(visibleCredits, /木地板与浅色墙面 PBR 材质：Poly Haven，CC0/);
   assert.match(visibleCredits, /Glam Velvet Sofa：[\s\S]*Eric Chadwick/);
   assert.match(
     visibleCredits,

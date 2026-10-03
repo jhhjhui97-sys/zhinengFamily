@@ -1,7 +1,7 @@
 import http from "node:http";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { createLocalServer } from "../server.mjs";
@@ -44,6 +44,19 @@ test("loopback UI sets HttpOnly SameSite cookie without browser token", async (t
   assert.match(r.headers.get("set-cookie"), /HttpOnly/);
   assert.match(r.headers.get("set-cookie"), /SameSite=Strict/);
   assert.doesNotMatch(await r.text(), /access_token|Bearer/);
+});
+test("bundled PBR material images are served only as local image resources", async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), "family-material-"));
+  await mkdir(join(dir, "materials"));
+  const bytes = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
+  await writeFile(join(dir, "index.html"), "<h1>本地家具设计</h1>");
+  await writeFile(join(dir, "materials", "floor.jpg"), bytes);
+  const s = await setup(t, { publicDirectory: dir });
+  const response = await fetch(`${s.url}/materials/floor.jpg`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "image/jpeg");
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
 });
 test("same origin API uses real SQLite library", async (t) => {
   const s = await setup(t);
