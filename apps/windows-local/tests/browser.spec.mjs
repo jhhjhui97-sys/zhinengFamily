@@ -1416,6 +1416,20 @@ test(
   },
 );
 
+test("missing room texture keeps the design visible and reports a fallback", async (t) => {
+  const { page } = await setup(t);
+  await page.route("**/assets/room/wood-floor-diffuse.jpg", (route) =>
+    route.fulfill({ status: 404, body: "" }),
+  );
+  await project(page, true);
+  await page.locator('canvas[data-room-material-loaded="false"]').waitFor();
+  await page
+    .locator("#render-status")
+    .filter({ hasText: "房间贴图未能加载" })
+    .waitFor();
+  assert.equal(await page.locator("#viewport canvas").isVisible(), true);
+});
+
 test(
   "offline catalog loads sofa chair velvet sofa and refrigerator and persists them",
   { timeout: 180000 },

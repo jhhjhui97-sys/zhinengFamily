@@ -3,6 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { renderPosition, wallSegments } from "./scene-tools.mjs";
+import { loadRoomTextures, tileWallGeometry } from "./room-materials.mjs";
 export class RoomRenderer {
   constructor(host, status) {
     this.host = host;
@@ -56,6 +57,8 @@ export class RoomRenderer {
     this.renderSerial = 0;
     this.catalog = new Map();
     this.modelPromises = new Map();
+    this.roomTextures = null;
+    this.roomTexturesPromise = null;
     this.resize = new ResizeObserver(() => this.size());
     this.resize.observe(host);
     this.interior();
@@ -115,8 +118,9 @@ export class RoomRenderer {
     this.controls.update();
     this.scheduleFrame();
   }
-  box(w, h, d, material, x, y, z) {
+  box(w, h, d, material, x, y, z, tiled = false) {
     const geometry = new THREE.BoxGeometry(w, h, d);
+    if (tiled) tileWallGeometry(geometry, w, h, d);
     this.resources.push(geometry);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(x, y, z);
@@ -130,6 +134,7 @@ export class RoomRenderer {
     for (const r of this.resources) r.dispose();
     this.resources = [];
     this.renderer.domElement.dataset.modelLoaded = "false";
+    this.renderer.domElement.dataset.roomMaterialLoaded = "false";
     this.status.textContent = "家具模型尚未加载";
     this.scheduleFrame();
   }
@@ -138,17 +143,24 @@ export class RoomRenderer {
     const serial = this.renderSerial;
     this.status.textContent = "正在加载真实家具材质…";
     this.renderer.domElement.dataset.modelLoaded = "false";
-    this.content.clear();
-    for (const r of this.resources) r.dispose();
-    this.resources = [];
+    this.roomTexturesPromise ??= loadRoomTextures(this.renderer);
+    this.roomTextures = await this.roomTexturesPromise;
+    if (serial !== this.renderSerial || this.disposed) return;
+    this.renderer.domElement.dataset.roomMaterialLoaded = String(
+      this.roomTextures.complete,
+    );
     const floors = new Map(document.floors.map((f) => [f.id, f.elevation_mm]));
     const wallMaterial = new THREE.MeshStandardMaterial({
-      color: 0xf0ede2,
+      color: 0xf5f3ed,
       roughness: 0.87,
+      normalScale: new THREE.Vector2(0.18, 0.18),
+      ...(this.roomTextures.wall ?? {}),
     });
     const floorMaterial = new THREE.MeshStandardMaterial({
-      color: 0xb8a086,
+      color: this.roomTextures.floor ? 0xffffff : 0xb8a086,
       roughness: 0.68,
+      normalScale: new THREE.Vector2(0.5, 0.5),
+      ...(this.roomTextures.floor ?? {}),
     });
     this.resources.push(wallMaterial, floorMaterial);
     for (const room of document.rooms) {
@@ -190,6 +202,7 @@ export class RoomRenderer {
             (wall.start.x + Math.cos(angle) * mid) / 1000,
             elevation + (piece.top + piece.bottom) / 2000,
             -(wall.start.y + Math.sin(angle) * mid) / 1000,
+            true,
           );
         mesh.rotation.y = angle;
         this.content.add(mesh);
@@ -272,6 +285,8 @@ export class RoomRenderer {
       this.renderer.domElement.dataset.modelLoaded = "true";
       this.status.textContent = `${document.furniture_instances.length} 件真实家具模型 · PBR 材质 · 本地渲染`;
     }
+    if (!this.roomTextures.complete)
+      this.status.textContent += "；房间贴图未能加载，已改用基础材质";
     this.scheduleFrame();
   }
   capture() {
@@ -288,6 +303,8 @@ export class RoomRenderer {
     this.renderer.dispose();
     this.environment.dispose();
     for (const r of this.resources) r.dispose();
+    for (const set of [this.roomTextures?.floor, this.roomTextures?.wall])
+      for (const texture of Object.values(set ?? {})) texture.dispose();
     for (const promise of this.modelPromises.values())
       promise
         .then((model) =>
