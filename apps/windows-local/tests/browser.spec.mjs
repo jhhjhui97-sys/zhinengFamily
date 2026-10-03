@@ -134,6 +134,7 @@ test(
     await page.getByRole("button", { name: "恢复此版本", exact: true }).click();
     await page.getByRole("button", { name: "确认恢复", exact: true }).click();
     await page.locator("#revision").filter({ hasText: "当前 v3" }).waitFor();
+    await page.locator('canvas[data-room-material-loaded="true"]').waitFor();
     await restart();
     await page.getByRole("button", { name: "张先生", exact: true }).click();
     await page
@@ -813,6 +814,7 @@ test(
     await page.getByRole("button", { name: "恢复此版本", exact: true }).click();
     await page.getByRole("button", { name: "确认恢复", exact: true }).click();
     await page.locator("#revision").filter({ hasText: "当前 v3" }).waitFor();
+    await page.locator('canvas[data-room-material-loaded="true"]').waitFor();
     await restart();
     await page.getByRole("button", { name: "张先生", exact: true }).click();
     await page
