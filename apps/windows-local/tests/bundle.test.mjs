@@ -13,6 +13,12 @@ test("portable Windows bundle contains executable runtime protocol model and lic
     "runtime/node.exe",
     "runtime/client/server.mjs",
     "runtime/client/glb.mjs",
+    "runtime/client/dxf-analyze.mjs",
+    "runtime/client/dxf-worker.mjs",
+    "runtime/client/public/dxf-import.mjs",
+    "runtime/client/public/dxf-scene.mjs",
+    "runtime/client/node_modules/dxf-parser/dist/dxf-parser.js",
+    "runtime/client/node_modules/loglevel/dist/loglevel.js",
     "runtime/bridge/LocalBridge.exe",
     "runtime/bridge/LocalScenes.dll",
     "runtime/bridge/Newtonsoft.Json.dll",
@@ -35,6 +41,8 @@ test("portable Windows bundle contains executable runtime protocol model and lic
     "licenses/Node-LICENSE.txt",
     "licenses/Newtonsoft-LICENSE.txt",
     "licenses/Three-LICENSE.txt",
+    "licenses/DxfParser-LICENSE.txt",
+    "licenses/Loglevel-LICENSE.txt",
     "licenses/ASSET-LICENSES.md",
   ]) {
     assert.ok((await stat(join(bundle, file))).size > 0, file);

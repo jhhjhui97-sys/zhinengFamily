@@ -126,12 +126,51 @@
           </div>
           <div class="actions">
             <button id="sample">载入两室一厅</button
+            ><button id="dxf-open">导入 DXF 户型</button
             ><button id="save" class="primary">保存新版本</button>
           </div>
         </div>
         <div id="message" role="status" aria-live="polite">
           新建方案后载入示例，即可开始。
         </div>
+        <section id="dxf-import" class="dxf-import" hidden>
+          <h2>导入 DXF 户型</h2>
+          <p>支持二维直线和闭合房间轮廓。门窗、水电和墙厚暂不自动识别。</p>
+          <label for="dxf-file">选择 DXF 文件（最大 8 MiB）</label>
+          <input id="dxf-file" type="file" accept=".dxf,application/dxf" />
+          <div id="dxf-summary" role="status"></div>
+          <div class="dxf-fields">
+            <div>
+              <label for="dxf-room-layer">房间轮廓图层</label
+              ><select id="dxf-room-layer"></select>
+            </div>
+            <div>
+              <label for="dxf-wall-layer">墙体中心线图层（可选）</label
+              ><select id="dxf-wall-layer"></select>
+            </div>
+          </div>
+          <svg id="dxf-preview" role="img" aria-label="DXF 二维户型预览"></svg>
+          <div id="dxf-unit-suggestion"></div>
+          <label class="dxf-check"
+            ><input
+              id="dxf-confirm-units"
+              type="checkbox"
+            />确认图纸单位和尺寸正确</label
+          >
+          <label for="dxf-length"
+            >若单位不明：点击预览中的直线，再输入实际长度（毫米）</label
+          >
+          <input
+            id="dxf-length"
+            type="number"
+            min="1"
+            step="any"
+            placeholder="例如 4200"
+          />
+          <div id="dxf-scale"></div>
+          <p>墙厚暂按 200 mm、层高暂按 2800 mm 估算；请在施工前核对原图。</p>
+          <button id="dxf-import-button" class="primary">生成 3D 草稿</button>
+        </section>
         <div class="viewport-wrap">
           <div id="viewport">
             <div class="empty-view" id="empty-view">

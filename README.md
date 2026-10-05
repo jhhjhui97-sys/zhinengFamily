@@ -2,11 +2,11 @@
 
 面向家具/家电门店的 AI + 3D 设计与销售系统。当前已实现 Phase 1 业务后端、统一 SceneModel 协议，以及 Phase 2 中文后台的客户、商品、设计项目和场景版本管理。
 
-当前代码包含五个核心数据库实体、登录认证、客户/商品/项目 CRUD、SceneModel、Local 存储接口及交付配置。Linux CI 全量验证为 **290 passed, 2 warnings**；Ruff、Alembic migration、SceneModel/OpenAPI 契约检查和 Docker build 均通过，Phase 1 已通过复审。详细证据见 [执行记录](docs/superpowers/plans/2026-09-17-phase-1-progress.md)。新增 Phase 3-1 Unity 最小离线场景消费者源工程；尚未通过 Unity Editor 或 iPad 实机验收。仍没有自动户型解析和 AI 摆放；Windows 本地客户端已有实际 3D 渲染，但 Unity Editor/Player 尚未验收。
+当前代码包含五个核心数据库实体、登录认证、客户/商品/项目 CRUD、SceneModel、Local 存储接口及交付配置。Linux CI 全量验证为 **290 passed, 2 warnings**；Ruff、Alembic migration、SceneModel/OpenAPI 契约检查和 Docker build 均通过，Phase 1 已通过复审。详细证据见 [执行记录](docs/superpowers/plans/2026-09-17-phase-1-progress.md)。新增 Phase 3-1 Unity 最小离线场景消费者源工程；尚未通过 Unity Editor 或 iPad 实机验收。Windows 本地客户端已支持受限二维 DXF 户型导入与实际 3D 渲染；尚无通用自动户型解析和 AI 摆放，Unity Editor/Player 也尚未验收。
 
 ## Windows 本地体验版（当前首要交付）
 
-可在 Windows 10/11 双击便携包的 `智能家居.exe` 使用本机离线客户→设计项目→3D 场景流程，也可在“商品管理”中录入、搜索、筛选和编辑本机在售商品，并为商品导入获授权的 GLB 模型。客户、项目、商品、场景、报价及订单保存在 SQLite 中；模型文件保存在同一用户资料目录，场景历史会固定当时使用的模型版本。保存含在售 SKU 的场景后可生成可打印的本机报价；旧报价保留当时的商品名称、单价和数量。可由已保存报价生成、确认、取消及打印本机订单；订单也保留不可变的商品价格快照。内置演示家具不计价。内置沙发、单人椅、丝绒沙发和冰箱四款有纹理的演示模型，可选房间放置、调整位置/角度。无需 Mac 或云端 API。旧版未关联项目的方案仍可从“旧方案入口”访问，数据库升级前会生成备份。本地数据与原 Web 后台不会自动同步；新录入的 SKU 不会自动生成模型，支付、库存管理和高级设计功能仍未完成。实际运行画面及启动方式见 [Windows 客户端说明](apps/windows-local/README.md)，验证见 [记录](docs/windows-local-verification.md)。
+可在 Windows 10/11 双击便携包的 `智能家居.exe` 使用本机离线客户→设计项目→3D 场景流程。项目方案可导入二维文本 DXF，人工选择房间/墙体图层并确认单位；单位不明时用已知线段校准。商品管理可录入本机在售商品并导入获授权的 GLB 模型。客户、项目、商品、场景、报价及订单保存在 SQLite 中；模型及 DXF 原图保存在同一用户资料目录。内置演示家具不计价。无需 Mac 或云端 API。本地数据与原 Web 后台不会自动同步；DWG/PDF、门窗水电自动识别、AI 布局、支付和库存管理尚未完成。操作与限制见 [Windows 客户端说明](apps/windows-local/README.md)，验证见 [记录](docs/windows-local-verification.md)。
 
 ![实际运行的沙发与单人椅场景](docs/images/windows-local-catalog-room.png)
 

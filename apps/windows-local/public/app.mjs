@@ -3,6 +3,7 @@ import { addFurniture, editFurniture } from "./scene-tools.mjs";
 import { mountProducts } from "./products.mjs";
 import { mountQuotes } from "./quotes.mjs";
 import { mountOrders } from "./orders.mjs";
+import { mountDxfImport } from "./dxf-import.mjs";
 const $ = (id) => document.getElementById(id);
 let active = null,
   baseline = 0,
@@ -72,6 +73,8 @@ function sceneScope() {
     : {};
 }
 function clearScene() {
+  dxfImport.reset();
+  $("dxf-import").hidden = true;
   active = null;
   baseline = 0;
   draft = saved = history = restoreIntent = null;
@@ -106,6 +109,17 @@ async function api(action, fields = {}) {
   return body.data;
 }
 const productsView = mountProducts({ api });
+const dxfImport = mountDxfImport({
+  getActive: () => (selectedProject ? active : null),
+  hasUnsavedChanges,
+  setDraft: async (scene) => {
+    const validated = await api("validate", { scene });
+    draft = validated.scene;
+    refreshDraft();
+  },
+  notify: message,
+  run,
+});
 const orders = mountOrders({ api, notify: message, scope: sceneScope });
 const quotes = mountQuotes({
   api,
@@ -682,7 +696,12 @@ for (const id of [
 window.addEventListener("pagehide", () => view.dispose());
 run(async () => {
   try {
-    await loadCatalog();
+    try {
+      await loadCatalog();
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await loadCatalog();
+    }
   } catch (error) {
     message(`家具目录暂不可用：${error.message}`, true);
   }

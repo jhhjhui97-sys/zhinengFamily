@@ -6,10 +6,11 @@
   "scripts": {
     "test": "node --test --test-concurrency=1 tests/*.test.mjs tests/browser.spec.mjs",
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check glb.mjs && node --check public/app.mjs && node --check public/products.mjs && node --check public/quotes.mjs && node --check public/orders.mjs && node --check public/money.mjs && node --check public/renderer.mjs && node --check public/room-materials.mjs",
-    "format:check": "prettier --check public/*.mjs public/*.html public/*.css tests/*.mjs server.mjs glb.mjs package.json"
+    "check": "node --check server.mjs && node --check glb.mjs && node --check dxf-analyze.mjs && node --check dxf-worker.mjs && node --check public/app.mjs && node --check public/dxf-import.mjs && node --check public/dxf-scene.mjs && node --check public/products.mjs && node --check public/quotes.mjs && node --check public/orders.mjs && node --check public/money.mjs && node --check public/renderer.mjs && node --check public/room-materials.mjs",
+    "format:check": "prettier --check public/*.mjs public/*.html public/*.css tests/*.mjs server.mjs glb.mjs dxf-analyze.mjs dxf-worker.mjs package.json"
   },
   "dependencies": {
+    "dxf-parser": "1.1.2",
     "three": "0.180.0"
   },
   "devDependencies": {
