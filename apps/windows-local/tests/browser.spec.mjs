@@ -86,6 +86,42 @@ async function project(page, requireModel = false) {
       .locator('canvas[data-model-loaded="true"]')
       .waitFor({ timeout: 90000 });
 }
+
+test(
+  "DXF import previews rooms, confirms scale and saves a local scene",
+  { timeout: 120000 },
+  async (t) => {
+    const { page, errors, restart } = await setup(t);
+    await page.locator("#project-name").fill("DXF 本地方案");
+    await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    const bytes = Buffer.from(
+      "0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLWPOLYLINE\n8\nROOM\n90\n4\n70\n1\n10\n0\n20\n0\n10\n4200\n20\n0\n10\n4200\n20\n3000\n10\n0\n20\n3000\n0\nENDSEC\n0\nEOF\n",
+    );
+    await page.locator("#dxf-file").setInputFiles({
+      name: "room.dxf",
+      mimeType: "application/dxf",
+      buffer: bytes,
+    });
+    await page.locator("#dxf-room-layer").selectOption("ROOM");
+    await page.locator("#dxf-preview").locator("polygon").waitFor();
+    await page.locator("#dxf-confirm-units").check();
+    await page
+      .getByRole("button", { name: "生成 3D 草稿", exact: true })
+      .click();
+    await page
+      .locator("#scene-stats")
+      .filter({ hasText: "1 个房间" })
+      .waitFor();
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    await restart();
+    await page
+      .getByRole("button", { name: "DXF 本地方案", exact: true })
+      .click();
+    await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    assert.equal(errors.length, 0, errors.join("\n"));
+  },
+);
 test(
   "offline customer to project to scene survives service restart and keeps legacy scenes separate",
   { timeout: 120000 },

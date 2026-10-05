@@ -1,10 +1,18 @@
 import http from "node:http";
 import { randomBytes, createHash } from "node:crypto";
-import { readFile, mkdir, open, rename, unlink } from "node:fs/promises";
+import {
+  readFile,
+  writeFile,
+  mkdir,
+  open,
+  rename,
+  unlink,
+} from "node:fs/promises";
 import { join, resolve, sep, extname } from "node:path";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { validateGlb } from "./glb.mjs";
+import { analyzeDxf, MAX_DXF_BYTES } from "./dxf-analyze.mjs";
 const here = import.meta.dirname;
 const BODY_LIMIT = 1024 * 1024;
 const MODEL_LIMIT = 30 * 1024 * 1024;
@@ -111,6 +119,56 @@ export function createLocalServer(options) {
       return;
     }
     const upload = pathname.match(uploadPattern);
+    if (pathname === "/api/dxf/analyze" || pathname === "/api/dxf/archive") {
+      if (req.method !== "POST")
+        return reply(405, { error: "请求方式不支持。" });
+      if (!authorized(true))
+        return reply(403, { error: "请求来源无效，请重新打开本地软件。" });
+      if (!/^application\/dxf(?:;|$)/i.test(req.headers["content-type"] ?? ""))
+        return reply(415, { error: "请选择 DXF 户型文件。" });
+      if (Number(req.headers["content-length"] ?? 0) > MAX_DXF_BYTES)
+        return reply(413, { error: "DXF 文件不能超过 8 MiB。" });
+      const timer = setTimeout(() => req.destroy(), 30000);
+      req.setTimeout(15000, () => req.destroy());
+      try {
+        const chunks = [];
+        let size = 0;
+        for await (const chunk of req.iterator({ destroyOnReturn: false })) {
+          size += chunk.length;
+          if (size > MAX_DXF_BYTES) {
+            req.resume();
+            return reply(413, { error: "DXF 文件不能超过 8 MiB。" });
+          }
+          chunks.push(chunk);
+        }
+        const bytes = Buffer.concat(chunks);
+        const analysis = await analyzeDxf(bytes);
+        if (pathname === "/api/dxf/analyze")
+          return reply(200, { data: analysis });
+        const directory = join(config.dataDirectory, "floorplans");
+        const temporary = join(
+          directory,
+          `.upload-${randomBytes(16).toString("hex")}`,
+        );
+        try {
+          await mkdir(directory, { recursive: true });
+          await writeFile(temporary, bytes, { flag: "wx" });
+          await rename(temporary, join(directory, `${analysis.sha256}.dxf`));
+        } finally {
+          await unlink(temporary).catch(() => {});
+        }
+        return reply(200, { data: { sha256: analysis.sha256 } });
+      } catch (error) {
+        if (error.message?.includes("8 MiB"))
+          return reply(413, { error: "DXF 文件不能超过 8 MiB。" });
+        if (error.message?.includes("DXF"))
+          return reply(422, { error: error.message });
+        return reply(422, { error: "DXF 文件无法处理，请检查文件后重试。" });
+      } finally {
+        clearTimeout(timer);
+        req.setTimeout(0);
+      }
+    }
     if (upload) {
       if (req.method !== "POST")
         return reply(405, { error: "请求方式不支持。" });
@@ -150,7 +208,7 @@ export function createLocalServer(options) {
             return reply(413, { error: "GLB 模型不能超过 30 MiB。" });
           }
           digest.update(chunk);
-          for (let cursor = 0; cursor < chunk.length; ) {
+          for (let cursor = 0; cursor < chunk.length;) {
             const { bytesWritten } = await handle.write(
               chunk,
               cursor,
