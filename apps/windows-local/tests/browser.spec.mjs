@@ -131,6 +131,46 @@ async function localDxfProject(page, sceneName) {
   await page.locator("#project-name").fill(sceneName);
   await page.getByRole("button", { name: "新建方案", exact: true }).click();
 }
+test(
+  "customer can be removed and restored with the same project and scene",
+  { timeout: 120000 },
+  async (t) => {
+    const { page } = await setup(t);
+    await localDxfProject(page, "保留方案");
+    const origin = new URL(page.url()).origin;
+    const call = async (body) =>
+      (
+        await page.request.post(`${origin}/api/local`, {
+          headers: { origin },
+          data: body,
+        })
+      ).json();
+    const customerId = (await call({ action: "customers" })).data.items[0].id;
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "移出客户", exact: true }).click();
+    await page
+      .locator("#customer-count")
+      .filter({ hasText: "共 0 位客户" })
+      .waitFor();
+    assert.equal(
+      (await call({ action: "customer", id: customerId })).status,
+      404,
+    );
+    await page.getByRole("button", { name: "已移出客户", exact: true }).click();
+    await page
+      .getByRole("button", { name: "恢复 DXF 客户", exact: true })
+      .click();
+    await page
+      .locator("#customer-count")
+      .filter({ hasText: "共 1 位客户" })
+      .waitFor();
+    await page.getByRole("button", { name: "DXF 客户", exact: true }).click();
+    await page
+      .getByRole("button", { name: "DXF 房屋项目", exact: true })
+      .click();
+    await page.getByRole("button", { name: "保留方案", exact: true }).waitFor();
+  },
+);
 
 test(
   "DXF import previews two project rooms and a separate wall layer, then saves locally",

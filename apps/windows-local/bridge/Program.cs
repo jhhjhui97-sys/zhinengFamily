@@ -8,7 +8,7 @@ using LocalScenes;
 using SmartHome.SceneConsumer;
 public static class LocalBridge {
  static object Version(LocalSceneVersion v) { return v==null ? null : new {revision=v.Revision,saved_at=v.CreatedAt,scene=JObject.Parse(v.SceneJson)}; }
- static object Customer(LocalCustomer c) { return new {id=c.Id,name=c.Name,phone=c.Phone,wechat=c.Wechat,source=c.Source,address=c.Address,budget=c.Budget,status=c.Status,notes=c.Notes,revision=c.Revision,created_at=c.CreatedAt,updated_at=c.UpdatedAt}; }
+ static object Customer(LocalCustomer c) { return new {id=c.Id,name=c.Name,phone=c.Phone,wechat=c.Wechat,source=c.Source,address=c.Address,budget=c.Budget,status=c.Status,notes=c.Notes,revision=c.Revision,created_at=c.CreatedAt,updated_at=c.UpdatedAt,deleted_at=c.DeletedAt}; }
  static object Project(LocalProject p) { return new {id=p.Id,customer_id=p.CustomerId,sales_actor_id=p.SalesActorId,name=p.Name,address=p.Address,status=p.Status,revision=p.Revision,created_at=p.CreatedAt,updated_at=p.UpdatedAt}; }
  static object Product(LocalProduct p) { return new {id=p.Id,category=p.Category,brand=p.Brand,name=p.Name,sku=p.Sku,price=p.Price,width_mm=p.WidthMm,depth_mm=p.DepthMm,height_mm=p.HeightMm,metadata=JObject.Parse(p.MetadataJson),active_asset_id=p.ActiveAssetId,revision=p.Revision,created_at=p.CreatedAt,updated_at=p.UpdatedAt}; }
  static object Quotation(LocalQuotation q) { return new {id=q.Id,customer_id=q.CustomerId,project_id=q.ProjectId,document_id=q.DocumentId,scene_version=q.SceneRevision,customer_name=q.CustomerName,project_name=q.ProjectName,scene_name=q.SceneName,currency=q.Currency,total=q.Total,total_cents=q.TotalCents,excluded_demo_count=q.ExcludedDemoCount,created_by=q.CreatedBy,created_at=q.CreatedAt,lines=q.Lines.Select(x=>new {product_id=x.ProductId,name=x.ProductName,sku=x.Sku,unit_price=x.UnitPrice,quantity=x.Quantity,line_total=x.LineTotal}),exclusions=q.Exclusions.Select(x=>new {instance_id=x.InstanceId,product_id=x.ProductId,name=x.Name})}; }
@@ -40,16 +40,19 @@ public static class LocalBridge {
    string[] allowed={"action","id","customer_id","project_id","name","phone","wechat","source","address","budget","status","notes","base_revision","revision","scene","scene_version","limit","offset","search","category","brand","sku","price","width_mm","depth_mm","height_mm","metadata","sha256","byte_count"};
    if(input.Properties().Any(x=>!allowed.Contains(x.Name))) throw new LocalStoreError(LocalErrorCode.InvalidInput);
    action=(string)input["action"];
-   if(!new[]{"list","create","sample","current","save","versions","restore","validate","catalog","customers","customer_create","customer","customer_update","projects","project_create","project","project_update","products","product_create","product","product_update","model_attach","model_asset","quotation_create","quotation","quotations","order_create","order","orders","order_status"}.Contains(action)) throw new LocalStoreError(LocalErrorCode.InvalidInput);
+   if(!new[]{"list","create","sample","current","save","versions","restore","validate","catalog","customers","deleted_customers","customer_create","customer","customer_update","customer_delete","customer_restore","projects","project_create","project","project_update","products","product_create","product","product_update","model_attach","model_asset","quotation_create","quotation","quotations","order_create","order","orders","order_status"}.Contains(action)) throw new LocalStoreError(LocalErrorCode.InvalidInput);
    var validator=new OfflineSceneValidator(File.ReadAllText(args[1]));
    var identity=LocalIdentity.Open(args[0]);object data=null;
    using(var store=new LocalSceneStore(args[0],identity.WorkspaceId,identity.ActorId,validator)) {
     int limit=checked((int)Number(input,"limit",20)),offset=checked((int)Number(input,"offset",0));
     switch(action) {
      case "customers":var customers=store.Customers(limit,offset);data=new{total=customers.Total,items=customers.Items.Select(x=>Customer(x))};break;
+     case "deleted_customers":var deleted=store.DeletedCustomers(limit,offset);data=new{total=deleted.Total,items=deleted.Items.Select(x=>Customer(x))};break;
      case "customer_create":data=Customer(store.CreateCustomer(Field(input,"name"),Field(input,"phone"),Field(input,"wechat"),Field(input,"source"),Field(input,"address"),Field(input,"budget"),Field(input,"status")??"new",Field(input,"notes")));break;
      case "customer":data=Customer(store.Customer(Id(input)));break;
      case "customer_update":data=Customer(store.UpdateCustomer(Id(input),Number(input,"base_revision",-1),Field(input,"name"),Field(input,"phone"),Field(input,"wechat"),Field(input,"source"),Field(input,"address"),Field(input,"budget"),Field(input,"status"),Field(input,"notes")));break;
+     case "customer_delete":store.DeleteCustomer(Id(input),Number(input,"base_revision",-1));data=new{removed=true};break;
+     case "customer_restore":data=Customer(store.RestoreCustomer(Id(input),Number(input,"base_revision",-1)));break;
      case "projects":var projects=store.Projects(Reference(input,"customer_id"),limit,offset);data=new{total=projects.Total,items=projects.Items.Select(x=>Project(x))};break;
      case "project_create":data=Project(store.CreateProject(Reference(input,"customer_id"),Field(input,"name"),Field(input,"address"),Field(input,"status")??"draft"));break;
      case "project":data=Project(store.Project(Id(input)));break;
@@ -97,7 +100,9 @@ public static class LocalBridge {
    bool quoteAction=action!=null&&action.StartsWith("quotation",StringComparison.Ordinal);
    bool orderAction=action!=null&&action.StartsWith("order",StringComparison.Ordinal);
    string message;
-   if(productAction&&status==409)message=action=="product_create"?"商品 SKU 已存在，请换一个 SKU。":"商品 SKU 冲突或资料已变化，你的修改已保留，请刷新后重试。";
+   if(action=="customer_delete"&&status==409)message="客户资料已变化或已移出，请刷新后重试。";
+   else if(action=="customer_restore"&&status==409)message="客户资料已变化，或手机号已被其他客户使用；原资料仍在已移出列表中。";
+   else if(productAction&&status==409)message=action=="product_create"?"商品 SKU 已存在，请换一个 SKU。":"商品 SKU 冲突或资料已变化，你的修改已保留，请刷新后重试。";
    else if(action=="model_asset"&&status==404)message="本机模型文件已丢失、损坏或无权访问，请重新导入。";
    else if(productAction&&status==404)message="商品不存在，可能已被其他操作移除。";
    else if(productAction&&status==422)message="商品资料不合法，请检查价格、尺寸和属性后重试。";

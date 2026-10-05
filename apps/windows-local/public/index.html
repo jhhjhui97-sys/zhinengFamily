@@ -39,6 +39,15 @@
           ><button id="customer-next">下一页</button>
         </div>
         <div id="customer-count" class="muted">共 0 位客户</div>
+        <button id="customer-trash-toggle">已移出客户</button>
+        <div id="customer-trash" hidden>
+          <div id="customer-trash-items" class="library-items"></div>
+          <div class="pager">
+            <button id="customer-trash-prev">上一页</button
+            ><button id="customer-trash-next">下一页</button>
+          </div>
+          <div id="customer-trash-count" class="muted">共 0 位已移出客户</div>
+        </div>
         <details id="customer-form-panel" open>
           <summary>新建 / 编辑客户</summary>
           <label for="customer-name">姓名 *</label
@@ -68,7 +77,8 @@
           ><textarea id="customer-notes"></textarea>
           <div class="form-actions">
             <button id="customer-create">保存客户</button
-            ><button id="customer-edit">更新客户</button>
+            ><button id="customer-edit">更新客户</button
+            ><button id="customer-delete">移出客户</button>
           </div>
         </details>
         <hr />

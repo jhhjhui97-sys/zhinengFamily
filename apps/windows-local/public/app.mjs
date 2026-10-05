@@ -19,6 +19,8 @@ let active = null,
   selectedCustomer = null,
   selectedProject = null,
   customerOffset = 0,
+  customerTrashOffset = 0,
+  customerTrashTotal = 0,
   projectOffset = 0,
   customerFormBaseline = null,
   projectFormBaseline = null;
@@ -276,6 +278,23 @@ function showCustomer(customer) {
   $("scene-scope-label").textContent = "请先选择项目";
   clearScene();
 }
+function clearCustomerSelection() {
+  selectedCustomer = selectedProject = null;
+  $("selected-customer").textContent = "尚未选择客户";
+  $("selected-project").textContent = "请先选择客户";
+  for (const key of Object.keys(customerForm()))
+    $("customer-" + key).value = "";
+  $("customer-status").value = "new";
+  $("sales-project-name").value = "";
+  $("sales-project-address").value = "";
+  $("sales-project-status").value = "draft";
+  customerFormBaseline = JSON.stringify(customerForm());
+  projectFormBaseline = JSON.stringify(projectForm());
+  $("sales-project-items").replaceChildren();
+  $("sales-project-count").textContent = "请先选择客户";
+  $("scene-scope-label").textContent = "请先选择项目";
+  clearScene();
+}
 async function customers() {
   const page = await api("customers", { limit: 20, offset: customerOffset });
   $("customer-count").textContent = `共 ${page.total} 位客户`;
@@ -289,6 +308,36 @@ async function customers() {
         await projects();
         await library();
         message(`已选择客户：${item.name}。`);
+      }),
+    );
+  }
+}
+async function deletedCustomers() {
+  if ($("customer-trash").hidden) return;
+  const page = await api("deleted_customers", {
+    limit: 20,
+    offset: customerTrashOffset,
+  });
+  customerTrashTotal = page.total;
+  $("customer-trash-count").textContent = `共 ${page.total} 位已移出客户`;
+  $("customer-trash-prev").disabled = customerTrashOffset === 0;
+  $("customer-trash-next").disabled = customerTrashOffset + 20 >= page.total;
+  $("customer-trash-items").replaceChildren();
+  for (const item of page.items) {
+    $("customer-trash-items").append(
+      button(`恢复 ${item.name}`, async () => {
+        if (!discard()) return;
+        const restored = await api("customer_restore", {
+          id: item.id,
+          base_revision: item.revision,
+        });
+        customerOffset = projectOffset = customerTrashOffset = 0;
+        showCustomer(restored);
+        await customers();
+        await deletedCustomers();
+        await projects();
+        await library();
+        message(`客户 ${restored.name} 及关联资料已恢复。`);
       }),
     );
   }
@@ -409,6 +458,46 @@ $("customer-edit").onclick = () =>
     $("selected-customer").textContent = customer.name;
     await customers();
     message(`客户 ${customer.name} 已更新。`);
+  });
+$("customer-delete").onclick = () =>
+  run(async () => {
+    if (!selectedCustomer) throw Error("请先选择要移出的客户。");
+    if (!discard()) return;
+    const customer = selectedCustomer;
+    if (
+      !confirm(
+        `确定移出客户 ${customer.name} 吗？关联的项目、方案、报价和订单会从常规列表隐藏，可从“已移出客户”恢复。`,
+      )
+    )
+      return;
+    await api("customer_delete", {
+      id: customer.id,
+      base_revision: customer.revision,
+    });
+    customerOffset = projectOffset = 0;
+    clearCustomerSelection();
+    await customers();
+    await deletedCustomers();
+    await library();
+    message(`客户 ${customer.name} 已移出，可随时恢复。`);
+  });
+$("customer-trash-toggle").onclick = () =>
+  run(async () => {
+    $("customer-trash").hidden = !$("customer-trash").hidden;
+    customerTrashOffset = 0;
+    await deletedCustomers();
+  });
+$("customer-trash-prev").onclick = () =>
+  run(async () => {
+    if (customerTrashOffset === 0) return;
+    customerTrashOffset = Math.max(0, customerTrashOffset - 20);
+    await deletedCustomers();
+  });
+$("customer-trash-next").onclick = () =>
+  run(async () => {
+    if (customerTrashOffset + 20 >= customerTrashTotal) return;
+    customerTrashOffset += 20;
+    await deletedCustomers();
   });
 $("sales-project-create").onclick = () =>
   run(async () => {

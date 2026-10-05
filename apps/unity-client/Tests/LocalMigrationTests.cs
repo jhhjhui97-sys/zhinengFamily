@@ -39,12 +39,14 @@ public static class LocalMigrationTests {
    using(var store=new LocalSceneStore(path,identity.WorkspaceId,identity.ActorId,validator))
     Check(store.Current(document).Revision==2&&store.Versions(document).Count==2,"scene history changed during migration");
    using(var db=new SqliteConnection(path)) {
-    Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==6,"migration did not advance format");
+    Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==7,"migration did not advance format");
     Check(db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name='local_projects'").Count==1,"project table missing");
+    db.Query("SELECT deleted_at FROM local_customers LIMIT 1");
    }
    Check(Backups(path).Length==1,"pre-v2 backup missing");
    Check(Directory.GetFiles(directory,"migration-legacy.sqlite.pre-v3-*.bak").Length==1,"direct v1 to v3 upgrade lacked intermediate backup");
    Check(Directory.GetFiles(directory,"migration-legacy.sqlite.pre-v5-*.bak").Length==1,"v1 to v5 upgrade lacked original backup");
+   Check(Directory.GetFiles(directory,"migration-legacy.sqlite.pre-v7-*.bak").Length==1,"v1 to v7 upgrade lacked original backup");
    using(var old=new SqliteConnection(Backups(path)[0])) {
     Check((long)old.Query("PRAGMA user_version")[0]["user_version"]==1,"backup was upgraded in place");
     Check((long)old.Query("SELECT COUNT(*) n FROM scene_versions WHERE document_id=?",document.ToString("D"))[0]["n"]==2,"backup lost scene history");
@@ -89,10 +91,10 @@ public static class LocalMigrationTests {
    string[] backups=Directory.GetFiles(directory,"migration-v1-v4-failure.sqlite.pre-v4-*.bak");Check(backups.Length==1,"original pre-v4 backup missing");
    using(var db=new SqliteConnection(backups[0])) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==1,"pre-v4 backup was not original v1");
   });
-  Test("fresh database starts at v5 without a recovery backup",()=>{
+  Test("fresh database starts at v7 without a recovery backup",()=>{
    string path=Path.Combine(directory,"migration-fresh.sqlite"); Guid workspace=Guid.NewGuid(),actor=Guid.NewGuid();
    using(var store=new LocalSceneStore(path,workspace,actor,validator)) Check(store.Documents().Total==0,"fresh library not empty");
-   using(var db=new SqliteConnection(path)) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==6,"fresh schema not v6");
+   using(var db=new SqliteConnection(path)) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==7,"fresh schema not v7");
    Check(Backups(path).Length==0,"fresh database has unnecessary backup");
   });
   Console.WriteLine("Local migration: "+passed+" passed");

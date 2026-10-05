@@ -16,14 +16,14 @@ public sealed partial class LocalSceneStore : IDisposable {
   db=new SqliteConnection(path);
   try {
    long format=(long)db.Query("PRAGMA user_version")[0]["user_version"];
-   if(format<0||format>6) throw new LocalStoreError(LocalErrorCode.Corrupt);
+   if(format<0||format>7) throw new LocalStoreError(LocalErrorCode.Corrupt);
    // Capture the original database before any schema change. All upgrade stages
    // then commit together, so a later failure cannot leave a partly upgraded v1/v2 file.
-   for(int target=2;target<=6;target++) if(format>=1&&format<target) {
+   for(int target=2;target<=7;target++) if(format>=1&&format<target) {
     string backup=path+".pre-v"+target+"-"+DateTime.UtcNow.ToString("yyyyMMddHHmmss",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N")+".bak";
     db.BackupTo(backup);
    }
-   if(format<6) db.Transaction(()=>{
+   if(format<7) db.Transaction(()=>{
    if(format<2) {
    if(format==0) {
     db.Execute(@"CREATE TABLE scene_documents(
@@ -172,6 +172,12 @@ public sealed partial class LocalSceneStore : IDisposable {
      db.Execute("CREATE TRIGGER "+table+"_no_delete BEFORE DELETE ON "+table+" BEGIN SELECT RAISE(ABORT,'immutable order'); END");
     }
     db.Execute("PRAGMA user_version=6");
+   }
+   if(format<7) {
+    db.Execute("ALTER TABLE local_customers ADD COLUMN deleted_at TEXT");
+    db.Execute("DROP INDEX local_customers_phone");
+    db.Execute("CREATE UNIQUE INDEX local_customers_phone ON local_customers(workspace_id,phone) WHERE deleted_at IS NULL AND phone IS NOT NULL AND phone<>''");
+    db.Execute("PRAGMA user_version=7");
    }
    });
   } catch { db.Dispose(); throw; }
