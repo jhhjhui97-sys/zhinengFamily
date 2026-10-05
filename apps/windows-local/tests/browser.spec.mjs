@@ -94,6 +94,9 @@ test(
     const { page, errors, restart } = await setup(t);
     await page.locator("#project-name").fill("DXF 本地方案");
     await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    await page
+      .getByRole("button", { name: "导入 DXF 户型", exact: true })
+      .click();
     const bytes = Buffer.from(
       "0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLWPOLYLINE\n8\nROOM\n90\n4\n70\n1\n10\n0\n20\n0\n10\n4200\n20\n0\n10\n4200\n20\n3000\n10\n0\n20\n3000\n0\nENDSEC\n0\nEOF\n",
     );
