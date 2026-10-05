@@ -147,7 +147,7 @@ export function mountDxfImport({
   }
 
   $("dxf-open").onclick = () => {
-    if (!getActive()) return notify("请先新建或打开方案。", true);
+    if (!getActive()) return notify("请先选择客户项目并新建或打开方案。", true);
     $("dxf-import").hidden = !$("dxf-import").hidden;
   };
   $("dxf-file").onchange = async () => {

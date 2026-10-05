@@ -103,3 +103,39 @@ test("rejects missing rooms, unconfirmed scale and intersecting boundaries", () 
     /房间轮廓/,
   );
 });
+
+test("rejects room boundaries that touch another edge or exceed the UI geometry budget", () => {
+  const make = (points) =>
+    buildDxfScene(
+      { ...analysis, closedPaths: [polygon(points)] },
+      { ...options, id: ids() },
+    );
+  assert.throws(
+    () =>
+      make([
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+        { x: 4, y: 4 },
+        { x: 2, y: 4 },
+        { x: 2, y: 0 },
+        { x: 0, y: 4 },
+      ]),
+    /房间轮廓/,
+  );
+  assert.throws(
+    () =>
+      make([
+        { x: 0, y: 0 },
+        { x: 4, y: 0 },
+        { x: 4, y: 4 },
+        { x: 2, y: 0 },
+        { x: 0, y: 4 },
+      ]),
+    /房间轮廓/,
+  );
+  const many = Array.from({ length: 1001 }, (_, i) => ({
+    x: Math.cos((i * 2 * Math.PI) / 1001) * 10,
+    y: Math.sin((i * 2 * Math.PI) / 1001) * 10,
+  }));
+  assert.throws(() => make(many), /顶点过多/);
+});

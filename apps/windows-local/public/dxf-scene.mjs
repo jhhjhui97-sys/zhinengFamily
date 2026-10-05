@@ -37,15 +37,28 @@ function orientation(a, b, c) {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
 
-function crosses(a, b, c, d) {
+function intersects(a, b, c, d) {
   const ab1 = orientation(a, b, c),
     ab2 = orientation(a, b, d),
     cd1 = orientation(c, d, a),
     cd2 = orientation(c, d, b);
-  return ab1 * ab2 < 0 && cd1 * cd2 < 0;
+  const onEdge = (point, start, end, turn) =>
+    Math.abs(turn) < 1e-7 &&
+    point.x >= Math.min(start.x, end.x) - 1e-7 &&
+    point.x <= Math.max(start.x, end.x) + 1e-7 &&
+    point.y >= Math.min(start.y, end.y) - 1e-7 &&
+    point.y <= Math.max(start.y, end.y) + 1e-7;
+  return (
+    (ab1 * ab2 < 0 && cd1 * cd2 < 0) ||
+    onEdge(c, a, b, ab1) ||
+    onEdge(d, a, b, ab2) ||
+    onEdge(a, c, d, cd1) ||
+    onEdge(b, c, d, cd2)
+  );
 }
 
 function validBoundary(points) {
+  if (points.length > 1000) throw Error("房间轮廓顶点过多，请先简化图纸。");
   if (
     points.length < 3 ||
     new Set(points.map((p) => `${p.x},${p.y}`)).size !== points.length
@@ -58,7 +71,7 @@ function validBoundary(points) {
     if (distance(a, b) < 0.001) return false;
     for (let j = i + 2; j < points.length; j++) {
       if (i === 0 && j === points.length - 1) continue;
-      if (crosses(a, b, points[j], points[(j + 1) % points.length]))
+      if (intersects(a, b, points[j], points[(j + 1) % points.length]))
         return false;
     }
   }
@@ -96,6 +109,8 @@ export function buildDxfScene(analysis, options) {
     analysis?.closedPaths?.filter((path) => path.layer === roomLayer) ?? [];
   if (!sourceRooms.length) throw Error("所选图层没有闭合房间轮廓。");
   const sourcePoints = sourceRooms.flatMap((path) => path.points);
+  if (sourceRooms.length > 100 || sourcePoints.length > 5000)
+    throw Error("房间轮廓过于复杂，请先简化图纸。");
   if (!sourcePoints.every(finitePoint)) throw Error("房间轮廓坐标无效。");
   const origin = {
     x: Math.min(...sourcePoints.map((p) => p.x)),
@@ -129,6 +144,7 @@ export function buildDxfScene(analysis, options) {
         })),
       );
   if (!sourceWalls.length) throw Error("所选墙体图层没有可用直线。");
+  if (sourceWalls.length > 5000) throw Error("墙体线段过多，请先简化图纸。");
   const seen = new Set(),
     walls = [];
   for (const source of sourceWalls) {

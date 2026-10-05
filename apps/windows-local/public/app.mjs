@@ -110,7 +110,7 @@ async function api(action, fields = {}) {
 }
 const productsView = mountProducts({ api });
 const dxfImport = mountDxfImport({
-  getActive: () => active,
+  getActive: () => (selectedProject ? active : null),
   hasUnsavedChanges,
   setDraft: async (scene) => {
     const validated = await api("validate", { scene });

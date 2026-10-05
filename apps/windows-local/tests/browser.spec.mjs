@@ -87,18 +87,44 @@ async function project(page, requireModel = false) {
       .waitFor({ timeout: 90000 });
 }
 
+const dxfRoom = (x1, y1, x2, y2) =>
+  `0\nLWPOLYLINE\n8\nROOM\n90\n4\n70\n1\n10\n${x1}\n20\n${y1}\n10\n${x2}\n20\n${y1}\n10\n${x2}\n20\n${y2}\n10\n${x1}\n20\n${y2}\n`;
+const dxfLine = (layer, x1, y1, x2, y2) =>
+  `0\nLINE\n8\n${layer}\n10\n${x1}\n20\n${y1}\n11\n${x2}\n21\n${y2}\n`;
+const dxfBytes = (entities, units = 4) =>
+  Buffer.from(
+    `0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n${units}\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n${entities}0\nENDSEC\n0\nEOF\n`,
+  );
+async function localDxfProject(page, sceneName) {
+  await page.locator("#customer-name").fill("DXF 客户");
+  await page.getByRole("button", { name: "保存客户", exact: true }).click();
+  await page
+    .locator("#selected-customer")
+    .filter({ hasText: "DXF 客户" })
+    .waitFor();
+  await page.locator("#sales-project-name").fill("DXF 房屋项目");
+  await page.getByRole("button", { name: "保存项目", exact: true }).click();
+  await page
+    .locator("#selected-project")
+    .filter({ hasText: "DXF 房屋项目" })
+    .waitFor();
+  await page.locator("#project-name").fill(sceneName);
+  await page.getByRole("button", { name: "新建方案", exact: true }).click();
+}
+
 test(
-  "DXF import previews rooms, confirms scale and saves a local scene",
+  "DXF import previews two project rooms and a separate wall layer, then saves locally",
   { timeout: 120000 },
   async (t) => {
     const { page, errors, restart } = await setup(t);
-    await page.locator("#project-name").fill("DXF 本地方案");
-    await page.getByRole("button", { name: "新建方案", exact: true }).click();
+    await localDxfProject(page, "DXF 本地方案");
     await page
       .getByRole("button", { name: "导入 DXF 户型", exact: true })
       .click();
-    const bytes = Buffer.from(
-      "0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLWPOLYLINE\n8\nROOM\n90\n4\n70\n1\n10\n0\n20\n0\n10\n4200\n20\n0\n10\n4200\n20\n3000\n10\n0\n20\n3000\n0\nENDSEC\n0\nEOF\n",
+    const bytes = dxfBytes(
+      dxfRoom(0, 0, 4200, 3000) +
+        dxfRoom(4200, 0, 8000, 3000) +
+        dxfLine("WALL", 0, 0, 4200, 0),
     );
     await page.locator("#dxf-file").setInputFiles({
       name: "room.dxf",
@@ -106,8 +132,69 @@ test(
       buffer: bytes,
     });
     await page.locator("#dxf-room-layer").selectOption("ROOM");
+    await page.locator("#dxf-wall-layer").selectOption("WALL");
     await page.locator("#dxf-preview").locator("polygon").waitFor();
     await page.locator("#dxf-confirm-units").check();
+    await page
+      .getByRole("button", { name: "生成 3D 草稿", exact: true })
+      .click();
+    await page
+      .locator("#scene-stats")
+      .filter({ hasText: "2 个房间 · 1 段墙体" })
+      .waitFor();
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    await restart();
+    await page.getByRole("button", { name: "DXF 客户", exact: true }).click();
+    await page
+      .getByRole("button", { name: "DXF 房屋项目", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "DXF 本地方案", exact: true })
+      .click();
+    await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    assert.equal(errors.length, 0, errors.join("\n"));
+  },
+);
+
+test(
+  "unitless DXF needs line calibration and a failed import preserves a dirty draft",
+  { timeout: 120000 },
+  async (t) => {
+    const { page, errors, restart } = await setup(t);
+    await localDxfProject(page, "待校准方案");
+    await page
+      .getByRole("button", { name: "载入两室一厅", exact: true })
+      .click();
+    await page
+      .locator("#scene-stats")
+      .filter({ hasText: "3 个房间" })
+      .waitFor();
+    const originalDraft = await page.locator("#scene-json").inputValue();
+    await page
+      .getByRole("button", { name: "导入 DXF 户型", exact: true })
+      .click();
+    await page.locator("#dxf-file").setInputFiles({
+      name: "unitless.dxf",
+      mimeType: "application/dxf",
+      buffer: dxfBytes(dxfRoom(0, 0, 4, 3) + dxfLine("WALL", 0, 0, 4, 3), 0),
+    });
+    await page.locator("#dxf-room-layer").selectOption("WALL");
+    await page.locator("#dxf-preview line").first().click();
+    await page.locator("#dxf-length").fill("5000");
+    await page.locator("#dxf-scale").filter({ hasText: "1000 mm" }).waitFor();
+    page.once("dialog", (dialog) => dialog.accept());
+    await page
+      .getByRole("button", { name: "生成 3D 草稿", exact: true })
+      .click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "没有闭合房间轮廓" })
+      .waitFor();
+    assert.equal(await page.locator("#scene-json").inputValue(), originalDraft);
+    await page.locator("#dxf-room-layer").selectOption("ROOM");
+    await page.locator("#dxf-wall-layer").selectOption("WALL");
+    page.once("dialog", (dialog) => dialog.accept());
     await page
       .getByRole("button", { name: "生成 3D 草稿", exact: true })
       .click();
@@ -118,9 +205,11 @@ test(
     await page.getByRole("button", { name: "保存新版本", exact: true }).click();
     await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
     await restart();
+    await page.getByRole("button", { name: "DXF 客户", exact: true }).click();
     await page
-      .getByRole("button", { name: "DXF 本地方案", exact: true })
+      .getByRole("button", { name: "DXF 房屋项目", exact: true })
       .click();
+    await page.getByRole("button", { name: "待校准方案", exact: true }).click();
     await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
     assert.equal(errors.length, 0, errors.join("\n"));
   },
