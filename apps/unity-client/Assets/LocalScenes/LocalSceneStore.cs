@@ -174,8 +174,10 @@ public sealed partial class LocalSceneStore : IDisposable {
     db.Execute("PRAGMA user_version=6");
    }
    if(format<7) {
-    db.Execute("ALTER TABLE local_customers ADD COLUMN deleted_at TEXT");
-    db.Execute("DROP INDEX local_customers_phone");
+    bool hasDeletedAt=false;
+    foreach(var column in db.Query("PRAGMA table_info(local_customers)")) if((string)column["name"]=="deleted_at") hasDeletedAt=true;
+    if(!hasDeletedAt) db.Execute("ALTER TABLE local_customers ADD COLUMN deleted_at TEXT");
+    db.Execute("DROP INDEX IF EXISTS local_customers_phone");
     db.Execute("CREATE UNIQUE INDEX local_customers_phone ON local_customers(workspace_id,phone) WHERE deleted_at IS NULL AND phone IS NOT NULL AND phone<>''");
     db.Execute("PRAGMA user_version=7");
    }
