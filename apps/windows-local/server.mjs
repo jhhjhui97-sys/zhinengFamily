@@ -208,7 +208,7 @@ export function createLocalServer(options) {
             return reply(413, { error: "GLB 模型不能超过 30 MiB。" });
           }
           digest.update(chunk);
-          for (let cursor = 0; cursor < chunk.length;) {
+          for (let cursor = 0; cursor < chunk.length; ) {
             const { bytesWritten } = await handle.write(
               chunk,
               cursor,
