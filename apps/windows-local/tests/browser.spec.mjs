@@ -133,7 +133,8 @@ test(
     });
     await page.locator("#dxf-room-layer").selectOption("ROOM");
     await page.locator("#dxf-wall-layer").selectOption("WALL");
-    await page.locator("#dxf-preview").locator("polygon").waitFor();
+    await page.locator("#dxf-preview polygon").first().waitFor();
+    assert.equal(await page.locator("#dxf-preview polygon").count(), 2);
     await page.locator("#dxf-confirm-units").check();
     await page
       .getByRole("button", { name: "生成 3D 草稿", exact: true })
