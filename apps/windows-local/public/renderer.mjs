@@ -57,6 +57,10 @@ export class RoomRenderer {
     this.scene.add(sun, sun.target);
     this.content = new THREE.Group();
     this.scene.add(this.content);
+    this.furniture = new Map();
+    this.selectedFurnitureId = null;
+    this.selectionHelper = null;
+    this.raycaster = new THREE.Raycaster();
     this.resources = [];
     this.renderSerial = 0;
     this.catalog = new Map();
@@ -136,6 +140,8 @@ export class RoomRenderer {
   }
   clear() {
     this.renderSerial++;
+    this.removeSelectionHelper();
+    this.furniture.clear();
     this.content.clear();
     for (const r of this.resources) r.dispose();
     this.resources = [];
@@ -144,10 +150,68 @@ export class RoomRenderer {
     this.status.textContent = "家具模型尚未加载";
     this.scheduleFrame();
   }
+  pointerRay(clientX, clientY) {
+    const bounds = this.renderer.domElement.getBoundingClientRect();
+    this.raycaster.setFromCamera(
+      new THREE.Vector2(
+        ((clientX - bounds.left) / bounds.width) * 2 - 1,
+        -((clientY - bounds.top) / bounds.height) * 2 + 1,
+      ),
+      this.camera,
+    );
+    return this.raycaster.ray;
+  }
+  pickFurniture(clientX, clientY) {
+    this.pointerRay(clientX, clientY);
+    const hits = this.raycaster.intersectObjects(
+      [...this.furniture.values()],
+      true,
+    );
+    for (const hit of hits) {
+      let object = hit.object;
+      while (object && !object.userData.furnitureId) object = object.parent;
+      if (object?.userData.furnitureId) return object.userData.furnitureId;
+    }
+    return null;
+  }
+  floorPoint(clientX, clientY, elevationMm = 0) {
+    const ray = this.pointerRay(clientX, clientY);
+    const point = ray.intersectPlane(
+      new THREE.Plane(new THREE.Vector3(0, 1, 0), -elevationMm / 1000),
+      new THREE.Vector3(),
+    );
+    return point ? { x: point.x * 1000, y: -point.z * 1000 } : null;
+  }
+  removeSelectionHelper() {
+    if (!this.selectionHelper) return;
+    this.scene.remove(this.selectionHelper);
+    this.selectionHelper.geometry.dispose();
+    this.selectionHelper.material.dispose();
+    this.selectionHelper = null;
+  }
+  selectFurniture(id) {
+    this.selectedFurnitureId = id;
+    this.removeSelectionHelper();
+    const placed = this.furniture.get(id);
+    if (placed) {
+      this.selectionHelper = new THREE.BoxHelper(placed, 0xd2782f);
+      this.scene.add(this.selectionHelper);
+    }
+    this.scheduleFrame();
+  }
+  previewPose(id, pose) {
+    const placed = this.furniture.get(id);
+    if (!placed) return;
+    placed.position.x = pose.x / 1000;
+    placed.position.z = -pose.y / 1000;
+    placed.rotation.y = THREE.MathUtils.degToRad(pose.rotation);
+    if (this.selectionHelper) this.selectionHelper.update();
+    this.scheduleFrame();
+  }
   async show(document) {
     this.clear();
     const serial = this.renderSerial;
-    this.status.textContent = "正在加载真实家具材质…";
+    this.status.textContent = "正在加载家具模型…";
     this.renderer.domElement.dataset.modelLoaded = "false";
     this.roomTextures = await this.roomTextureCache.get();
     if (serial !== this.renderSerial || this.disposed || !this.roomTextures)
@@ -271,6 +335,7 @@ export class RoomRenderer {
           renderPosition(item.position, floors.get(item.floor_id) ?? 0),
         );
         placed.rotation.y = THREE.MathUtils.degToRad(item.rotation_deg);
+        placed.userData.furnitureId = item.id;
         placed.traverse((o) => {
           if (o.isMesh) {
             o.castShadow = true;
@@ -278,6 +343,8 @@ export class RoomRenderer {
           }
         });
         this.content.add(placed);
+        this.furniture.set(item.id, placed);
+        if (this.selectedFurnitureId === item.id) this.selectFurniture(item.id);
         this.scheduleFrame();
       } catch {
         failed++;
@@ -289,7 +356,7 @@ export class RoomRenderer {
       this.status.textContent = `${failed} 件家具模型未能加载；请检查安装文件，已保存场景不受影响。`;
     } else {
       this.renderer.domElement.dataset.modelLoaded = "true";
-      this.status.textContent = `${document.furniture_instances.length} 件真实家具模型 · PBR 材质 · 本地渲染`;
+      this.status.textContent = `${document.furniture_instances.length} 件家具模型 · 本地渲染`;
     }
     if (!this.roomTextures.complete)
       this.status.textContent +=
@@ -305,6 +372,7 @@ export class RoomRenderer {
     this.disposed = true;
     if (this.frame) cancelAnimationFrame(this.frame);
     this.resize.disconnect();
+    this.removeSelectionHelper();
     this.controls.removeEventListener("change", this.onControlsChange);
     this.controls.dispose();
     this.renderer.dispose();

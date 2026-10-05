@@ -1,5 +1,10 @@
 import { RoomRenderer } from "./renderer.mjs";
-import { addFurniture, editFurniture } from "./scene-tools.mjs";
+import {
+  addFurniture,
+  editFurniture,
+  nearestWallGapMm,
+} from "./scene-tools.mjs";
+import { mountFurnitureGestures } from "./furniture-gestures.mjs";
 import { mountProducts } from "./products.mjs";
 import { mountQuotes } from "./quotes.mjs";
 import { mountOrders } from "./orders.mjs";
@@ -191,6 +196,7 @@ function fields() {
     ]),
   );
   furnitureFieldsBaseline.selection = $("furniture-select").value;
+  view.selectFurniture(item?.id ?? null);
   refreshRevision();
 }
 function refreshDraft() {
@@ -690,6 +696,39 @@ $("furniture-select").onchange = () => {
   }
   fields();
 };
+mountFurnitureGestures({
+  canvas: $("viewport").querySelector("canvas"),
+  renderer: view,
+  getScene: () => draft,
+  getSelectedId: () => $("furniture-select").value,
+  canEdit: () =>
+    Boolean(draft && !busy && !pendingJson() && !pendingFurniture()),
+  onSelect: (id) => {
+    if (pendingFurniture()) return;
+    $("furniture-select").value = id;
+    fields();
+  },
+  onCommit: (id, pose, start) =>
+    run(async () => {
+      try {
+        const candidate = editFurniture(draft, id, pose);
+        const validated = await api("validate", { scene: candidate });
+        draft = validated.scene;
+        $("furniture-select").value = id;
+        refreshDraft();
+        $("gesture-hint").textContent = "家具已调整，请保存新版本。";
+        message("家具已调整，请保存新版本。");
+      } catch (error) {
+        view.previewPose(id, start);
+        throw error;
+      }
+    }),
+  onHint: (text, error) => {
+    $("gesture-hint").textContent = text;
+    $("gesture-hint").classList.toggle("error", error);
+  },
+  wallGap: nearestWallGapMm,
+});
 $("apply-json").onclick = () =>
   run(async () => {
     if (pendingFurniture()) {

@@ -23,7 +23,7 @@ public static class LocalModelAssetTests {
   Test("fresh current database does not create a recovery backup",()=>{
    string path=Path.Combine(directory,"model-fresh.sqlite");Guid ws=Guid.NewGuid();
    using(var store=new LocalSceneStore(path,ws,Guid.NewGuid(),validator)) Check(store.LocalProducts().Total==0,"fresh catalog not empty");
-   using(var db=new SqliteConnection(path)) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==6,"fresh model format wrong");
+   using(var db=new SqliteConnection(path)) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==7,"fresh model format wrong");
    Check(Directory.GetFiles(directory,"model-fresh.sqlite.pre-v*.bak").Length==0,"fresh DB made recovery backup");
   });
   Test("v3 model migration preserves products and creates restorable pre-v4 backup",()=>{

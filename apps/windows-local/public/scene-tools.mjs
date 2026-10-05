@@ -15,7 +15,107 @@ export function editFurniture(scene, id, { x, y, rotation }) {
   item.position.x = x;
   item.position.y = y;
   item.rotation_deg = ((rotation % 360) + 360) % 360;
+  validateFurniturePlacement(copy, item);
   return copy;
+}
+function footprint(item) {
+  const angle = ((item.rotation_deg ?? 0) * Math.PI) / 180;
+  const width = { x: Math.cos(angle), y: Math.sin(angle) };
+  const depth = { x: -Math.sin(angle), y: Math.cos(angle) };
+  return [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ].map(([sx, sy]) => ({
+    x:
+      item.position.x +
+      ((sx * item.width_mm) / 2) * width.x +
+      ((sy * item.depth_mm) / 2) * depth.x,
+    y:
+      item.position.y +
+      ((sx * item.width_mm) / 2) * width.y +
+      ((sy * item.depth_mm) / 2) * depth.y,
+  }));
+}
+function overlap(a, b, clearance = 100) {
+  const axes = [a, b].flatMap((points) =>
+    [0, 1].map((i) => {
+      const start = points[i],
+        end = points[i + 1];
+      return { x: end.y - start.y, y: start.x - end.x };
+    }),
+  );
+  return axes.every((axis) => {
+    const projection = (points) =>
+      points.map((p) => p.x * axis.x + p.y * axis.y);
+    const pa = projection(a),
+      pb = projection(b);
+    const margin = clearance * Math.hypot(axis.x, axis.y);
+    return (
+      Math.max(...pa) + margin > Math.min(...pb) &&
+      Math.max(...pb) + margin > Math.min(...pa)
+    );
+  });
+}
+function validateFurniturePlacement(scene, item) {
+  const room = scene.rooms?.find((value) => value.id === item.room_id);
+  if (!room) return;
+  const corners = footprint(item);
+  if (!corners.every((corner) => insidePolygon(corner, room.boundary)))
+    throw Error("家具不能超出房间边界。");
+  for (let i = 0; i < corners.length; i++)
+    for (let j = 0; j < room.boundary.length; j++)
+      if (
+        crossing(
+          corners[i],
+          corners[(i + 1) % 4],
+          room.boundary[j],
+          room.boundary[(j + 1) % room.boundary.length],
+        )
+      )
+        throw Error("家具不能穿过房间边界。");
+  if (
+    scene.furniture_instances.some(
+      (other) =>
+        other.id !== item.id &&
+        other.room_id === item.room_id &&
+        overlap(corners, footprint(other)),
+    )
+  )
+    throw Error("家具与其他家具碰撞，请调整位置。");
+}
+export function nearestWallGapMm(scene, id, pose = null) {
+  const original = scene.furniture_instances.find((value) => value.id === id);
+  const item =
+    pose && original
+      ? {
+          ...original,
+          position: { ...original.position, x: pose.x, y: pose.y },
+          rotation_deg: pose.rotation,
+        }
+      : original;
+  const room = scene.rooms?.find((value) => value.id === item?.room_id);
+  if (!item || !room) return null;
+  const angle = ((item.rotation_deg ?? 0) * Math.PI) / 180;
+  let gap = Infinity;
+  for (let i = 0; i < room.boundary.length; i++) {
+    const a = room.boundary[i],
+      b = room.boundary[(i + 1) % room.boundary.length];
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (!length) continue;
+    const normal = { x: (b.y - a.y) / length, y: (a.x - b.x) / length };
+    const fromCenter = Math.abs(
+      (item.position.x - a.x) * normal.x + (item.position.y - a.y) * normal.y,
+    );
+    const radius =
+      (item.width_mm / 2) *
+        Math.abs(normal.x * Math.cos(angle) + normal.y * Math.sin(angle)) +
+      (item.depth_mm / 2) *
+        Math.abs(-normal.x * Math.sin(angle) + normal.y * Math.cos(angle));
+    gap = Math.min(gap, fromCenter - radius);
+  }
+  return Number.isFinite(gap) ? gap : null;
 }
 function insidePolygon(point, boundary) {
   let inside = false;

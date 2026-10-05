@@ -980,14 +980,21 @@ test(
       .locator("#product-detail")
       .filter({ hasText: "SHOP-SOFA-1" })
       .waitFor();
+    await page.locator("#product-photo-file").setInputFiles({
+      name: "shop-sofa.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==",
+        "base64",
+      ),
+    });
     await page
-      .locator("#product-model-file")
-      .setInputFiles(
-        join(root, "apps/windows-local/public/assets/velvet-sofa.glb"),
-      );
-    await page
-      .getByRole("button", { name: "导入当前商品 3D 模型", exact: true })
+      .getByRole("button", { name: "生成近似 3D 模型", exact: true })
       .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "尺寸近似模型已保存在本机" })
+      .waitFor();
     await page.waitForFunction(
       async ({ productId, firstAsset }) => {
         const response = await fetch("/api/local", {
@@ -1695,7 +1702,7 @@ test(
     await page.getByRole("button", { name: "放入场景", exact: true }).click();
     await page
       .locator("#render-status")
-      .filter({ hasText: "4 件真实家具模型" })
+      .filter({ hasText: "4 件家具模型" })
       .waitFor({ timeout: 90000 });
     await page.getByRole("button", { name: "保存新版本", exact: true }).click();
     await page.locator("#message").filter({ hasText: "已保存 v2" }).waitFor();
@@ -1707,7 +1714,7 @@ test(
     assert.equal(await page.locator("#furniture-select option").count(), 4);
     await page
       .locator("#render-status")
-      .filter({ hasText: "4 件真实家具模型" })
+      .filter({ hasText: "4 件家具模型" })
       .waitFor({ timeout: 90000 });
     await mkdir(join(root, ".local/windows-evidence"), { recursive: true });
     await page.screenshot({
@@ -1718,6 +1725,48 @@ test(
     await page.screenshot({
       path: join(root, ".local/windows-evidence/catalog-overview.png"),
     });
+    assert.equal(errors.length, 0, errors.join("\n"));
+  },
+);
+
+test(
+  "middle drag moves selected furniture and right drag rotates it",
+  { timeout: 120000 },
+  async (t) => {
+    const { page, errors } = await setup(t);
+    await project(page, true);
+    const canvas = page.locator("#viewport canvas");
+    const box = await canvas.boundingBox();
+    const x = box.x + box.width / 2,
+      y = box.y + box.height / 2;
+    const before = JSON.parse(await page.locator("#scene-json").inputValue())
+      .furniture_instances[0];
+    await page.mouse.move(x, y);
+    await page.mouse.down({ button: "middle" });
+    await page.mouse.move(x + 30, y, { steps: 6 });
+    await page.mouse.up({ button: "middle" });
+    await page.waitForFunction(
+      (previous) =>
+        JSON.parse(document.querySelector("#scene-json").value)
+          .furniture_instances[0].position.x !== previous,
+      before.position.x,
+    );
+    const moved = JSON.parse(await page.locator("#scene-json").inputValue())
+      .furniture_instances[0];
+    await page.mouse.move(x, y);
+    await page.mouse.down({ button: "right" });
+    await page.mouse.move(x + 30, y, { steps: 6 });
+    await page.mouse.up({ button: "right" });
+    await page.waitForFunction(
+      (previous) =>
+        JSON.parse(document.querySelector("#scene-json").value)
+          .furniture_instances[0].rotation_deg !== previous,
+      moved.rotation_deg,
+    );
+    assert.match(
+      await page.locator("#gesture-hint").textContent(),
+      /保存新版本/,
+    );
     assert.equal(errors.length, 0, errors.join("\n"));
   },
 );

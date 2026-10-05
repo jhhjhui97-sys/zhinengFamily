@@ -5,6 +5,7 @@ import {
   editFurniture,
   addFurniture,
   wallSegments,
+  nearestWallGapMm,
 } from "../public/scene-tools.mjs";
 test("RH_Z_UP millimetres map to right handed Y up metres", () =>
   assert.deepEqual(
@@ -43,6 +44,56 @@ test("invalid furniture edits reject NaN Infinity negative limits and missing id
   assert.throws(() =>
     editFurniture(fixture, "missing", { x: 0, y: 0, rotation: 0 }),
   );
+});
+test("furniture movement and rotation stay in its room without overlapping another item", () => {
+  const scene = {
+    rooms: [
+      {
+        id: "room",
+        floor_id: "floor",
+        boundary: [
+          { x: 0, y: 0 },
+          { x: 4000, y: 0 },
+          { x: 4000, y: 4000 },
+          { x: 0, y: 4000 },
+        ],
+      },
+    ],
+    furniture_instances: [
+      {
+        id: "one",
+        room_id: "room",
+        position: { x: 1000, y: 1000, z: 0 },
+        width_mm: 800,
+        depth_mm: 800,
+        rotation_deg: 0,
+      },
+      {
+        id: "two",
+        room_id: "room",
+        position: { x: 3000, y: 3000, z: 0 },
+        width_mm: 800,
+        depth_mm: 800,
+        rotation_deg: 0,
+      },
+    ],
+  };
+  assert.throws(
+    () => editFurniture(scene, "one", { x: 3700, y: 1000, rotation: 0 }),
+    /房间/,
+  );
+  assert.throws(
+    () => editFurniture(scene, "one", { x: 3000, y: 3000, rotation: 0 }),
+    /碰撞/,
+  );
+  assert.throws(
+    () => editFurniture(scene, "one", { x: 500, y: 500, rotation: 45 }),
+    /房间/,
+  );
+  const moved = editFurniture(scene, "one", { x: 2000, y: 1000, rotation: 45 });
+  assert.equal(moved.furniture_instances[0].rotation_deg, 45);
+  assert.equal(scene.furniture_instances[0].rotation_deg, 0);
+  assert.equal(Math.round(nearestWallGapMm(moved, "one")), 434);
 });
 test("catalog furniture enters a selected room with valid scene fields without changing the source", () => {
   const scene = {
