@@ -13,7 +13,10 @@ const { createLocalServer } = await import(
     : new URL("../server.mjs", import.meta.url).href
 );
 const root = resolve(import.meta.dirname, "../../..");
-async function setup(t, { trackFrames = false } = {}) {
+async function setup(
+  t,
+  { trackFrames = false, failFirstCatalog = false } = {},
+) {
   const data = await mkdtemp(join(tmpdir(), "family-browser-"));
   const config = {
     bridgePath: process.env.FAMILY_BUNDLE
@@ -52,6 +55,23 @@ async function setup(t, { trackFrames = false } = {}) {
       ? route.continue()
       : route.abort(),
   );
+  if (failFirstCatalog) {
+    let first = true;
+    await context.route("**/api/local", (route) => {
+      if (
+        first &&
+        JSON.parse(route.request().postData() ?? "{}").action === "catalog"
+      ) {
+        first = false;
+        return route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "temporary" }),
+        });
+      }
+      return route.continue();
+    });
+  }
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -145,6 +165,10 @@ test(
       .waitFor();
     await page.getByRole("button", { name: "保存新版本", exact: true }).click();
     await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    await page
+      .locator('canvas[data-room-material-loaded="true"]')
+      .waitFor({ timeout: 90000 });
+    assert.equal(errors.length, 0, errors.join("\n"));
     await restart();
     await page.getByRole("button", { name: "DXF 客户", exact: true }).click();
     await page
@@ -205,6 +229,10 @@ test(
       .waitFor();
     await page.getByRole("button", { name: "保存新版本", exact: true }).click();
     await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    await page
+      .locator('canvas[data-room-material-loaded="true"]')
+      .waitFor({ timeout: 90000 });
+    assert.equal(errors.length, 0, errors.join("\n"));
     await restart();
     await page.getByRole("button", { name: "DXF 客户", exact: true }).click();
     await page
@@ -215,6 +243,21 @@ test(
     assert.equal(errors.length, 0, errors.join("\n"));
   },
 );
+test(
+  "startup retries a transient local catalog failure",
+  { timeout: 90000 },
+  async (t) => {
+    const { page } = await setup(t, { failFirstCatalog: true });
+    await page.waitForFunction(
+      () => document.querySelectorAll("#catalog-select option").length === 4,
+    );
+    assert.doesNotMatch(
+      await page.locator("#message").textContent(),
+      /家具目录暂不可用/,
+    );
+  },
+);
+
 test(
   "offline customer to project to scene survives service restart and keeps legacy scenes separate",
   { timeout: 120000 },

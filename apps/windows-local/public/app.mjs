@@ -696,7 +696,12 @@ for (const id of [
 window.addEventListener("pagehide", () => view.dispose());
 run(async () => {
   try {
-    await loadCatalog();
+    try {
+      await loadCatalog();
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await loadCatalog();
+    }
   } catch (error) {
     message(`家具目录暂不可用：${error.message}`, true);
   }
