@@ -981,10 +981,29 @@ test(
       .filter({ hasText: "SHOP-SOFA-1" })
       .waitFor();
     await page.locator("#product-photo-file").setInputFiles({
-      name: "shop-sofa.png",
+      name: "broken.png",
       mimeType: "image/png",
       buffer: Buffer.from(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL/nwAAAABJRU5ErkJggg==",
+        "base64",
+      ),
+    });
+    await page
+      .getByRole("button", { name: "生成近似 3D 模型", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "图片无法解码" })
+      .waitFor();
+    assert.equal(
+      (await call({ action: "product", id: productId })).data.active_asset_id,
+      firstAsset,
+    );
+    await page.locator("#product-photo-file").setInputFiles({
+      name: "shop-sofa.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
         "base64",
       ),
     });

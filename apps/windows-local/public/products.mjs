@@ -1,5 +1,5 @@
 import { formatMoney } from "./money.mjs";
-import { makePhotoGlb } from "./photo-model.mjs";
+import { makePhotoGlb, photoDimensions } from "./photo-model.mjs";
 
 const $ = (id) => document.getElementById(id);
 const fields = [
@@ -312,12 +312,22 @@ export function mountProducts({ api }) {
       const file = $("product-photo-file").files?.[0];
       if (!file) throw Error("请先选择商品正面图片。");
       if (file.size > 5 * 1024 * 1024) throw Error("图片不能超过 5 MiB。");
+      const imageBytes = new Uint8Array(await file.arrayBuffer());
+      photoDimensions(imageBytes);
+      let decoded;
+      try {
+        decoded = await createImageBitmap(file);
+      } catch {
+        throw Error("图片无法解码，请选择完整的 PNG 或 JPEG 文件。");
+      } finally {
+        decoded?.close();
+      }
       const bytes = makePhotoGlb({
         width_mm: selected.width_mm,
         depth_mm: selected.depth_mm,
         height_mm: selected.height_mm,
         category: selected.category,
-        imageBytes: new Uint8Array(await file.arrayBuffer()),
+        imageBytes,
       });
       await attachModel(bytes);
       $("product-photo-file").value = "";
