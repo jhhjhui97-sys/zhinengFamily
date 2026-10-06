@@ -119,10 +119,20 @@ test("body limit and wrong content type handled safely", async (t) => {
   );
 });
 test("missing subprocess returns Chinese safe error", async (t) => {
-  const s = await setup(t, { bridgePath: "Z:/not-present/private.exe" });
-  const r = await s.request({ action: "list" });
+  const failures = [];
+  const s = await setup(t, {
+    bridgePath: "Z:/not-present/private.exe",
+    onBridgeFailure: (failure) => failures.push(failure),
+  });
+  const r = await s.request({ action: "create", name: "PRIVATE-CUSTOMER" });
   assert.equal(r.status, 503);
-  assert.match((await r.json()).error, /本地/);
+  const body = await r.json();
+  assert.match(body.error, /本地/);
+  assert.equal(failures.length, 1);
+  assert.equal(failures[0].reason, "process");
+  assert.ok(failures[0].elapsed_ms >= 0);
+  assert.doesNotMatch(JSON.stringify(failures), /PRIVATE-CUSTOMER|private.exe/);
+  assert.doesNotMatch(JSON.stringify(body), /elapsed_ms|process|private.exe/);
 });
 test("same local data survives service restart without internet or login", async (t) => {
   const s = await setup(t);

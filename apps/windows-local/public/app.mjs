@@ -1,6 +1,13 @@
 import { RoomRenderer } from "./renderer.mjs";
-import { addFurniture, editFurniture } from "./scene-tools.mjs";
+import {
+  addFurniture,
+  editFurniture,
+  removeFurniture,
+  nearestWallGapMm,
+} from "./scene-tools.mjs";
+import { mountFurnitureGestures } from "./furniture-gestures.mjs";
 import { mountProducts } from "./products.mjs";
+import { createCatalogRefresh } from "./catalog-refresh.mjs";
 import { mountQuotes } from "./quotes.mjs";
 import { mountOrders } from "./orders.mjs";
 import { mountDxfImport } from "./dxf-import.mjs";
@@ -19,6 +26,8 @@ let active = null,
   selectedCustomer = null,
   selectedProject = null,
   customerOffset = 0,
+  customerTrashOffset = 0,
+  customerTrashTotal = 0,
   projectOffset = 0,
   customerFormBaseline = null,
   projectFormBaseline = null;
@@ -108,7 +117,8 @@ async function api(action, fields = {}) {
   if (!response.ok) throw Error(body.error ?? "操作失败，请重试。");
   return body.data;
 }
-const productsView = mountProducts({ api });
+const refreshCatalog = createCatalogRefresh(() => api("catalog"), applyCatalog);
+const productsView = mountProducts({ api, onChanged: loadCatalog });
 const dxfImport = mountDxfImport({
   getActive: () => (selectedProject ? active : null),
   hasUnsavedChanges,
@@ -189,6 +199,7 @@ function fields() {
     ]),
   );
   furnitureFieldsBaseline.selection = $("furniture-select").value;
+  view.selectFurniture(item?.id ?? null);
   refreshRevision();
 }
 function refreshDraft() {
@@ -224,15 +235,18 @@ function refreshDraft() {
   if (draft) view.show(draft);
   else view.clear();
 }
-async function loadCatalog() {
+function loadCatalog() {
+  return refreshCatalog();
+}
+function applyCatalog(products) {
   const selected = $("catalog-select").value;
-  catalogItems = await api("catalog");
+  catalogItems = products;
   view.configureCatalog(catalogItems);
   $("catalog-select").replaceChildren();
   for (const product of catalogItems) {
     const option = document.createElement("option");
     option.value = product.id;
-    option.textContent = `${product.asset_id ? "在售" : "演示"} · ${product.name}`;
+    option.textContent = `${product.sellable || product.asset_id ? "在售" : "演示"} · ${product.name}${product.model_kind === "dimensions" ? "（尺寸模型）" : ""}`;
     $("catalog-select").append(option);
   }
   if (selected && catalogItems.some((product) => product.id === selected))
@@ -276,6 +290,23 @@ function showCustomer(customer) {
   $("scene-scope-label").textContent = "请先选择项目";
   clearScene();
 }
+function clearCustomerSelection() {
+  selectedCustomer = selectedProject = null;
+  $("selected-customer").textContent = "尚未选择客户";
+  $("selected-project").textContent = "请先选择客户";
+  for (const key of Object.keys(customerForm()))
+    $("customer-" + key).value = "";
+  $("customer-status").value = "new";
+  $("sales-project-name").value = "";
+  $("sales-project-address").value = "";
+  $("sales-project-status").value = "draft";
+  customerFormBaseline = JSON.stringify(customerForm());
+  projectFormBaseline = JSON.stringify(projectForm());
+  $("sales-project-items").replaceChildren();
+  $("sales-project-count").textContent = "请先选择客户";
+  $("scene-scope-label").textContent = "请先选择项目";
+  clearScene();
+}
 async function customers() {
   const page = await api("customers", { limit: 20, offset: customerOffset });
   $("customer-count").textContent = `共 ${page.total} 位客户`;
@@ -289,6 +320,36 @@ async function customers() {
         await projects();
         await library();
         message(`已选择客户：${item.name}。`);
+      }),
+    );
+  }
+}
+async function deletedCustomers() {
+  if ($("customer-trash").hidden) return;
+  const page = await api("deleted_customers", {
+    limit: 20,
+    offset: customerTrashOffset,
+  });
+  customerTrashTotal = page.total;
+  $("customer-trash-count").textContent = `共 ${page.total} 位已移出客户`;
+  $("customer-trash-prev").disabled = customerTrashOffset === 0;
+  $("customer-trash-next").disabled = customerTrashOffset + 20 >= page.total;
+  $("customer-trash-items").replaceChildren();
+  for (const item of page.items) {
+    $("customer-trash-items").append(
+      button(`恢复 ${item.name}`, async () => {
+        if (!discard()) return;
+        const restored = await api("customer_restore", {
+          id: item.id,
+          base_revision: item.revision,
+        });
+        customerOffset = projectOffset = customerTrashOffset = 0;
+        showCustomer(restored);
+        await customers();
+        await deletedCustomers();
+        await projects();
+        await library();
+        message(`客户 ${restored.name} 及关联资料已恢复。`);
       }),
     );
   }
@@ -409,6 +470,46 @@ $("customer-edit").onclick = () =>
     $("selected-customer").textContent = customer.name;
     await customers();
     message(`客户 ${customer.name} 已更新。`);
+  });
+$("customer-delete").onclick = () =>
+  run(async () => {
+    if (!selectedCustomer) throw Error("请先选择要移出的客户。");
+    if (!discard()) return;
+    const customer = selectedCustomer;
+    if (
+      !confirm(
+        `确定移出客户 ${customer.name} 吗？关联的项目、方案、报价和订单会从常规列表隐藏，可从“已移出客户”恢复。`,
+      )
+    )
+      return;
+    await api("customer_delete", {
+      id: customer.id,
+      base_revision: customer.revision,
+    });
+    customerOffset = projectOffset = 0;
+    clearCustomerSelection();
+    await customers();
+    await deletedCustomers();
+    await library();
+    message(`客户 ${customer.name} 已移出，可随时恢复。`);
+  });
+$("customer-trash-toggle").onclick = () =>
+  run(async () => {
+    $("customer-trash").hidden = !$("customer-trash").hidden;
+    customerTrashOffset = 0;
+    await deletedCustomers();
+  });
+$("customer-trash-prev").onclick = () =>
+  run(async () => {
+    if (customerTrashOffset === 0) return;
+    customerTrashOffset = Math.max(0, customerTrashOffset - 20);
+    await deletedCustomers();
+  });
+$("customer-trash-next").onclick = () =>
+  run(async () => {
+    if (customerTrashOffset + 20 >= customerTrashTotal) return;
+    customerTrashOffset += 20;
+    await deletedCustomers();
   });
 $("sales-project-create").onclick = () =>
   run(async () => {
@@ -594,6 +695,28 @@ $("apply-position").onclick = () =>
     refreshDraft();
     message("家具位置已更新，请保存新版本。");
   });
+$("remove-furniture").onclick = () =>
+  run(async () => {
+    if (!draft) throw Error("请先载入场景。");
+    if (pendingJson() || pendingFurniture())
+      throw Error("请先应用输入框中的修改，再删除家具。");
+    const id = $("furniture-select").value;
+    const item = draft.furniture_instances.find(
+      (furniture) => furniture.id === id,
+    );
+    if (!item) throw Error("请先选择要删除的家具。");
+    if (
+      !confirm(
+        `确定从当前草稿删除 ${item.metadata?.name ?? "当前家具"} 吗？请保存新版本，之前保存的版本仍保留。`,
+      )
+    )
+      return;
+    const candidate = removeFurniture(draft, id);
+    const validated = await api("validate", { scene: candidate });
+    draft = validated.scene;
+    refreshDraft();
+    message("当前家具已从草稿删除，请保存新版本；之前保存的版本仍保留。");
+  });
 $("furniture-select").onchange = () => {
   if (pendingFurniture() && !confirm("位置输入尚未应用，确定放弃吗？")) {
     $("furniture-select").value = furnitureFieldsBaseline.selection;
@@ -601,6 +724,39 @@ $("furniture-select").onchange = () => {
   }
   fields();
 };
+mountFurnitureGestures({
+  canvas: $("viewport").querySelector("canvas"),
+  renderer: view,
+  getScene: () => draft,
+  getSelectedId: () => $("furniture-select").value,
+  canEdit: () =>
+    Boolean(draft && !busy && !pendingJson() && !pendingFurniture()),
+  onSelect: (id) => {
+    if (pendingFurniture()) return;
+    $("furniture-select").value = id;
+    fields();
+  },
+  onCommit: (id, pose, start) =>
+    run(async () => {
+      try {
+        const candidate = editFurniture(draft, id, pose);
+        const validated = await api("validate", { scene: candidate });
+        draft = validated.scene;
+        $("furniture-select").value = id;
+        refreshDraft();
+        $("gesture-hint").textContent = "家具已调整，请保存新版本。";
+        message("家具已调整，请保存新版本。");
+      } catch (error) {
+        view.previewPose(id, start);
+        throw error;
+      }
+    }),
+  onHint: (text, error) => {
+    $("gesture-hint").textContent = text;
+    $("gesture-hint").classList.toggle("error", error);
+  },
+  wallGap: nearestWallGapMm,
+});
 $("apply-json").onclick = () =>
   run(async () => {
     if (pendingFurniture()) {

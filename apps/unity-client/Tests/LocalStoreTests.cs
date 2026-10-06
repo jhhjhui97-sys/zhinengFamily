@@ -105,6 +105,37 @@ public static class LocalStoreTests {
    SqliteTests.Error(()=>{using(var ignored=Store(path)) {}},LocalErrorCode.Corrupt);
    using(var sql=new SqliteConnection(path)) Check((long)sql.Query("SELECT n FROM preserved")[0]["n"]==17,"future DB changed");
   });
+  Test("customer removal hides linked work and restore preserves it",()=>{
+   string path=Path.Combine(rootDir,"customer-removal.sqlite");Guid customer,project,scene;
+   using(var store=Store(path)) {
+    var created=store.CreateCustomer("待清理客户","13800000000");customer=created.Id;
+    project=store.CreateProject(customer,"客厅项目").Id;
+    scene=store.CreateForProject(project,"客厅方案");
+    store.DeleteCustomer(customer,created.Revision);
+    Check(store.Customers().Total==0&&store.DeletedCustomers().Total==1,"removed customer still visible");
+    SqliteTests.Error(()=>store.Customer(customer),LocalErrorCode.NotFound);
+    SqliteTests.Error(()=>store.Projects(customer),LocalErrorCode.NotFound);
+    SqliteTests.Error(()=>store.ProjectScenes(project),LocalErrorCode.NotFound);
+    SqliteTests.Error(()=>store.DeleteCustomer(customer,created.Revision),LocalErrorCode.Conflict);
+   }
+   using(var store=Store(path)) {
+    var removed=store.DeletedCustomers().Items[0];
+    var restored=store.RestoreCustomer(customer,removed.Revision);
+    Check(restored.Id==customer&&store.Customers().Total==1,"restore lost customer");
+    Check(store.Projects(customer).Items[0].Id==project&&store.ProjectScenes(project).Items[0].Id==scene,"restore lost linked work");
+    SqliteTests.Error(()=>store.RestoreCustomer(customer,removed.Revision),LocalErrorCode.Conflict);
+   }
+  });
+  Test("removed customer phone may be reused but restore reports conflict",()=>{
+   using(var store=Store(Path.Combine(rootDir,"customer-phone-reuse.sqlite"))) {
+    var former=store.CreateCustomer("甲","13900000000");
+    store.DeleteCustomer(former.Id,former.Revision);
+    store.CreateCustomer("乙","13900000000");
+    var removed=store.DeletedCustomers().Items[0];
+    SqliteTests.Error(()=>store.RestoreCustomer(former.Id,removed.Revision),LocalErrorCode.Conflict);
+    Check(store.Customers().Total==1&&store.DeletedCustomers().Total==1,"conflict changed customer state");
+   }
+  });
   Test("independent-connection first save race has exactly one winner",()=>Race("first",0,false,false));
   Test("independent-connection update race has exactly one winner",()=>Race("update",1,false,false));
   Test("independent-connection restore/update race has exactly one winner",()=>Race("mixed",2,true,false));

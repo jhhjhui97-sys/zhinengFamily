@@ -353,6 +353,21 @@ canvas {
   border-radius: 6px;
   font-size: 11px;
 }
+#gesture-hint {
+  position: absolute;
+  bottom: 47px;
+  left: 16px;
+  max-width: calc(100% - 32px);
+  background: #ffffffeb;
+  color: #315e4b;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  pointer-events: none;
+}
+#gesture-hint.error {
+  color: #ac4032;
+}
 .scene-footer {
   display: flex;
   justify-content: space-between;

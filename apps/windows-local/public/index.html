@@ -39,6 +39,15 @@
           ><button id="customer-next">下一页</button>
         </div>
         <div id="customer-count" class="muted">共 0 位客户</div>
+        <button id="customer-trash-toggle">已移出客户</button>
+        <div id="customer-trash" hidden>
+          <div id="customer-trash-items" class="library-items"></div>
+          <div class="pager">
+            <button id="customer-trash-prev">上一页</button
+            ><button id="customer-trash-next">下一页</button>
+          </div>
+          <div id="customer-trash-count" class="muted">共 0 位已移出客户</div>
+        </div>
         <details id="customer-form-panel" open>
           <summary>新建 / 编辑客户</summary>
           <label for="customer-name">姓名 *</label
@@ -68,7 +77,8 @@
           ><textarea id="customer-notes"></textarea>
           <div class="form-actions">
             <button id="customer-create">保存客户</button
-            ><button id="customer-edit">更新客户</button>
+            ><button id="customer-edit">更新客户</button
+            ><button id="customer-delete">移出客户</button>
           </div>
         </details>
         <hr />
@@ -184,10 +194,15 @@
             ><button id="capture">导出效果图</button>
           </div>
           <div class="render-note" id="render-status">家具模型尚未加载</div>
+          <div id="gesture-hint" role="status" aria-live="polite">
+            点击选中家具；按住中键移动，按住右键旋转。拖动时显示与墙面的距离。
+          </div>
         </div>
         <div class="scene-footer">
           <span id="scene-stats">毫米为单位 · 真实比例</span
-          ><span>拖动旋转视角 · 滚轮缩放 · 右键平移</span>
+          ><span
+            >左键空白处旋转视角 · 滚轮缩放 · 中键移动家具 · 右键旋转家具</span
+          >
         </div>
         <details id="advanced">
           <summary>高级场景 JSON</summary>
@@ -198,14 +213,13 @@
       </section>
       <aside class="inspector">
         <div class="section-title">家具目录</div>
-        <label for="catalog-select">选择本机模型</label>
+        <label for="catalog-select">选择商品或演示家具</label>
         <select id="catalog-select"></select>
         <label for="room-select">放入房间</label>
         <select id="room-select"></select>
         <button id="add-furniture">放入场景</button>
         <p class="muted">
-          “演示”是内置示例，不代表门店库存；“在售”是已导入 GLB
-          的真实商品。添加后可调整位置并保存版本。
+          “演示”是内置示例；“在售”是本机商品。未导入模型的商品以真实尺寸盒显示，标注为“尺寸模型”。添加后可调整位置并保存版本。
         </p>
         <hr />
         <div class="section-title">家具调整</div>
@@ -228,8 +242,10 @@
         >
           更新家具位置
         </button>
+        <button id="remove-furniture">删除当前家具</button>
         <p class="muted">
-          位置调整后请保存新版本。所有模型来自本机资源；在售商品尺寸按录入的毫米值显示。
+          可在左侧 3D
+          场景直接选中家具，中键拖动位置、右键拖动旋转；也可输入毫米坐标。调整后请保存新版本。
         </p>
         <hr />
         <div class="section-title">版本历史</div>
@@ -429,6 +445,7 @@
           <div class="product-actions">
             <button id="product-create" class="primary">新建在售商品</button
             ><button id="product-update">更新在售商品</button
+            ><button id="product-delete">删除当前商品</button
             ><button id="product-reset">清空表单</button>
           </div>
           <div class="product-model-import">
@@ -441,6 +458,25 @@
               />
             </label>
             <button id="product-model-upload">导入当前商品 3D 模型</button>
+            <button id="product-model-create">导入模型并新建商品</button>
+            <p>
+              填写上方商品资料并选择
+              GLB，可导入模型并新建商品；导入当前商品模型会替换当前商品的模型。
+            </p>
+          </div>
+          <div class="product-model-import">
+            <label
+              >商品正面图片（PNG/JPEG，最大 5 MiB）
+              <input
+                id="product-photo-file"
+                type="file"
+                accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+              />
+            </label>
+            <button id="product-photo-generate">生成近似 3D 模型</button>
+            <p>
+              按商品宽、深、高生成本机尺寸近似模型，图片显示在正面；无法还原真实背面和材质。
+            </p>
           </div>
         </div>
       </div>

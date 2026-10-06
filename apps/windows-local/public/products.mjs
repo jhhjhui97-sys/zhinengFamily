@@ -1,4 +1,5 @@
 import { formatMoney } from "./money.mjs";
+import { makePhotoGlb, photoDimensions } from "./photo-model.mjs";
 
 const $ = (id) => document.getElementById(id);
 const fields = [
@@ -68,7 +69,7 @@ function validate(values) {
     metadata,
   };
 }
-export function mountProducts({ api }) {
+export function mountProducts({ api, onChanged = async () => {} }) {
   let selected = null,
     baseline = JSON.stringify(empty()),
     offset = 0,
@@ -81,12 +82,15 @@ export function mountProducts({ api }) {
   };
   const formChanged = () => JSON.stringify(form()) !== baseline;
   const dirty = () =>
-    formChanged() || Boolean($("product-model-file").files?.length);
+    formChanged() ||
+    Boolean($("product-model-file").files?.length) ||
+    Boolean($("product-photo-file").files?.length);
   const canLeave = () =>
     !dirty() || confirm("商品资料有未保存的修改，确定放弃吗？");
   const reset = () => {
     selected = null;
     $("product-model-file").value = "";
+    $("product-photo-file").value = "";
     put(empty());
     baseline = JSON.stringify(form());
     $("product-detail").textContent =
@@ -94,7 +98,10 @@ export function mountProducts({ api }) {
     note("");
   };
   function detail(product) {
-    if (selected?.id !== product.id) $("product-model-file").value = "";
+    if (selected?.id !== product.id) {
+      $("product-model-file").value = "";
+      $("product-photo-file").value = "";
+    }
     selected = product;
     put({
       ...product,
@@ -119,6 +126,8 @@ export function mountProducts({ api }) {
     } catch {
       throw Error("商品查询失败，仍显示上次结果；请重试。");
     }
+    if (nextOffset > 0 && nextOffset >= page.total)
+      return list(Math.max(0, Math.floor((page.total - 1) / 20) * 20));
     offset = nextOffset;
     total = page.total;
     const tbody = $("products-items");
@@ -136,19 +145,23 @@ export function mountProducts({ api }) {
         cell.textContent = value;
         row.append(cell);
       }
-      const cell = document.createElement("td"),
-        button = document.createElement("button");
-      button.textContent = `查看 ${product.name}`;
-      button.disabled = busy;
-      button.onclick = async () => {
-        await settled;
-        return operate(async () => {
-          if (!canLeave()) return;
-          detail(await api("product", { id: product.id }));
-          note("");
-        });
-      };
-      cell.append(button);
+      const cell = document.createElement("td");
+      for (const action of ["查看", "编辑", "删除"]) {
+        const button = document.createElement("button");
+        button.textContent = `${action} ${product.name}`;
+        button.disabled = busy;
+        button.onclick = async () => {
+          await settled;
+          return operate(async () => {
+            if (action === "删除") return deleteProduct(product);
+            if (!canLeave()) return;
+            detail(await api("product", { id: product.id }));
+            if (action === "编辑") $("product-name").focus();
+            note("");
+          });
+        };
+        cell.append(button);
+      }
       row.append(cell);
       tbody.append(row);
     }
@@ -174,8 +187,11 @@ export function mountProducts({ api }) {
     for (const id of [
       "product-create",
       "product-update",
+      "product-delete",
       "product-reset",
       "product-model-upload",
+      "product-model-create",
+      "product-photo-generate",
       "products-search-button",
       "products-prev",
       "products-next",
@@ -196,8 +212,11 @@ export function mountProducts({ api }) {
       for (const id of [
         "product-create",
         "product-update",
+        "product-delete",
         "product-reset",
         "product-model-upload",
+        "product-model-create",
+        "product-photo-generate",
         "products-search-button",
       ])
         $(id).disabled = false;
@@ -227,17 +246,53 @@ export function mountProducts({ api }) {
   $("product-reset").onclick = () => {
     if (canLeave()) reset();
   };
+  async function refreshAfterMutation(success, listFailure) {
+    const warnings = [];
+    try {
+      await list();
+    } catch {
+      warnings.push(listFailure);
+    }
+    try {
+      await onChanged();
+    } catch {
+      warnings.push("工作台目录刷新失败，请切回设计工作台重试。");
+    }
+    note(
+      warnings.length ? `${success}${warnings.join(" ")}` : success,
+      warnings.length > 0,
+    );
+  }
+  async function deleteProduct(product) {
+    if (
+      !confirm(
+        `确定删除商品 ${product.name}（${product.sku}）吗？商品将移出在售列表；已保存的场景、报价和模型保留。${selected?.id === product.id && dirty() ? "当前商品未保存的修改将放弃。" : ""}`,
+      )
+    )
+      return;
+    await api("product_delete", {
+      id: product.id,
+      base_revision: product.revision,
+    });
+    if (selected?.id === product.id) reset();
+    await refreshAfterMutation(
+      "商品已删除，历史资料仍保留。",
+      "商品已删除，但列表刷新失败，请重试搜索。",
+    );
+  }
+  $("product-delete").onclick = () =>
+    operate(async () => {
+      if (!selected) throw Error("请先选择要删除的商品。");
+      await deleteProduct(selected);
+    });
   $("product-create").onclick = () =>
     operate(async () => {
       const product = await api("product_create", validate(form()));
-      try {
-        await list();
-        detail(product);
-        note("商品已保存在本机。");
-      } catch {
-        detail(product);
-        note("商品已保存，但列表刷新失败，请重试搜索。", true);
-      }
+      detail(product);
+      await refreshAfterMutation(
+        "商品已保存在本机。",
+        "商品已保存，但列表刷新失败，请重试搜索。",
+      );
     });
   $("product-update").onclick = () =>
     operate(async () => {
@@ -247,54 +302,123 @@ export function mountProducts({ api }) {
         base_revision: selected.revision,
         ...validate(form()),
       });
+      detail(product);
+      await refreshAfterMutation(
+        "商品资料已更新。",
+        "商品已更新，但列表刷新失败，请重试搜索。",
+      );
+    });
+  async function attachModel(payload) {
+    let response;
+    try {
+      response = await fetch(`/api/product-models/${selected.id}`, {
+        method: "POST",
+        headers: {
+          "content-type": "model/gltf-binary",
+          "x-base-revision": String(selected.revision),
+        },
+        body: payload,
+      });
+    } catch {
+      throw Error("本地模型服务暂时不可用，请重试。");
+    }
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (response.status === 409)
+        throw Error("商品信息已变化，请重新打开商品后重试；所选文件已保留。");
+      throw Error(body?.error ?? "模型导入失败，请检查文件后重试。");
+    }
+    return body.data;
+  }
+  function modelFile() {
+    const file = $("product-model-file").files?.[0];
+    if (!file) throw Error("请先选择 GLB 模型文件。");
+    if (file.size > 30 * 1024 * 1024) throw Error("模型文件不能超过 30 MiB。");
+    return file;
+  }
+  $("product-model-create").onclick = () =>
+    operate(async () => {
+      const values = validate(form());
+      const file = modelFile();
+      let response;
       try {
-        await list();
-        detail(product);
-        note("商品资料已更新。");
+        response = await fetch("/api/model-files", {
+          method: "POST",
+          headers: { "content-type": "model/gltf-binary" },
+          body: file,
+        });
       } catch {
-        detail(product);
-        note("商品已更新，但列表刷新失败，请重试搜索。", true);
+        throw Error("本地模型服务暂时不可用，请重试；所选文件已保留。");
       }
+      const body = await response.json().catch(() => null);
+      if (!response.ok)
+        throw Error(body?.error ?? "模型导入失败，请检查文件后重试。");
+      const staged = body?.data;
+      if (
+        !staged ||
+        !/^[0-9a-f]{64}$/i.test(staged.sha256) ||
+        !Number.isSafeInteger(staged.byte_count) ||
+        staged.byte_count !== file.size
+      )
+        throw Error("模型服务返回的文件资料不完整，请重试；所选文件已保留。");
+      const product = await api("product_create_model", {
+        ...values,
+        sha256: staged.sha256,
+        byte_count: staged.byte_count,
+      });
+      detail(product);
+      $("product-model-file").value = "";
+      await refreshAfterMutation(
+        "模型已导入，并新建在售商品。",
+        "商品和模型已保存，但列表刷新失败，请重试搜索。",
+      );
     });
   $("product-model-upload").onclick = () =>
     operate(async () => {
       if (!selected) throw Error("请先选择已保存的商品。 ");
       if (formChanged())
         throw Error("商品资料有未保存的修改，请先更新商品，再导入模型。 ");
-      const file = $("product-model-file").files?.[0];
-      if (!file) throw Error("请先选择 GLB 模型文件。 ");
-      if (file.size > 30 * 1024 * 1024)
-        throw Error("模型文件不能超过 30 MiB。 ");
-      let response;
-      try {
-        response = await fetch(`/api/product-models/${selected.id}`, {
-          method: "POST",
-          headers: {
-            "content-type": "model/gltf-binary",
-            "x-base-revision": String(selected.revision),
-          },
-          body: file,
-        });
-      } catch {
-        throw Error("本地模型服务暂时不可用，请重试。 ");
-      }
-      const body = await response.json().catch(() => null);
-      if (!response.ok) {
-        if (response.status === 409)
-          throw Error(
-            "商品信息已变化，请重新打开商品后重试；所选文件已保留。 ",
-          );
-        throw Error(body?.error ?? "模型导入失败，请检查 GLB 文件后重试。 ");
-      }
+      const product = await attachModel(modelFile());
+      detail(product);
       $("product-model-file").value = "";
-      detail(body.data);
-      note("模型已导入本机，并关联当前商品。 ");
+      await refreshAfterMutation(
+        "模型已导入本机，并关联当前商品。",
+        "模型已保存，但列表刷新失败，请重试搜索。",
+      );
+    });
+  $("product-photo-generate").onclick = () =>
+    operate(async () => {
+      if (!selected) throw Error("请先保存商品及真实尺寸。");
+      if (formChanged()) throw Error("请先更新商品尺寸，再生成模型。");
+      const file = $("product-photo-file").files?.[0];
+      if (!file) throw Error("请先选择商品正面图片。");
+      if (file.size > 5 * 1024 * 1024) throw Error("图片不能超过 5 MiB。");
+      const imageBytes = new Uint8Array(await file.arrayBuffer());
+      photoDimensions(imageBytes);
+      let decoded;
       try {
-        await list();
+        decoded = await createImageBitmap(file);
       } catch {
-        note("模型已导入，但列表刷新失败。 ", true);
+        throw Error("图片无法解码，请选择完整的 PNG 或 JPEG 文件。");
+      } finally {
+        decoded?.close();
       }
+      const bytes = makePhotoGlb({
+        width_mm: selected.width_mm,
+        depth_mm: selected.depth_mm,
+        height_mm: selected.height_mm,
+        category: selected.category,
+        imageBytes,
+      });
+      const product = await attachModel(bytes);
+      detail(product);
+      $("product-photo-file").value = "";
+      await refreshAfterMutation(
+        "尺寸近似模型已保存在本机，可用于商品摆放。",
+        "模型已保存，但列表刷新失败，请重试搜索。",
+      );
     });
   $("product-model-file").onchange = () => note("");
+  $("product-photo-file").onchange = () => note("");
   return { open: () => operate(list), dirty, canLeave };
 }

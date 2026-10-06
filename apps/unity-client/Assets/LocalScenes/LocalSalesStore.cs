@@ -17,6 +17,7 @@ namespace LocalScenes {
   public long Revision { get; internal set; }
   public string CreatedAt { get; internal set; }
   public string UpdatedAt { get; internal set; }
+  public string DeletedAt { get; internal set; }
  }
  public sealed class LocalCustomerPage {
   public long Total { get; internal set; }
@@ -67,7 +68,7 @@ namespace LocalScenes {
     Id=Guid.Parse((string)row["id"]),Name=(string)row["name"],Phone=(string)row["phone"],
     Wechat=(string)row["wechat"],Source=(string)row["source"],Address=(string)row["address"],
     Budget=(string)row["budget"],Status=(string)row["status"],Notes=(string)row["notes"],
-    Revision=(long)row["revision"],CreatedAt=(string)row["created_at"],UpdatedAt=(string)row["updated_at"]
+    Revision=(long)row["revision"],CreatedAt=(string)row["created_at"],UpdatedAt=(string)row["updated_at"],DeletedAt=(string)row["deleted_at"]
    };
   }
   static LocalProject ProjectRow(Dictionary<string,object> row) {
@@ -88,7 +89,7 @@ namespace LocalScenes {
    return Customer(id);
   }
   public LocalCustomer Customer(Guid id) {
-   var rows=db.Query("SELECT * FROM local_customers WHERE workspace_id=? AND id=?",Key(workspace),Key(id));
+   var rows=db.Query("SELECT * FROM local_customers WHERE workspace_id=? AND id=? AND deleted_at IS NULL",Key(workspace),Key(id));
    if(rows.Count!=1) throw new LocalStoreError(LocalErrorCode.NotFound);
    return CustomerRow(rows[0]);
   }
@@ -96,9 +97,9 @@ namespace LocalScenes {
    Input(limit>=1&&limit<=100&&offset>=0);
    LocalCustomerPage page=null;
    db.Transaction(()=>{
-    long total=(long)db.Query("SELECT COUNT(*) n FROM local_customers WHERE workspace_id=?",Key(workspace))[0]["n"];
+    long total=(long)db.Query("SELECT COUNT(*) n FROM local_customers WHERE workspace_id=? AND deleted_at IS NULL",Key(workspace))[0]["n"];
     var items=new List<LocalCustomer>();
-    foreach(var row in db.Query("SELECT * FROM local_customers WHERE workspace_id=? ORDER BY updated_at DESC,id ASC LIMIT ? OFFSET ?",Key(workspace),limit,offset))
+    foreach(var row in db.Query("SELECT * FROM local_customers WHERE workspace_id=? AND deleted_at IS NULL ORDER BY updated_at DESC,id ASC LIMIT ? OFFSET ?",Key(workspace),limit,offset))
      items.Add(CustomerRow(row));
     page=new LocalCustomerPage {Total=total,Items=items};
    });
@@ -114,6 +115,34 @@ namespace LocalScenes {
    if(changed!=1) throw new LocalStoreError(LocalErrorCode.Conflict);
    return Customer(id);
   }
+  public LocalCustomerPage DeletedCustomers(int limit=20,int offset=0) {
+   Input(limit>=1&&limit<=100&&offset>=0);
+   LocalCustomerPage page=null;
+   db.Transaction(()=>{
+    long total=(long)db.Query("SELECT COUNT(*) n FROM local_customers WHERE workspace_id=? AND deleted_at IS NOT NULL",Key(workspace))[0]["n"];
+    var items=new List<LocalCustomer>();
+    foreach(var row in db.Query("SELECT * FROM local_customers WHERE workspace_id=? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC,id ASC LIMIT ? OFFSET ?",Key(workspace),limit,offset)) items.Add(CustomerRow(row));
+    page=new LocalCustomerPage {Total=total,Items=items};
+   });
+   return page;
+  }
+  public void DeleteCustomer(Guid id,long baseRevision) {
+   Input(id!=Guid.Empty&&baseRevision>=1);
+   var rows=db.Query("SELECT revision,deleted_at FROM local_customers WHERE workspace_id=? AND id=?",Key(workspace),Key(id));
+   if(rows.Count!=1) throw new LocalStoreError(LocalErrorCode.NotFound);
+   if(rows[0]["deleted_at"]!=null||!Equals(rows[0]["revision"],baseRevision)) throw new LocalStoreError(LocalErrorCode.Conflict);
+   int changed=db.Execute("UPDATE local_customers SET deleted_at=?,revision=revision+1,updated_at=? WHERE workspace_id=? AND id=? AND revision=? AND deleted_at IS NULL",Now(),Now(),Key(workspace),Key(id),baseRevision);
+   if(changed!=1) throw new LocalStoreError(LocalErrorCode.Conflict);
+  }
+  public LocalCustomer RestoreCustomer(Guid id,long baseRevision) {
+   Input(id!=Guid.Empty&&baseRevision>=1);
+   var rows=db.Query("SELECT revision,deleted_at FROM local_customers WHERE workspace_id=? AND id=?",Key(workspace),Key(id));
+   if(rows.Count!=1) throw new LocalStoreError(LocalErrorCode.NotFound);
+   if(rows[0]["deleted_at"]==null||!Equals(rows[0]["revision"],baseRevision)) throw new LocalStoreError(LocalErrorCode.Conflict);
+   int changed=db.Execute("UPDATE local_customers SET deleted_at=NULL,revision=revision+1,updated_at=? WHERE workspace_id=? AND id=? AND revision=? AND deleted_at IS NOT NULL",Now(),Key(workspace),Key(id),baseRevision);
+   if(changed!=1) throw new LocalStoreError(LocalErrorCode.Conflict);
+   return Customer(id);
+  }
   public LocalProject CreateProject(Guid customerId,string name,string address=null,string status="draft") {
    Customer(customerId);name=Name(name);address=Optional(address,500);status=ProjectStatus(status);
    Guid id=Guid.NewGuid(); string stamp=Now();
@@ -124,7 +153,7 @@ namespace LocalScenes {
   public LocalProject Project(Guid id) {
    var rows=db.Query("SELECT * FROM local_projects WHERE workspace_id=? AND id=?",Key(workspace),Key(id));
    if(rows.Count!=1) throw new LocalStoreError(LocalErrorCode.NotFound);
-   return ProjectRow(rows[0]);
+   var project=ProjectRow(rows[0]);Customer(project.CustomerId);return project;
   }
   public LocalProjectPage Projects(Guid customerId,int limit=20,int offset=0) {
    Input(limit>=1&&limit<=100&&offset>=0);Customer(customerId);

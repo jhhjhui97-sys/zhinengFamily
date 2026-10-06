@@ -37,48 +37,73 @@ function finite(value) {
   return true;
 }
 function bridge(config, body) {
+  const started = Date.now();
+  const reportFailure = (details) => {
+    try {
+      config.onBridgeFailure?.({
+        ...details,
+        elapsed_ms: Date.now() - started,
+      });
+    } catch {}
+  };
   return new Promise((resolveReply) => {
-    const child = execFile(
-      config.bridgePath,
-      [
-        join(config.dataDirectory, "scenes.sqlite"),
-        join(config.protocolDirectory, "scene.schema.json"),
-        join(config.protocolDirectory, "two-bedroom.json"),
-        join(config.publicDirectory, "catalog.json"),
-      ],
-      {
-        encoding: "utf8",
-        windowsHide: true,
-        timeout: 15000,
-        maxBuffer: 32 * 1024 * 1024,
-      },
-      (error, stdout) => {
-        if (error) {
-          resolveReply({
-            status: 503,
-            error: "本地资料服务暂时无法使用，请检查安装后重试。",
-          });
-          return;
-        }
-        try {
-          const result = JSON.parse(stdout.replace(/^\uFEFF/, ""));
-          if (
-            !Number.isInteger(result.status) ||
-            result.status < 200 ||
-            result.status > 599
-          )
-            throw Error();
-          resolveReply(result);
-        } catch {
-          resolveReply({
-            status: 503,
-            error: "本地资料服务暂时无法使用，请重试。",
-          });
-        }
-      },
-    );
-    child.stdin.on("error", () => {});
-    child.stdin.end(body);
+    const processFailed = (error) => {
+      reportFailure({
+        reason: "process",
+        code: error.code ?? null,
+        signal: error.signal ?? null,
+        killed: Boolean(error.killed),
+      });
+      resolveReply({
+        status: 503,
+        error: "本地资料服务暂时无法使用，请检查安装后重试。",
+      });
+    };
+    try {
+      const child = execFile(
+        config.bridgePath,
+        [
+          join(config.dataDirectory, "scenes.sqlite"),
+          join(config.protocolDirectory, "scene.schema.json"),
+          join(config.protocolDirectory, "two-bedroom.json"),
+          join(config.publicDirectory, "catalog.json"),
+        ],
+        {
+          encoding: "utf8",
+          windowsHide: true,
+          timeout: 15000,
+          maxBuffer: 32 * 1024 * 1024,
+        },
+        (error, stdout) => {
+          if (error) {
+            processFailed(error);
+            return;
+          }
+          try {
+            const result = JSON.parse(stdout.replace(/^\uFEFF/, ""));
+            if (
+              !Number.isInteger(result.status) ||
+              result.status < 200 ||
+              result.status > 599
+            )
+              throw Error();
+            if (result.status >= 500)
+              reportFailure({ reason: "service", status: result.status });
+            resolveReply(result);
+          } catch {
+            reportFailure({ reason: "response" });
+            resolveReply({
+              status: 503,
+              error: "本地资料服务暂时无法使用，请重试。",
+            });
+          }
+        },
+      );
+      child.stdin.on("error", () => {});
+      child.stdin.end(body);
+    } catch (error) {
+      processFailed(error);
+    }
   });
 }
 export function createLocalServer(options) {
@@ -119,6 +144,7 @@ export function createLocalServer(options) {
       return;
     }
     const upload = pathname.match(uploadPattern);
+    const stageModel = pathname === "/api/model-files";
     if (pathname === "/api/dxf/analyze" || pathname === "/api/dxf/archive") {
       if (req.method !== "POST")
         return reply(405, { error: "请求方式不支持。" });
@@ -169,7 +195,7 @@ export function createLocalServer(options) {
         req.setTimeout(0);
       }
     }
-    if (upload) {
+    if (upload || stageModel) {
       if (req.method !== "POST")
         return reply(405, { error: "请求方式不支持。" });
       if (!authorized(true))
@@ -179,7 +205,7 @@ export function createLocalServer(options) {
       )
         return reply(415, { error: "请选择 GLB 格式的家具模型。" });
       const revision = req.headers["x-base-revision"];
-      if (!/^[1-9]\d{0,14}$/.test(revision ?? ""))
+      if (!stageModel && !/^[1-9]\d{0,14}$/.test(revision ?? ""))
         return reply(422, { error: "商品版本无效，请重新打开商品。" });
       if (Number(req.headers["content-length"] ?? 0) > MODEL_LIMIT)
         return reply(413, { error: "GLB 模型不能超过 30 MiB。" });
@@ -225,6 +251,11 @@ export function createLocalServer(options) {
         validateGlb(await readFile(temporary));
         const sha256 = digest.digest("hex");
         await rename(temporary, join(directory, `${sha256}.glb`));
+        if (stageModel)
+          return reply(200, {
+            status: 200,
+            data: { sha256, byte_count: size },
+          });
         const result = await bridge(
           config,
           JSON.stringify({

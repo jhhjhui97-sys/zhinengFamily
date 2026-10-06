@@ -23,7 +23,7 @@ public static class LocalModelAssetTests {
   Test("fresh current database does not create a recovery backup",()=>{
    string path=Path.Combine(directory,"model-fresh.sqlite");Guid ws=Guid.NewGuid();
    using(var store=new LocalSceneStore(path,ws,Guid.NewGuid(),validator)) Check(store.LocalProducts().Total==0,"fresh catalog not empty");
-   using(var db=new SqliteConnection(path)) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==6,"fresh model format wrong");
+   using(var db=new SqliteConnection(path)) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==8,"fresh model format wrong");
    Check(Directory.GetFiles(directory,"model-fresh.sqlite.pre-v*.bak").Length==0,"fresh DB made recovery backup");
   });
   Test("v3 model migration preserves products and creates restorable pre-v4 backup",()=>{
@@ -93,6 +93,7 @@ public static class LocalModelAssetTests {
     File.WriteAllBytes(Path.Combine(directory,"models",hash+".glb"),new byte[]{1,2,3});
     Reject(()=>store.VerifiedModelPath(asset.Id),LocalErrorCode.NotFound);
     Check(store.LocalModelProducts().Count==0,"damaged active model remained available for placement");
+    Check(store.LocalCatalogProducts().Count==1&&store.LocalCatalogProducts()[0].Id==product,"damaged model incorrectly hid the product dimension fallback");
    }
   });
   Test("independent transactions race to attach at one product revision",()=>{
@@ -109,6 +110,66 @@ public static class LocalModelAssetTests {
     int loser=winners[0]==Guid.Empty?0:1;Check(errors[loser] is LocalStoreError&&((LocalStoreError)errors[loser]).Code==LocalErrorCode.Conflict,"attach race loser not conflict");
     Check(left.LocalProduct(product).Revision==2&&left.LocalProduct(product).ActiveAssetId==winners[1-loser],"attach race pointer wrong");
     using(var db=new SqliteConnection(path)) Check((long)db.Query("SELECT COUNT(*) n FROM local_model_assets")[0]["n"]==1,"attach race left extra asset");
+   }
+  });
+  Test("model product creation commits the product and its active asset together",()=>{
+   string path=Path.Combine(directory,"model-create.sqlite");Guid ws=Guid.NewGuid(),actor=Guid.NewGuid(),id;
+   string hash=AddFile(path,sofa);long bytes=new FileInfo(Path.Combine(directory,"models",hash+".glb")).Length;
+   using(var store=new LocalSceneStore(path,ws,actor,validator)) {
+    var product=store.CreateLocalProductWithModel("sofa","品牌","导入沙发","IMPORT-S1","6800.50",2400,950,850,"{\"color\":\"灰\"}",hash,bytes);id=product.Id;
+    Check(product.Revision==2&&product.ActiveAssetId.HasValue&&product.MetadataJson.Contains("灰"),"created product was only partly attached");
+    var asset=store.ModelAsset(product.ActiveAssetId.Value);Check(asset.ProductId==product.Id&&asset.Sha256==hash&&asset.ByteCount==bytes,"new product asset differs from uploaded bytes");
+    Check(store.LocalModelProducts().Count==1&&store.LocalCatalogProducts().Count==1,"imported product not available immediately");
+    store.VerifiedModelPath(asset.Id);
+   }
+   using(var store=new LocalSceneStore(path,ws,actor,validator)) Check(store.LocalProduct(id).ActiveAssetId.HasValue,"imported product missing after restart");
+  });
+  Test("invalid model inputs and duplicate SKU leave no partially created product",()=>{
+   string path=Path.Combine(directory,"model-create-invalid.sqlite");string hash=AddFile(path,sofa);
+   long bytes=new FileInfo(Path.Combine(directory,"models",hash+".glb")).Length;
+   using(var store=new LocalSceneStore(path,Guid.NewGuid(),Guid.NewGuid(),validator)) {
+    Reject(()=>store.CreateLocalProductWithModel("sofa","品牌","导入沙发","IMPORT-S1","100.00",2400,950,850,"{}",new string('0',64),bytes),LocalErrorCode.InvalidInput);
+    Reject(()=>store.CreateLocalProductWithModel("sofa","品牌","导入沙发","IMPORT-S1","100.00",2400,950,850,"{}",hash,bytes+1),LocalErrorCode.InvalidInput);
+    Reject(()=>store.CreateLocalProductWithModel("sofa","品牌","导入沙发","IMPORT-S1","100.00",2400,950,850,"[]",hash,bytes),LocalErrorCode.InvalidInput);
+    Check(store.LocalProducts().Total==0,"invalid import left a product");
+    var existing=store.CreateLocalProduct("sofa","品牌","已有沙发","IMPORT-S1","100.00",2400,950,850);
+    Reject(()=>store.CreateLocalProductWithModel("sofa","品牌","重复商品","IMPORT-S1","200.00",2400,950,850,"{}",hash,bytes),LocalErrorCode.Conflict);
+    Check(store.LocalProducts().Total==1&&store.LocalProduct(existing.Id).Revision==1&&store.LocalProduct(existing.Id).ActiveAssetId==null,"duplicate import changed existing product");
+    using(var db=new SqliteConnection(path))Check((long)db.Query("SELECT COUNT(*) n FROM local_model_assets")[0]["n"]==0,"invalid import left an asset");
+   }
+  });
+  Test("SQL attachment failure rolls back model product creation and permits retry",()=>{
+   string path=Path.Combine(directory,"model-create-failed.sqlite");string hash=AddFile(path,sofa);
+   long bytes=new FileInfo(Path.Combine(directory,"models",hash+".glb")).Length;
+   using(var store=new LocalSceneStore(path,Guid.NewGuid(),Guid.NewGuid(),validator)) {
+    using(var db=new SqliteConnection(path))db.Execute("CREATE TRIGGER fail_create_model BEFORE INSERT ON local_product_active_model BEGIN SELECT RAISE(ABORT,'test fault'); END");
+    Reject(()=>store.CreateLocalProductWithModel("sofa","品牌","导入沙发","IMPORT-S1","100.00",2400,950,850,"{}",hash,bytes),LocalErrorCode.Conflict);
+    Check(store.LocalProducts().Total==0&&store.LocalCatalogProducts().Count==0,"failed import left a product in active lists");
+    using(var db=new SqliteConnection(path)) {
+     Check((long)db.Query("SELECT COUNT(*) n FROM local_products")[0]["n"]==0,"failed import left an invisible product");
+     Check((long)db.Query("SELECT COUNT(*) n FROM local_model_assets")[0]["n"]==0,"failed import left an asset");
+     Check((long)db.Query("SELECT COUNT(*) n FROM local_product_active_model")[0]["n"]==0,"failed import left an active pointer");
+     db.Execute("DROP TRIGGER fail_create_model");
+    }
+    Check(store.CreateLocalProductWithModel("sofa","品牌","导入沙发","IMPORT-S1","100.00",2400,950,850,"{}",hash,bytes).ActiveAssetId.HasValue,"rolled back SKU blocked retry");
+   }
+  });
+  Test("deleting a model product retains immutable assets saved scenes quotations and orders",()=>{
+   string path=Path.Combine(directory,"model-delete-history.sqlite");Guid ws=Guid.NewGuid();string hash=AddFile(path,sofa);
+   long bytes=new FileInfo(Path.Combine(directory,"models",hash+".glb")).Length;
+   using(var store=new LocalSceneStore(path,ws,Guid.NewGuid(),validator)) {
+    var product=store.CreateLocalProductWithModel("sofa","品牌","历史沙发","DELETE-S1","6800.50",2400,950,850,"{}",hash,bytes);
+    var customer=store.CreateCustomer("历史客户");var project=store.CreateProject(customer.Id,"历史项目");Guid scene=store.CreateForProject(project.Id,"历史方案");
+    var draft=JObject.Parse(File.ReadAllText(sample));var item=(JObject)draft["furniture_instances"][0];
+    item["product_id"]=product.Id.ToString("D");item["asset_id"]=product.ActiveAssetId.Value.ToString("D");draft["furniture_instances"]=new JArray(item);
+    string saved=store.Put(scene,0,draft.ToString()).SceneJson;
+    var quote=store.CreateQuotation(customer.Id,project.Id,scene,1);var order=store.CreateOrder(customer.Id,project.Id,quote.Id);
+    store.DeleteLocalProduct(product.Id,product.Revision);
+    Check(store.LocalModelProducts().Count==0&&store.LocalCatalogProducts().Count==0,"deleted model still available for placement");
+    Reject(()=>store.AttachLocalModel(product.Id,3,hash,bytes),LocalErrorCode.NotFound);
+    Check(store.ModelAsset(product.ActiveAssetId.Value).ProductId==product.Id&&File.Exists(store.VerifiedModelPath(product.ActiveAssetId.Value)),"delete removed immutable asset or bytes");
+    Check(store.ExportVersion(scene,1)==saved&&store.Restore(scene,1,1).SceneJson==saved,"delete changed or prevented restoring saved scene");
+    Check(store.Quotation(quote.Id).Total=="6800.50"&&store.Order(order.Id).Total=="6800.50","delete changed quotation or order snapshot");
    }
   });
   Console.WriteLine("Local model assets: "+passed+" passed");
