@@ -68,6 +68,26 @@ public static class LocalQuotationTests {
     Check(store.Quotations(project).Total==0,"failed quote left a partial row");
    }
   });
+  Test("dimension products can be saved quoted and restored while demo items stay excluded",()=>{
+   string path=Path.Combine(directory,"quotation-dimensions.sqlite");Guid ws=Guid.NewGuid();
+   using(var store=new LocalSceneStore(path,ws,Guid.NewGuid(),validator)) {
+    Guid customer=store.CreateCustomer("尺寸模型客户").Id,project=store.CreateProject(customer,"尺寸模型项目").Id;
+    var product=store.CreateLocalProduct("sofa","品牌","尺寸沙发","DIM-S1","6800.50",2400,950,850);Guid document=store.CreateForProject(project,"尺寸模型方案");
+    var scene=JObject.Parse(File.ReadAllText(sample));var items=(JArray)scene["furniture_instances"];
+    var sale=(JObject)items[0].DeepClone();sale["id"]=Guid.NewGuid().ToString("D");sale["product_id"]=product.Id.ToString("D");sale.Remove("asset_id");items.Add(sale);
+    var second=(JObject)sale.DeepClone();second["id"]=Guid.NewGuid().ToString("D");items.Add(second);
+    store.Catalog(Guid.Parse("40000000-0000-4000-8000-000000000002"),"演示沙发",2400,950,850);
+    string saved=store.Put(document,0,scene.ToString()).SceneJson;
+    var quote=store.CreateQuotation(customer,project,document,1);
+    Check(quote.Total=="13601.00"&&quote.Lines.Count==1&&quote.Lines[0].Quantity==2&&quote.Lines[0].Sku=="DIM-S1","assetless product was omitted or priced incorrectly");
+    Check(quote.ExcludedDemoCount==1&&quote.Exclusions.Count==1,"dimension product was treated as a demo");
+    var updated=store.UpdateLocalProduct(product.Id,1,"sofa","品牌","新尺寸沙发","DIM-S1","9000.00",3000,1100,900,"{}");
+    Check(store.ExportVersion(document,1)==saved&&store.Quotation(quote.Id).Total=="13601.00","editing product rewrote scene or quotation snapshot");
+    store.DeleteLocalProduct(product.Id,updated.Revision);
+    Check(store.Restore(document,1,1).SceneJson==saved&&store.Quotation(quote.Id).Total=="13601.00","deleted dimension product broke historical scene or quotation");
+    Check(store.CreateQuotation(customer,project,document,1).Lines.Count==1,"historical dimension product could not be quoted");
+   }
+  });
   Test("v4 quotation migration backs up old products and rolls back on final-stage failure",()=>{
    string path=Path.Combine(directory,"quotation-migration.sqlite");Guid ws=Guid.NewGuid(),actor=Guid.NewGuid(),product;
    using(var store=new LocalSceneStore(path,ws,actor,validator))product=store.CreateLocalProduct("sofa","品牌","沙发","S-1","12345.67",2400,950,850).Id;

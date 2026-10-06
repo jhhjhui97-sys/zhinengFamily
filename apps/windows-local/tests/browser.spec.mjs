@@ -36,7 +36,12 @@ async function setup(
   let server = createLocalServer(config);
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   let url = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({ channel: "msedge", headless: true });
+  let browser;
+  t.after(async () => {
+    await browser?.close();
+    await new Promise((r) => server.close(r));
+  });
+  browser = await chromium.launch({ channel: "msedge", headless: true });
   const context = await browser.newContext({
     viewport: { width: 1500, height: 1000 },
   });
@@ -78,10 +83,6 @@ async function setup(
   page.on("console", (m) => {
     if (m.type() === "error") errors.push(m.text());
   });
-  t.after(async () => {
-    await browser.close();
-    await new Promise((r) => server.close(r));
-  });
   await page.goto(url);
   await page
     .locator("#customer-count")
@@ -105,6 +106,22 @@ async function project(page, requireModel = false) {
     await page
       .locator('canvas[data-model-loaded="true"]')
       .waitFor({ timeout: 90000 });
+}
+async function fillProduct(page, overrides = {}) {
+  const values = {
+    category: "chair",
+    brand: "门店品牌",
+    name: "尺寸商品椅",
+    sku: "DIM-CHAIR-1",
+    price: "1200.00",
+    width: "800",
+    depth: "700",
+    height: "900",
+    metadata: '{"color":"浅灰"}',
+    ...overrides,
+  };
+  for (const [key, value] of Object.entries(values))
+    await page.locator(`#product-${key}`).fill(value);
 }
 
 const dxfRoom = (x1, y1, x2, y2) =>
@@ -131,6 +148,312 @@ async function localDxfProject(page, sceneName) {
   await page.locator("#project-name").fill(sceneName);
   await page.getByRole("button", { name: "新建方案", exact: true }).click();
 }
+test(
+  "dimensions-only products refresh immediately, preserve saved scenes and quotes, and furniture deletion saves a new version",
+  { timeout: 180000 },
+  async (t) => {
+    const { page, errors } = await setup(t);
+    const origin = new URL(page.url()).origin;
+    const call = async (body) => {
+      const response = await page.request.post(`${origin}/api/local`, {
+        headers: { origin },
+        data: body,
+      });
+      const result = await response.json();
+      assert.equal(response.status(), 200, JSON.stringify(result));
+      return result.data;
+    };
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await fillProduct(page);
+    await page
+      .getByRole("button", { name: "新建在售商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "商品已保存在本机" })
+      .waitFor();
+    const product = (await call({ action: "products", search: "DIM-CHAIR-1" }))
+      .items[0];
+    assert.equal(product.active_asset_id, null);
+    // The design page is still hidden: no page switch or reload may be needed.
+    assert.equal(
+      await page
+        .locator(`#catalog-select option[value="${product.id}"]`)
+        .textContent(),
+      "在售 · 尺寸商品椅（尺寸模型）",
+    );
+    await page.getByRole("button", { name: "设计工作台", exact: true }).click();
+    await localDxfProject(page, "尺寸商品方案");
+    await page
+      .getByRole("button", { name: "载入两室一厅", exact: true })
+      .click();
+    await page.locator("#catalog-select").selectOption(product.id);
+    await page.getByRole("button", { name: "放入场景", exact: true }).click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "尺寸商品椅已放入场景" })
+      .waitFor();
+    await page
+      .locator('canvas[data-model-loaded="true"][data-dimension-models="1"]')
+      .waitFor({ timeout: 90000 });
+    const original = JSON.parse(await page.locator("#scene-json").inputValue());
+    const placed = original.furniture_instances.find(
+      (item) => item.product_id === product.id,
+    );
+    assert.ok(placed);
+    assert.equal(placed.asset_id, null);
+    assert.equal(placed.metadata.offline_catalog_only, false);
+    assert.equal(placed.metadata.model_kind, "dimensions");
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    await page.getByRole("button", { name: "生成报价", exact: true }).click();
+    await page
+      .locator("#quote-total")
+      .filter({ hasText: "¥1,200.00" })
+      .waitFor();
+    await page
+      .locator("#quote-lines")
+      .filter({ hasText: "DIM-CHAIR-1" })
+      .waitFor();
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await page
+      .getByRole("button", { name: "编辑 尺寸商品椅", exact: true })
+      .click();
+    assert.equal(
+      await page
+        .locator("#product-name")
+        .evaluate((element) => element === document.activeElement),
+      true,
+    );
+    await page.locator("#product-name").fill("更新后的尺寸椅");
+    await page.locator("#product-width").fill("1000");
+    await page
+      .getByRole("button", { name: "更新在售商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "商品资料已更新" })
+      .waitFor();
+    assert.match(
+      await page
+        .locator(`#catalog-select option[value="${product.id}"]`)
+        .textContent(),
+      /更新后的尺寸椅/,
+    );
+    assert.deepEqual(
+      JSON.parse(await page.locator("#scene-json").inputValue()),
+      original,
+    );
+    page.once("dialog", (dialog) => dialog.dismiss());
+    await page
+      .getByRole("button", { name: "删除 更新后的尺寸椅", exact: true })
+      .click();
+    assert.equal(
+      (await call({ action: "products", search: "DIM-CHAIR-1" })).total,
+      1,
+    );
+    page.once("dialog", (dialog) => dialog.accept());
+    await page
+      .getByRole("button", { name: "删除当前商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "商品已删除" })
+      .waitFor();
+    assert.equal(
+      await page
+        .locator(`#catalog-select option[value="${product.id}"]`)
+        .count(),
+      0,
+    );
+    assert.deepEqual(
+      JSON.parse(await page.locator("#scene-json").inputValue()),
+      original,
+    );
+    await page.getByRole("button", { name: "设计工作台", exact: true }).click();
+    assert.match(
+      await page.locator("#quote-lines").textContent(),
+      /尺寸商品椅.*DIM-CHAIR-1/s,
+    );
+    assert.match(await page.locator("#quote-total").textContent(), /1,200\.00/);
+    await page.locator("#furniture-select").selectOption(placed.id);
+    page.once("dialog", (dialog) => dialog.dismiss());
+    await page
+      .getByRole("button", { name: "删除当前家具", exact: true })
+      .click();
+    assert.deepEqual(
+      JSON.parse(await page.locator("#scene-json").inputValue()),
+      original,
+    );
+    const rejectRemoval = (route) => {
+      const body = JSON.parse(route.request().postData() ?? "{}");
+      return body.action === "validate"
+        ? route.fulfill({
+            status: 422,
+            contentType: "application/json",
+            body: JSON.stringify({ error: "场景校验失败，请重试" }),
+          })
+        : route.continue();
+    };
+    await page.route("**/api/local", rejectRemoval);
+    page.once("dialog", (dialog) => dialog.accept());
+    await page
+      .getByRole("button", { name: "删除当前家具", exact: true })
+      .click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "场景校验失败" })
+      .waitFor();
+    assert.deepEqual(
+      JSON.parse(await page.locator("#scene-json").inputValue()),
+      original,
+    );
+    await page.unroute("**/api/local", rejectRemoval);
+    page.once("dialog", (dialog) => dialog.accept());
+    await page
+      .getByRole("button", { name: "删除当前家具", exact: true })
+      .click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "请保存新版本" })
+      .waitFor();
+    const removed = JSON.parse(await page.locator("#scene-json").inputValue());
+    assert.deepEqual(
+      removed.furniture_instances,
+      original.furniture_instances.filter((item) => item.id !== placed.id),
+    );
+    assert.notEqual(
+      await page.locator("#furniture-select").inputValue(),
+      placed.id,
+    );
+    await page.getByRole("button", { name: "保存新版本", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v2" }).waitFor();
+    await page.getByRole("button", { name: "查看 v1", exact: true }).click();
+    assert.match(
+      await page.locator("#history-json").textContent(),
+      new RegExp(placed.id),
+    );
+    await page.getByRole("button", { name: "恢复此版本", exact: true }).click();
+    await page.getByRole("button", { name: "确认恢复", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v3" }).waitFor();
+    await page
+      .locator('canvas[data-model-loaded="true"][data-dimension-models="1"]')
+      .waitFor({ timeout: 90000 });
+    assert.deepEqual(
+      JSON.parse(await page.locator("#scene-json").inputValue())
+        .furniture_instances,
+      original.furniture_instances,
+    );
+    assert.deepEqual(
+      errors.filter((error) => !error.includes("422")),
+      [],
+    );
+  },
+);
+test(
+  "GLB import creates a new product with an existing selection and preserves files after invalid or duplicate inputs",
+  { timeout: 120000 },
+  async (t) => {
+    const { page } = await setup(t);
+    const origin = new URL(page.url()).origin;
+    const products = async () =>
+      (
+        await (
+          await page.request.post(`${origin}/api/local`, {
+            headers: { origin },
+            data: { action: "products" },
+          })
+        ).json()
+      ).data;
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await fillProduct(page);
+    await page
+      .getByRole("button", { name: "新建在售商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "商品已保存在本机" })
+      .waitFor();
+    const original = (await products()).items[0];
+    const picker = page.locator("#product-model-file");
+    await picker.setInputFiles(
+      join(root, "apps/windows-local/public/assets/chair.glb"),
+    );
+    let stagedUploads = 0;
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/api/model-files")
+        stagedUploads++;
+    });
+    await page.locator("#product-width").fill("0");
+    await page
+      .getByRole("button", { name: "导入模型并新建商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "尺寸必须" })
+      .waitFor();
+    assert.equal(stagedUploads, 0);
+    assert.equal((await products()).total, 1);
+    await page.locator("#product-width").fill("800");
+    await page
+      .getByRole("button", { name: "导入模型并新建商品", exact: true })
+      .click();
+    await page.locator("#product-message").filter({ hasText: /SKU/ }).waitFor();
+    assert.equal((await products()).total, 1);
+    assert.equal(await picker.evaluate((element) => element.files.length), 1);
+    await fillProduct(page, { name: "新模型椅", sku: "MODEL-NEW-1" });
+    await picker.setInputFiles({
+      name: "broken.glb",
+      mimeType: "model/gltf-binary",
+      buffer: Buffer.from("broken"),
+    });
+    await page
+      .getByRole("button", { name: "导入模型并新建商品", exact: true })
+      .click();
+    await page.locator("#product-message.error").waitFor();
+    assert.equal((await products()).total, 1);
+    assert.equal(
+      await picker.evaluate((element) => element.files[0].name),
+      "broken.glb",
+    );
+    await picker.setInputFiles(
+      join(root, "apps/windows-local/public/assets/chair.glb"),
+    );
+    await page
+      .getByRole("button", { name: "导入模型并新建商品", exact: true })
+      .click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "模型已导入，并新建在售商品" })
+      .waitFor();
+    const saved = await products();
+    assert.equal(saved.total, 2);
+    const imported = saved.items.find((item) => item.sku === "MODEL-NEW-1");
+    assert.ok(imported.active_asset_id);
+    assert.notEqual(imported.id, original.id);
+    assert.equal(
+      saved.items.find((item) => item.id === original.id).active_asset_id,
+      null,
+    );
+    assert.equal(
+      saved.items.find((item) => item.id === original.id).name,
+      "尺寸商品椅",
+    );
+    assert.match(
+      await page
+        .locator(`#catalog-select option[value="${imported.id}"]`)
+        .textContent(),
+      /在售 · 新模型椅/,
+    );
+    assert.doesNotMatch(
+      await page
+        .locator(`#catalog-select option[value="${imported.id}"]`)
+        .textContent(),
+      /尺寸模型/,
+    );
+    assert.equal(await picker.evaluate((element) => element.files.length), 0);
+  },
+);
 test(
   "customer can be removed and restored with the same project and scene",
   { timeout: 120000 },

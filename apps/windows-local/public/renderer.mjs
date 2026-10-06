@@ -85,6 +85,46 @@ export class RoomRenderer {
   configureCatalog(products) {
     this.catalog = new Map(products.map((product) => [product.id, product]));
   }
+  isDimensionModel(item) {
+    return (
+      !item.asset_id &&
+      (item.metadata?.model_kind === "dimensions" ||
+        this.catalog.get(item.product_id.replace(/^urn:uuid:/i, ""))
+          ?.model_kind === "dimensions")
+    );
+  }
+  async furnitureModel(item) {
+    if (this.isDimensionModel(item)) {
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x9aa7a0,
+        roughness: 0.8,
+      });
+      this.resources.push(material);
+      return this.box(
+        item.width_mm / 1000,
+        item.height_mm / 1000,
+        item.depth_mm / 1000,
+        material,
+        0,
+        item.height_mm / 2000,
+        0,
+      );
+    }
+    const source = await this.modelFor(item.product_id, item.asset_id);
+    const model = source.clone(true),
+      bounds = new THREE.Box3().setFromObject(model),
+      size = bounds.getSize(new THREE.Vector3()),
+      center = bounds.getCenter(new THREE.Vector3());
+    model.position.set(-center.x, -bounds.min.y, -center.z);
+    const normalized = new THREE.Group();
+    normalized.add(model);
+    normalized.scale.set(
+      item.width_mm / 1000 / size.x,
+      item.height_mm / 1000 / size.y,
+      item.depth_mm / 1000 / size.z,
+    );
+    return normalized;
+  }
   modelFor(productId, assetId = null) {
     const id = productId.replace(/^urn:uuid:/i, "");
     const product = this.catalog.get(id);
@@ -312,25 +352,15 @@ export class RoomRenderer {
       this.content.add(pane);
     }
     this.scheduleFrame();
-    let failed = 0;
+    let failed = 0,
+      dimensions = 0;
     for (const item of document.furniture_instances) {
       try {
-        const source = await this.modelFor(item.product_id, item.asset_id);
+        const model = await this.furnitureModel(item);
         if (serial !== this.renderSerial) return;
-        const model = source.clone(true),
-          bounds = new THREE.Box3().setFromObject(model),
-          size = bounds.getSize(new THREE.Vector3()),
-          center = bounds.getCenter(new THREE.Vector3());
-        model.position.set(-center.x, -bounds.min.y, -center.z);
-        const normalized = new THREE.Group();
-        normalized.add(model);
-        normalized.scale.set(
-          item.width_mm / 1000 / size.x,
-          item.height_mm / 1000 / size.y,
-          item.depth_mm / 1000 / size.z,
-        );
+        if (this.isDimensionModel(item)) dimensions++;
         const placed = new THREE.Group();
-        placed.add(normalized);
+        placed.add(model);
         placed.position.fromArray(
           renderPosition(item.position, floors.get(item.floor_id) ?? 0),
         );
@@ -358,6 +388,8 @@ export class RoomRenderer {
       this.renderer.domElement.dataset.modelLoaded = "true";
       this.status.textContent = `${document.furniture_instances.length} 件家具模型 · 本地渲染`;
     }
+    this.renderer.domElement.dataset.dimensionModels = String(dimensions);
+    if (dimensions) this.status.textContent += ` · ${dimensions} 件尺寸模型`;
     if (!this.roomTextures.complete)
       this.status.textContent +=
         "；房间贴图未能全部加载，缺失表面已改用基础材质";

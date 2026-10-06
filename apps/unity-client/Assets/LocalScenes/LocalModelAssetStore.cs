@@ -35,7 +35,7 @@ namespace LocalScenes {
    var products=new List<LocalProduct>();
    foreach(var row in db.Query(@"SELECT p.*,m.asset_id active_asset_id FROM local_products p
     INNER JOIN local_product_active_model m ON m.workspace_id=p.workspace_id AND m.product_id=p.id
-    WHERE p.workspace_id=? ORDER BY p.name,p.id",Key(workspace))) {
+    WHERE p.workspace_id=? AND p.deleted_at IS NULL ORDER BY p.name,p.id",Key(workspace))) {
     var product=ProductRow(row);
     try { VerifiedModelPath(product.ActiveAssetId.Value); products.Add(product); }
     catch(LocalStoreError error) { if(error.Code!=LocalErrorCode.NotFound) throw; }
@@ -47,20 +47,37 @@ namespace LocalScenes {
    if(!File.Exists(path)||new FileInfo(path).Length!=asset.ByteCount||Hash(path)!=asset.Sha256)throw new LocalStoreError(LocalErrorCode.NotFound);
    return path;
   }
-  public LocalModelAsset AttachLocalModel(Guid product,long baseRevision,string sha,long byteCount) {
-   Input(product!=Guid.Empty&&baseRevision>=1&&baseRevision<long.MaxValue&&ValidSha(sha)&&byteCount>0&&byteCount<=30L*1024*1024);
-   LocalProduct(product);
+  void RequireUploadedModel(string sha,long byteCount) {
+   Input(ValidSha(sha)&&byteCount>0&&byteCount<=30L*1024*1024);
    string file=ModelPath(sha);
    Input(File.Exists(file)&&new FileInfo(file).Length==byteCount&&Hash(file)==sha);
+  }
+  LocalModelAsset AttachLocalModelCore(Guid product,long baseRevision,string sha,long byteCount) {
+   ActiveLocalProduct(product);
    Guid assetId=Guid.NewGuid();string stamp=Now();
-   db.Transaction(()=>{
-    int changed=db.Execute("UPDATE local_products SET revision=revision+1,updated_at=? WHERE workspace_id=? AND id=? AND revision=?",stamp,Key(workspace),Key(product),baseRevision);
-    if(changed!=1)throw new LocalStoreError(LocalErrorCode.Conflict);
-    db.Execute("INSERT INTO local_model_assets(workspace_id,id,product_id,sha256,byte_count,created_at) VALUES(?,?,?,?,?,?)",Key(workspace),Key(assetId),Key(product),sha,byteCount,stamp);
-    db.Execute("DELETE FROM local_product_active_model WHERE workspace_id=? AND product_id=?",Key(workspace),Key(product));
-    db.Execute("INSERT INTO local_product_active_model(workspace_id,product_id,asset_id) VALUES(?,?,?)",Key(workspace),Key(product),Key(assetId));
-   });
+   int changed=db.Execute("UPDATE local_products SET revision=revision+1,updated_at=? WHERE workspace_id=? AND id=? AND revision=? AND deleted_at IS NULL",stamp,Key(workspace),Key(product),baseRevision);
+   if(changed!=1)throw new LocalStoreError(LocalErrorCode.Conflict);
+   db.Execute("INSERT INTO local_model_assets(workspace_id,id,product_id,sha256,byte_count,created_at) VALUES(?,?,?,?,?,?)",Key(workspace),Key(assetId),Key(product),sha,byteCount,stamp);
+   db.Execute("DELETE FROM local_product_active_model WHERE workspace_id=? AND product_id=?",Key(workspace),Key(product));
+   db.Execute("INSERT INTO local_product_active_model(workspace_id,product_id,asset_id) VALUES(?,?,?)",Key(workspace),Key(product),Key(assetId));
    return ModelAsset(assetId);
+  }
+  public LocalModelAsset AttachLocalModel(Guid product,long baseRevision,string sha,long byteCount) {
+   Input(product!=Guid.Empty&&baseRevision>=1&&baseRevision<long.MaxValue&&ValidSha(sha)&&byteCount>0&&byteCount<=30L*1024*1024);
+   ActiveLocalProduct(product);RequireUploadedModel(sha,byteCount);
+   LocalModelAsset asset=null;
+   db.Transaction(()=>{asset=AttachLocalModelCore(product,baseRevision,sha,byteCount);});
+   return asset;
+  }
+  public LocalProduct CreateLocalProductWithModel(string category,string brand,string name,string sku,string price,double width,double depth,double height,string metadataJson,string sha,long byteCount) {
+   RequireUploadedModel(sha,byteCount);
+   LocalProduct product=null;
+   db.Transaction(()=>{
+    var created=CreateLocalProduct(category,brand,name,sku,price,width,depth,height,metadataJson);
+    AttachLocalModelCore(created.Id,created.Revision,sha,byteCount);
+    product=LocalProduct(created.Id);
+   });
+   return product;
   }
  }
 }

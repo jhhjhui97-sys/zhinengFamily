@@ -213,14 +213,13 @@
       </section>
       <aside class="inspector">
         <div class="section-title">家具目录</div>
-        <label for="catalog-select">选择本机模型</label>
+        <label for="catalog-select">选择商品或演示家具</label>
         <select id="catalog-select"></select>
         <label for="room-select">放入房间</label>
         <select id="room-select"></select>
         <button id="add-furniture">放入场景</button>
         <p class="muted">
-          “演示”是内置示例，不代表门店库存；“在售”是已导入 GLB
-          的真实商品。添加后可调整位置并保存版本。
+          “演示”是内置示例；“在售”是本机商品。未导入模型的商品以真实尺寸盒显示，标注为“尺寸模型”。添加后可调整位置并保存版本。
         </p>
         <hr />
         <div class="section-title">家具调整</div>
@@ -243,6 +242,7 @@
         >
           更新家具位置
         </button>
+        <button id="remove-furniture">删除当前家具</button>
         <p class="muted">
           可在左侧 3D
           场景直接选中家具，中键拖动位置、右键拖动旋转；也可输入毫米坐标。调整后请保存新版本。
@@ -445,6 +445,7 @@
           <div class="product-actions">
             <button id="product-create" class="primary">新建在售商品</button
             ><button id="product-update">更新在售商品</button
+            ><button id="product-delete">删除当前商品</button
             ><button id="product-reset">清空表单</button>
           </div>
           <div class="product-model-import">
@@ -457,6 +458,11 @@
               />
             </label>
             <button id="product-model-upload">导入当前商品 3D 模型</button>
+            <button id="product-model-create">导入模型并新建商品</button>
+            <p>
+              填写上方商品资料并选择
+              GLB，可导入模型并新建商品；导入当前商品模型会替换当前商品的模型。
+            </p>
           </div>
           <div class="product-model-import">
             <label

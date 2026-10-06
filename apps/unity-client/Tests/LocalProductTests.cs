@@ -107,6 +107,34 @@ public static class LocalProductTests {
     Check(store.LocalProducts().Total==0,"invalid input inserted product");
    }
   });
+  Test("active catalogue includes every product without requiring uploaded models",()=>{
+   string path=Path.Combine(directory,"products-catalog.sqlite");Guid workspace=Guid.NewGuid(),actor=Guid.NewGuid();
+   using(var store=new LocalSceneStore(path,workspace,actor,validator)) {
+    for(int i=0;i<105;i++)Create(store,"沙发"+i,"S-"+i);
+    var catalog=store.LocalCatalogProducts();Check(catalog.Count==105,"catalogue was paginated or required a model");
+    foreach(var product in catalog)Check(product.ActiveAssetId==null,"assetless catalogue fabricated an asset");
+   }
+   using(var other=new LocalSceneStore(path,Guid.NewGuid(),Guid.NewGuid(),validator)) Check(other.LocalCatalogProducts().Count==0,"catalogue leaked another workspace");
+  });
+  Test("product removal hides all active lists preserves the record and reserves its SKU",()=>{
+   string path=Path.Combine(directory,"products-deleted.sqlite");Guid workspace=Guid.NewGuid(),actor=Guid.NewGuid(),product;
+   using(var store=new LocalSceneStore(path,workspace,actor,validator)) {
+    product=Create(store,"待删除沙发","DELETED-S1").Id;Create(store,"仍在售床架","KEEP-B1","木作","bed");
+    var updated=store.UpdateLocalProduct(product,1,"sofa","品牌","待删除沙发","DELETED-S1","6800.50",2400,950,850,"{}");
+    Reject(()=>store.DeleteLocalProduct(product,1),LocalErrorCode.Conflict);
+    Check(store.LocalProducts().Total==2,"stale delete hid the product");
+    Reject(()=>store.DeleteLocalProduct(product,0),LocalErrorCode.InvalidInput);
+    using(var other=new LocalSceneStore(path,Guid.NewGuid(),Guid.NewGuid(),validator))Reject(()=>other.DeleteLocalProduct(product,updated.Revision),LocalErrorCode.NotFound);
+    store.DeleteLocalProduct(product,updated.Revision);
+    Check(store.LocalProducts().Total==1&&store.LocalProducts(20,0,"DELETED").Total==0&&store.LocalProducts(20,0,null,"sofa").Total==0,"deleted product remained in a product list");
+    Check(store.LocalCatalogProducts().Count==1,"deleted product remained in placement catalogue");
+    var historical=store.LocalProduct(product);Check(historical.Sku=="DELETED-S1"&&historical.DeletedAt!=null&&historical.Revision==3,"product history was removed or tombstone did not revise it");
+    Reject(()=>store.UpdateLocalProduct(product,3,"sofa","品牌","被修改","DELETED-S1","1.00",1,1,1,"{}"),LocalErrorCode.NotFound);
+    Reject(()=>store.DeleteLocalProduct(product,3),LocalErrorCode.Conflict);
+    Reject(()=>Create(store,"SKU 被复用","DELETED-S1"),LocalErrorCode.Conflict);
+   }
+   using(var reopened=new LocalSceneStore(path,workspace,actor,validator))Check(reopened.LocalProduct(product).DeletedAt!=null&&reopened.LocalProducts().Total==1,"product removal did not survive restart");
+  });
   Console.WriteLine("Local products: "+passed+" passed");
  }
 }

@@ -7,6 +7,9 @@ import {
   wallSegments,
   nearestWallGapMm,
 } from "../public/scene-tools.mjs";
+import * as sceneTools from "../public/scene-tools.mjs";
+import { RoomRenderer } from "../public/renderer.mjs";
+import * as THREE from "three";
 test("RH_Z_UP millimetres map to right handed Y up metres", () =>
   assert.deepEqual(
     renderPosition({ x: 1000, y: 2000, z: 3000 }, 500),
@@ -26,6 +29,93 @@ const fixture = {
     },
   ],
 };
+test("removing one furniture instance preserves other objects and leaves the source unchanged", () => {
+  const source = {
+    ...fixture,
+    metadata: { retained: true },
+    furniture_instances: [
+      ...fixture.furniture_instances,
+      { id: "two", metadata: { name: "保留的家具" }, position: { x: 2, y: 3 } },
+    ],
+  };
+  const snapshot = structuredClone(source);
+  const removed = sceneTools.removeFurniture(source, "one");
+  assert.deepEqual(source, snapshot);
+  assert.deepEqual(removed.furniture_instances, [
+    snapshot.furniture_instances[1],
+  ]);
+  assert.deepEqual(removed.floors, snapshot.floors);
+  assert.deepEqual(removed.metadata, { retained: true });
+  removed.furniture_instances[0].metadata.name = "新名称";
+  assert.equal(source.furniture_instances[1].metadata.name, "保留的家具");
+});
+test("removing absent or empty furniture ids rejects without changing the scene", () => {
+  const snapshot = structuredClone(fixture);
+  for (const id of ["missing", "", null])
+    assert.throws(() => sceneTools.removeFurniture(fixture, id), /找不到家具/);
+  assert.deepEqual(fixture, snapshot);
+});
+test("dimension products retain sellable provenance and saved dimensions after catalogue edits", async () => {
+  const product = {
+    id: "dimension-product",
+    name: "尺寸椅子",
+    sellable: true,
+    model_kind: "dimensions",
+    asset_id: null,
+    model: null,
+    width_mm: 800,
+    depth_mm: 700,
+    height_mm: 900,
+  };
+  const source = {
+    furniture_instances: [],
+    rooms: [
+      {
+        id: "room",
+        floor_id: "floor",
+        boundary: [
+          { x: 0, y: 0 },
+          { x: 4000, y: 0 },
+          { x: 4000, y: 4000 },
+          { x: 0, y: 4000 },
+        ],
+      },
+    ],
+  };
+  const item = addFurniture(source, product, "room", "dimension-instance")
+    .furniture_instances[0];
+  assert.equal(item.metadata.offline_catalog_only, false);
+  assert.equal(item.metadata.model_kind, "dimensions");
+  const renderer = Object.assign(Object.create(RoomRenderer.prototype), {
+    catalog: new Map([[product.id, { ...product, width_mm: 1200 }]]),
+    resources: [],
+  });
+  const model = await renderer.furnitureModel(item);
+  const size = new THREE.Box3()
+    .setFromObject(model)
+    .getSize(new THREE.Vector3());
+  assert.ok(Math.abs(size.x - 0.8) < 1e-6);
+  assert.ok(Math.abs(size.y - 0.9) < 1e-6);
+  assert.ok(Math.abs(size.z - 0.7) < 1e-6);
+  renderer.catalog.clear();
+  const historical = await renderer.furnitureModel(item);
+  assert.ok(Math.abs(new THREE.Box3().setFromObject(historical).min.y) < 1e-6);
+  const disposed = [];
+  for (const resource of renderer.resources)
+    resource.addEventListener("dispose", () => disposed.push(resource));
+  Object.assign(renderer, {
+    renderSerial: 0,
+    furniture: new Map(),
+    content: new THREE.Group(),
+    renderer: { domElement: { dataset: {} } },
+    status: {},
+    removeSelectionHelper() {},
+    scheduleFrame() {},
+  });
+  renderer.clear();
+  assert.equal(disposed.length, 4);
+  assert.equal(renderer.resources.length, 0);
+});
 test("furniture edit validates finite bounds and retains metadata without source mutation", () => {
   const updated = editFurniture(fixture, "one", {
     x: 3000,

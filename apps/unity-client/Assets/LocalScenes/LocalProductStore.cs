@@ -19,6 +19,7 @@ namespace LocalScenes {
   public long Revision { get; internal set; }
   public string CreatedAt { get; internal set; }
   public string UpdatedAt { get; internal set; }
+  public string DeletedAt { get; internal set; }
  }
  public sealed class LocalProductPage {
   public long Total { get; internal set; }
@@ -58,7 +59,7 @@ namespace LocalScenes {
     Name=(string)row["name"],Sku=(string)row["sku"],Price=(string)row["price"],
     WidthMm=(double)row["width_mm"],DepthMm=(double)row["depth_mm"],HeightMm=(double)row["height_mm"],
     MetadataJson=(string)row["metadata_json"],ActiveAssetId=row["active_asset_id"]==null?(Guid?)null:Guid.Parse((string)row["active_asset_id"]),Revision=(long)row["revision"],
-    CreatedAt=(string)row["created_at"],UpdatedAt=(string)row["updated_at"]
+    CreatedAt=(string)row["created_at"],UpdatedAt=(string)row["updated_at"],DeletedAt=(string)row["deleted_at"]
    };
   }
   public LocalProduct CreateLocalProduct(string category,string brand,string name,string sku,string price,double width,double depth,double height,string metadataJson="{}") {
@@ -76,10 +77,30 @@ namespace LocalScenes {
    if(rows.Count!=1) throw new LocalStoreError(LocalErrorCode.NotFound);
    return ProductRow(rows[0]);
   }
+  public List<LocalProduct> LocalCatalogProducts() {
+   var products=new List<LocalProduct>();
+   foreach(var row in db.Query(@"SELECT p.*,m.asset_id active_asset_id FROM local_products p
+    LEFT JOIN local_product_active_model m ON m.workspace_id=p.workspace_id AND m.product_id=p.id
+    WHERE p.workspace_id=? AND p.deleted_at IS NULL ORDER BY p.name,p.id",Key(workspace)))products.Add(ProductRow(row));
+   return products;
+  }
+  LocalProduct ActiveLocalProduct(Guid id) {
+   var product=LocalProduct(id);
+   if(product.DeletedAt!=null)throw new LocalStoreError(LocalErrorCode.NotFound);
+   return product;
+  }
+  public void DeleteLocalProduct(Guid id,long baseRevision) {
+   Input(id!=Guid.Empty&&baseRevision>=1&&baseRevision<long.MaxValue);
+   var product=LocalProduct(id);
+   if(product.DeletedAt!=null||product.Revision!=baseRevision)throw new LocalStoreError(LocalErrorCode.Conflict);
+   string stamp=Now();
+   int changed=db.Execute("UPDATE local_products SET deleted_at=?,revision=revision+1,updated_at=? WHERE workspace_id=? AND id=? AND revision=? AND deleted_at IS NULL",stamp,stamp,Key(workspace),Key(id),baseRevision);
+   if(changed!=1)throw new LocalStoreError(LocalErrorCode.Conflict);
+  }
   public LocalProductPage LocalProducts(int limit=20,int offset=0,string search=null,string category=null) {
    Input(limit>=1&&limit<=100&&offset>=0);
    search=Optional(search,100);category=Optional(category,100);
-   string filter=" WHERE p.workspace_id=?";var args=new List<object>{Key(workspace)};
+   string filter=" WHERE p.workspace_id=? AND p.deleted_at IS NULL";var args=new List<object>{Key(workspace)};
    if(category!=null) { filter+=" AND p.category=?";args.Add(category); }
    if(search!=null) {
     string pattern="%"+search.Replace("\\","\\\\").Replace("%","\\%").Replace("_","\\_")+"%";
@@ -97,13 +118,17 @@ namespace LocalScenes {
    return page;
   }
   public LocalProduct UpdateLocalProduct(Guid id,long baseRevision,string category,string brand,string name,string sku,string price,double width,double depth,double height,string metadataJson) {
-   Input(baseRevision>=1);category=ProductLabel(category);brand=ProductLabel(brand);name=Name(name);sku=ProductLabel(sku);
+   Input(baseRevision>=1&&baseRevision<long.MaxValue);category=ProductLabel(category);brand=ProductLabel(brand);name=Name(name);sku=ProductLabel(sku);
    price=ProductPrice(price);ProductDimensions(width,depth,height);metadataJson=ProductMetadata(metadataJson);
-   LocalProduct(id);
-   int changed=db.Execute(@"UPDATE local_products SET category=?,brand=?,name=?,sku=?,price=?,width_mm=?,depth_mm=?,height_mm=?,metadata_json=?,revision=revision+1,updated_at=?
-    WHERE workspace_id=? AND id=? AND revision=?",category,brand,name,sku,price,width,depth,height,metadataJson,Now(),Key(workspace),Key(id),baseRevision);
-   if(changed!=1) throw new LocalStoreError(LocalErrorCode.Conflict);
-   return LocalProduct(id);
+   LocalProduct updated=null;
+   db.Transaction(()=>{
+    ActiveLocalProduct(id);
+    int changed=db.Execute(@"UPDATE local_products SET category=?,brand=?,name=?,sku=?,price=?,width_mm=?,depth_mm=?,height_mm=?,metadata_json=?,revision=revision+1,updated_at=?
+     WHERE workspace_id=? AND id=? AND revision=? AND deleted_at IS NULL",category,brand,name,sku,price,width,depth,height,metadataJson,Now(),Key(workspace),Key(id),baseRevision);
+    if(changed!=1) throw new LocalStoreError(LocalErrorCode.Conflict);
+    updated=LocalProduct(id);
+   });
+   return updated;
   }
  }
 }

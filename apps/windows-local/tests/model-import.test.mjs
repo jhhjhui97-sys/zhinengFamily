@@ -4,10 +4,87 @@ import { readFile, mkdtemp, unlink, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { request } from "node:http";
+import { createHash } from "node:crypto";
 import { createLocalServer } from "../server.mjs";
+import { makePhotoGlb } from "../public/photo-model.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 const source = join(root, "apps/windows-local/public/assets/sofa.glb");
+async function stagedSetup(t) {
+  const dataDirectory = await mkdtemp(join(tmpdir(), "family-model-stage-"));
+  const server = createLocalServer({ dataDirectory });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const cookie = (await fetch(url)).headers.get("set-cookie").split(";")[0];
+  const upload = (body, headers = {}) =>
+    fetch(`${url}/api/model-files`, {
+      method: "POST",
+      headers: {
+        origin: url,
+        cookie,
+        "content-type": "model/gltf-binary",
+        ...headers,
+      },
+      body,
+    });
+  return { dataDirectory, url, cookie, upload };
+}
+const stagedGlb = () =>
+  Buffer.from(
+    makePhotoGlb({
+      category: "sofa",
+      width_mm: 2400,
+      depth_mm: 950,
+      height_mm: 850,
+      imageBytes: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
+        "base64",
+      ),
+    }),
+  );
+
+test("staged GLB is validated and archived before any product is created", async (t) => {
+  const s = await stagedSetup(t),
+    bytes = stagedGlb();
+  const response = await s.upload(bytes);
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  assert.deepEqual(result, {
+    status: 200,
+    data: { sha256, byte_count: bytes.length },
+  });
+  assert.deepEqual(
+    await readFile(join(s.dataDirectory, "models", `${sha256}.glb`)),
+    bytes,
+  );
+  assert.deepEqual((await readdir(s.dataDirectory)).sort(), ["models"]);
+  assert.deepEqual(await readdir(join(s.dataDirectory, "models")), [
+    `${sha256}.glb`,
+  ]);
+});
+
+test("staged GLB rejects invalid files, unauthorized requests and oversized files", async (t) => {
+  const s = await stagedSetup(t),
+    bytes = stagedGlb();
+  assert.equal(
+    (await s.upload(bytes, { origin: "https://evil.example" })).status,
+    403,
+  );
+  assert.equal((await s.upload(bytes, { cookie: "" })).status, 403);
+  assert.equal(
+    (await s.upload(bytes, { "content-type": "application/json" })).status,
+    415,
+  );
+  assert.equal((await s.upload(Buffer.alloc(40))).status, 422);
+  assert.equal(
+    (await s.upload(Buffer.alloc(30 * 1024 * 1024 + 1))).status,
+    413,
+  );
+  assert.deepEqual(await readdir(join(s.dataDirectory, "models")), []);
+});
+
 async function setup(t, options = {}) {
   const dataDirectory = await mkdtemp(join(tmpdir(), "family-model-import-"));
   const server = createLocalServer({

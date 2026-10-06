@@ -16,14 +16,14 @@ public sealed partial class LocalSceneStore : IDisposable {
   db=new SqliteConnection(path);
   try {
    long format=(long)db.Query("PRAGMA user_version")[0]["user_version"];
-   if(format<0||format>7) throw new LocalStoreError(LocalErrorCode.Corrupt);
+   if(format<0||format>8) throw new LocalStoreError(LocalErrorCode.Corrupt);
    // Capture the original database before any schema change. All upgrade stages
    // then commit together, so a later failure cannot leave a partly upgraded v1/v2 file.
-   for(int target=2;target<=7;target++) if(format>=1&&format<target) {
+   for(int target=2;target<=8;target++) if(format>=1&&format<target) {
     string backup=path+".pre-v"+target+"-"+DateTime.UtcNow.ToString("yyyyMMddHHmmss",CultureInfo.InvariantCulture)+"-"+Guid.NewGuid().ToString("N")+".bak";
     db.BackupTo(backup);
    }
-   if(format<7) db.Transaction(()=>{
+   if(format<8) db.Transaction(()=>{
    if(format<2) {
    if(format==0) {
     db.Execute(@"CREATE TABLE scene_documents(
@@ -181,6 +181,13 @@ public sealed partial class LocalSceneStore : IDisposable {
     db.Execute("CREATE UNIQUE INDEX local_customers_phone ON local_customers(workspace_id,phone) WHERE deleted_at IS NULL AND phone IS NOT NULL AND phone<>''");
     db.Execute("PRAGMA user_version=7");
    }
+   if(format<8) {
+    bool hasDeletedAt=false;
+    foreach(var column in db.Query("PRAGMA table_info(local_products)")) if((string)column["name"]=="deleted_at") hasDeletedAt=true;
+    if(!hasDeletedAt) db.Execute("ALTER TABLE local_products ADD COLUMN deleted_at TEXT");
+    db.Execute("CREATE INDEX IF NOT EXISTS local_products_active ON local_products(workspace_id,deleted_at,name,id)");
+    db.Execute("PRAGMA user_version=8");
+   }
    });
   } catch { db.Dispose(); throw; }
  }
@@ -216,7 +223,8 @@ public sealed partial class LocalSceneStore : IDisposable {
    Guid product=Guid.Parse(value); // Already checked by the authoritative offline validator.
    string assetText=(string)item["asset_id"];
    if(assetText==null) {
-    Input(db.Query("SELECT product_id FROM local_catalog WHERE workspace_id=? AND product_id=?",Key(workspace),Key(product)).Count==1);
+    Input(db.Query("SELECT id FROM local_products WHERE workspace_id=? AND id=?",Key(workspace),Key(product)).Count==1||
+     db.Query("SELECT product_id FROM local_catalog WHERE workspace_id=? AND product_id=?",Key(workspace),Key(product)).Count==1);
    } else {
     if(assetText.StartsWith("urn:uuid:",StringComparison.Ordinal)) assetText=assetText.Substring(9);
     Guid asset;Input(Guid.TryParse(assetText,out asset)&&asset!=Guid.Empty);

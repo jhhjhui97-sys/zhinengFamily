@@ -119,6 +119,7 @@ export function createLocalServer(options) {
       return;
     }
     const upload = pathname.match(uploadPattern);
+    const stageModel = pathname === "/api/model-files";
     if (pathname === "/api/dxf/analyze" || pathname === "/api/dxf/archive") {
       if (req.method !== "POST")
         return reply(405, { error: "请求方式不支持。" });
@@ -169,7 +170,7 @@ export function createLocalServer(options) {
         req.setTimeout(0);
       }
     }
-    if (upload) {
+    if (upload || stageModel) {
       if (req.method !== "POST")
         return reply(405, { error: "请求方式不支持。" });
       if (!authorized(true))
@@ -179,7 +180,7 @@ export function createLocalServer(options) {
       )
         return reply(415, { error: "请选择 GLB 格式的家具模型。" });
       const revision = req.headers["x-base-revision"];
-      if (!/^[1-9]\d{0,14}$/.test(revision ?? ""))
+      if (!stageModel && !/^[1-9]\d{0,14}$/.test(revision ?? ""))
         return reply(422, { error: "商品版本无效，请重新打开商品。" });
       if (Number(req.headers["content-length"] ?? 0) > MODEL_LIMIT)
         return reply(413, { error: "GLB 模型不能超过 30 MiB。" });
@@ -225,6 +226,11 @@ export function createLocalServer(options) {
         validateGlb(await readFile(temporary));
         const sha256 = digest.digest("hex");
         await rename(temporary, join(directory, `${sha256}.glb`));
+        if (stageModel)
+          return reply(200, {
+            status: 200,
+            data: { sha256, byte_count: size },
+          });
         const result = await bridge(
           config,
           JSON.stringify({

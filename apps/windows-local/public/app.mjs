@@ -2,6 +2,7 @@ import { RoomRenderer } from "./renderer.mjs";
 import {
   addFurniture,
   editFurniture,
+  removeFurniture,
   nearestWallGapMm,
 } from "./scene-tools.mjs";
 import { mountFurnitureGestures } from "./furniture-gestures.mjs";
@@ -115,7 +116,7 @@ async function api(action, fields = {}) {
   if (!response.ok) throw Error(body.error ?? "操作失败，请重试。");
   return body.data;
 }
-const productsView = mountProducts({ api });
+const productsView = mountProducts({ api, onChanged: loadCatalog });
 const dxfImport = mountDxfImport({
   getActive: () => (selectedProject ? active : null),
   hasUnsavedChanges,
@@ -240,7 +241,7 @@ async function loadCatalog() {
   for (const product of catalogItems) {
     const option = document.createElement("option");
     option.value = product.id;
-    option.textContent = `${product.asset_id ? "在售" : "演示"} · ${product.name}`;
+    option.textContent = `${product.sellable || product.asset_id ? "在售" : "演示"} · ${product.name}${product.model_kind === "dimensions" ? "（尺寸模型）" : ""}`;
     $("catalog-select").append(option);
   }
   if (selected && catalogItems.some((product) => product.id === selected))
@@ -688,6 +689,28 @@ $("apply-position").onclick = () =>
     draft = candidate;
     refreshDraft();
     message("家具位置已更新，请保存新版本。");
+  });
+$("remove-furniture").onclick = () =>
+  run(async () => {
+    if (!draft) throw Error("请先载入场景。");
+    if (pendingJson() || pendingFurniture())
+      throw Error("请先应用输入框中的修改，再删除家具。");
+    const id = $("furniture-select").value;
+    const item = draft.furniture_instances.find(
+      (furniture) => furniture.id === id,
+    );
+    if (!item) throw Error("请先选择要删除的家具。");
+    if (
+      !confirm(
+        `确定从当前草稿删除 ${item.metadata?.name ?? "当前家具"} 吗？请保存新版本，之前保存的版本仍保留。`,
+      )
+    )
+      return;
+    const candidate = removeFurniture(draft, id);
+    const validated = await api("validate", { scene: candidate });
+    draft = validated.scene;
+    refreshDraft();
+    message("当前家具已从草稿删除，请保存新版本；之前保存的版本仍保留。");
   });
 $("furniture-select").onchange = () => {
   if (pendingFurniture() && !confirm("位置输入尚未应用，确定放弃吗？")) {

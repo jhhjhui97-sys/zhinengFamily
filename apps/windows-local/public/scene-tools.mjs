@@ -18,6 +18,13 @@ export function editFurniture(scene, id, { x, y, rotation }) {
   validateFurniturePlacement(copy, item);
   return copy;
 }
+export function removeFurniture(scene, id) {
+  const index = scene.furniture_instances.findIndex((item) => item.id === id);
+  if (!id || index < 0) throw Error("找不到家具");
+  const copy = structuredClone(scene);
+  copy.furniture_instances.splice(index, 1);
+  return copy;
+}
 function footprint(item) {
   const angle = ((item.rotation_deg ?? 0) * Math.PI) / 180;
   const width = { x: Math.cos(angle), y: Math.sin(angle) };
@@ -244,7 +251,13 @@ export function addFurniture(scene, product, roomId, instanceId) {
     );
   const copy = structuredClone(scene);
   copy.furniture_instances.push({
-    metadata: { name: product.name, offline_catalog_only: !product.asset_id },
+    metadata: {
+      name: product.name,
+      offline_catalog_only: product.sellable !== true && !product.asset_id,
+      ...(product.model_kind === "dimensions"
+        ? { model_kind: "dimensions" }
+        : {}),
+    },
     id: instanceId,
     floor_id: room.floor_id,
     room_id: room.id,

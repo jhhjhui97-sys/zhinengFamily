@@ -63,18 +63,18 @@ namespace LocalScenes {
     var furniture=(JArray)JObject.Parse(sceneJson)["furniture_instances"];
     var lines=new Dictionary<Guid,LocalQuotationLine>();var exclusions=new List<LocalQuotationExclusion>();long total=0;
     foreach(JObject item in furniture) {
-     if(item["asset_id"]==null||item["asset_id"].Type==JTokenType.Null) {
-      Guid demoProduct=SceneReference((string)item["product_id"]);
-      var catalog=db.Query("SELECT name FROM local_catalog WHERE workspace_id=? AND product_id=?",Key(workspace),Key(demoProduct));
+     Guid productId=SceneReference((string)item["product_id"]);
+     bool hasAsset=item["asset_id"]!=null&&item["asset_id"].Type!=JTokenType.Null;
+     if(!hasAsset&&db.Query("SELECT id FROM local_products WHERE workspace_id=? AND id=?",Key(workspace),Key(productId)).Count==0) {
+      var catalog=db.Query("SELECT name FROM local_catalog WHERE workspace_id=? AND product_id=?",Key(workspace),Key(productId));
       Input(catalog.Count==1);
       string name=(string)catalog[0]["name"];
       var metadata=item["metadata"] as JObject;
       if(metadata!=null&&metadata["name"]!=null&&metadata["name"].Type==JTokenType.String&&!String.IsNullOrWhiteSpace((string)metadata["name"]))name=(string)metadata["name"];
-      exclusions.Add(new LocalQuotationExclusion {InstanceId=SceneReference((string)item["id"]),ProductId=demoProduct,Name=name});
+      exclusions.Add(new LocalQuotationExclusion {InstanceId=SceneReference((string)item["id"]),ProductId=productId,Name=name});
       continue;
      }
-     Guid productId=SceneReference((string)item["product_id"]),assetId=SceneReference((string)item["asset_id"]);
-     if(ModelAsset(assetId).ProductId!=productId)throw new LocalStoreError(LocalErrorCode.InvalidInput);
+     if(hasAsset&&ModelAsset(SceneReference((string)item["asset_id"])).ProductId!=productId)throw new LocalStoreError(LocalErrorCode.InvalidInput);
      LocalQuotationLine line;
      if(!lines.TryGetValue(productId,out line)) {
       var product=LocalProduct(productId);

@@ -10,7 +10,16 @@ public static class LocalBridge {
  static object Version(LocalSceneVersion v) { return v==null ? null : new {revision=v.Revision,saved_at=v.CreatedAt,scene=JObject.Parse(v.SceneJson)}; }
  static object Customer(LocalCustomer c) { return new {id=c.Id,name=c.Name,phone=c.Phone,wechat=c.Wechat,source=c.Source,address=c.Address,budget=c.Budget,status=c.Status,notes=c.Notes,revision=c.Revision,created_at=c.CreatedAt,updated_at=c.UpdatedAt,deleted_at=c.DeletedAt}; }
  static object Project(LocalProject p) { return new {id=p.Id,customer_id=p.CustomerId,sales_actor_id=p.SalesActorId,name=p.Name,address=p.Address,status=p.Status,revision=p.Revision,created_at=p.CreatedAt,updated_at=p.UpdatedAt}; }
- static object Product(LocalProduct p) { return new {id=p.Id,category=p.Category,brand=p.Brand,name=p.Name,sku=p.Sku,price=p.Price,width_mm=p.WidthMm,depth_mm=p.DepthMm,height_mm=p.HeightMm,metadata=JObject.Parse(p.MetadataJson),active_asset_id=p.ActiveAssetId,revision=p.Revision,created_at=p.CreatedAt,updated_at=p.UpdatedAt}; }
+ static object Product(LocalProduct p) { return new {id=p.Id,category=p.Category,brand=p.Brand,name=p.Name,sku=p.Sku,price=p.Price,width_mm=p.WidthMm,depth_mm=p.DepthMm,height_mm=p.HeightMm,metadata=JObject.Parse(p.MetadataJson),active_asset_id=p.ActiveAssetId,revision=p.Revision,created_at=p.CreatedAt,updated_at=p.UpdatedAt,deleted_at=p.DeletedAt}; }
+ static object CatalogProduct(LocalSceneStore store,LocalProduct product) {
+  Guid? assetId=null;
+  if(product.ActiveAssetId.HasValue) {
+   try {store.VerifiedModelPath(product.ActiveAssetId.Value);assetId=product.ActiveAssetId;}
+   catch(LocalStoreError error) {if(error.Code!=LocalErrorCode.NotFound)throw;}
+  }
+  return new {id=product.Id,name=product.Name,category=product.Category,brand=product.Brand,width_mm=product.WidthMm,depth_mm=product.DepthMm,height_mm=product.HeightMm,
+   model=assetId.HasValue?"/local-models/"+assetId.Value.ToString("D")+".glb":null,asset_id=assetId,model_kind=assetId.HasValue?"glb":"dimensions",sku=product.Sku,price=product.Price,sellable=true};
+ }
  static object Quotation(LocalQuotation q) { return new {id=q.Id,customer_id=q.CustomerId,project_id=q.ProjectId,document_id=q.DocumentId,scene_version=q.SceneRevision,customer_name=q.CustomerName,project_name=q.ProjectName,scene_name=q.SceneName,currency=q.Currency,total=q.Total,total_cents=q.TotalCents,excluded_demo_count=q.ExcludedDemoCount,created_by=q.CreatedBy,created_at=q.CreatedAt,lines=q.Lines.Select(x=>new {product_id=x.ProductId,name=x.ProductName,sku=x.Sku,unit_price=x.UnitPrice,quantity=x.Quantity,line_total=x.LineTotal}),exclusions=q.Exclusions.Select(x=>new {instance_id=x.InstanceId,product_id=x.ProductId,name=x.Name})}; }
  static object Order(LocalOrder o) { return new {id=o.Id,number=o.Number,quotation_id=o.QuotationId,customer_id=o.CustomerId,project_id=o.ProjectId,document_id=o.DocumentId,scene_version=o.SceneRevision,customer_name=o.CustomerName,project_name=o.ProjectName,scene_name=o.SceneName,currency=o.Currency,total=o.Total,status=o.Status,revision=o.Revision,created_at=o.CreatedAt,updated_at=o.UpdatedAt,lines=o.Lines.Select(x=>new {name=x.ProductName,sku=x.Sku,unit_price=x.UnitPrice,quantity=x.Quantity,line_total=x.LineTotal}),exclusions=o.Exclusions.Select(x=>new {name=x.Name}),events=o.Events.Select(x=>new {revision=x.Revision,status=x.Status,created_at=x.CreatedAt})}; }
  static string Field(JObject input,string key) { var value=input[key];if(value==null||value.Type==JTokenType.Null)return null;if(value.Type!=JTokenType.String)throw new LocalStoreError(LocalErrorCode.InvalidInput);return (string)value; }
@@ -40,7 +49,7 @@ public static class LocalBridge {
    string[] allowed={"action","id","customer_id","project_id","name","phone","wechat","source","address","budget","status","notes","base_revision","revision","scene","scene_version","limit","offset","search","category","brand","sku","price","width_mm","depth_mm","height_mm","metadata","sha256","byte_count"};
    if(input.Properties().Any(x=>!allowed.Contains(x.Name))) throw new LocalStoreError(LocalErrorCode.InvalidInput);
    action=(string)input["action"];
-   if(!new[]{"list","create","sample","current","save","versions","restore","validate","catalog","customers","deleted_customers","customer_create","customer","customer_update","customer_delete","customer_restore","projects","project_create","project","project_update","products","product_create","product","product_update","model_attach","model_asset","quotation_create","quotation","quotations","order_create","order","orders","order_status"}.Contains(action)) throw new LocalStoreError(LocalErrorCode.InvalidInput);
+   if(!new[]{"list","create","sample","current","save","versions","restore","validate","catalog","customers","deleted_customers","customer_create","customer","customer_update","customer_delete","customer_restore","projects","project_create","project","project_update","products","product_create","product_create_model","product","product_update","product_delete","model_attach","model_asset","quotation_create","quotation","quotations","order_create","order","orders","order_status"}.Contains(action)) throw new LocalStoreError(LocalErrorCode.InvalidInput);
    var validator=new OfflineSceneValidator(File.ReadAllText(args[1]));
    var identity=LocalIdentity.Open(args[0]);object data=null;
    using(var store=new LocalSceneStore(args[0],identity.WorkspaceId,identity.ActorId,validator)) {
@@ -59,8 +68,10 @@ public static class LocalBridge {
      case "project_update":if(input["customer_id"]!=null)throw new LocalStoreError(LocalErrorCode.InvalidInput);data=Project(store.UpdateProject(Id(input),Number(input,"base_revision",-1),Field(input,"name"),Field(input,"address"),Field(input,"status")));break;
      case "products":var saleProducts=store.LocalProducts(limit,offset,Field(input,"search"),Field(input,"category"));data=new{total=saleProducts.Total,items=saleProducts.Items.Select(x=>Product(x))};break;
      case "product_create":if(input["id"]!=null)throw new LocalStoreError(LocalErrorCode.InvalidInput);data=Product(store.CreateLocalProduct(Field(input,"category"),Field(input,"brand"),Field(input,"name"),Field(input,"sku"),Field(input,"price"),Dimension(input,"width_mm"),Dimension(input,"depth_mm"),Dimension(input,"height_mm"),Metadata(input)));break;
+     case "product_create_model":if(input["id"]!=null)throw new LocalStoreError(LocalErrorCode.InvalidInput);data=Product(store.CreateLocalProductWithModel(Field(input,"category"),Field(input,"brand"),Field(input,"name"),Field(input,"sku"),Field(input,"price"),Dimension(input,"width_mm"),Dimension(input,"depth_mm"),Dimension(input,"height_mm"),Metadata(input),Field(input,"sha256"),Number(input,"byte_count",-1)));break;
      case "product":data=Product(store.LocalProduct(Id(input)));break;
      case "product_update":data=Product(store.UpdateLocalProduct(Id(input),Number(input,"base_revision",-1),Field(input,"category"),Field(input,"brand"),Field(input,"name"),Field(input,"sku"),Field(input,"price"),Dimension(input,"width_mm"),Dimension(input,"depth_mm"),Dimension(input,"height_mm"),Metadata(input)));break;
+     case "product_delete":store.DeleteLocalProduct(Id(input),Number(input,"base_revision",-1));data=new{removed=true};break;
      case "model_attach":store.AttachLocalModel(Id(input),Number(input,"base_revision",-1),Field(input,"sha256"),Number(input,"byte_count",-1));data=Product(store.LocalProduct(Id(input)));break;
      case "model_asset":var model=store.ModelAsset(Id(input));store.VerifiedModelPath(model.Id);data=new{id=model.Id,product_id=model.ProductId,sha256=model.Sha256,byte_count=model.ByteCount};break;
      case "quotation_create":var quoteProject=QuoteProject(store,input);data=Quotation(store.CreateQuotation(Reference(input,"customer_id"),quoteProject,Id(input),Number(input,"scene_version",0)));break;
@@ -79,7 +90,7 @@ public static class LocalBridge {
        double width=(double)item["width_mm"],depth=(double)item["depth_mm"],height=(double)item["height_mm"];
        store.Catalog(product,name,width,depth,height);
       }
-      foreach(var product in store.LocalModelProducts()) products.Add(JObject.FromObject(new{id=product.Id,name=product.Name,category=product.Category,width_mm=product.WidthMm,depth_mm=product.DepthMm,height_mm=product.HeightMm,model="/local-models/"+product.ActiveAssetId.Value.ToString("D")+".glb",asset_id=product.ActiveAssetId.Value,sku=product.Sku}));
+      foreach(var product in store.LocalCatalogProducts())products.Add(JObject.FromObject(CatalogProduct(store,product)));
       data=products;break;
      case "list":var scopedProject=SceneProject(store,input);var page=scopedProject.HasValue?store.ProjectScenes(scopedProject.Value,limit,offset):store.LegacyDocuments(limit,offset);data=new {total=page.Total,items=page.Items.Select(x=>new{id=x.Id,name=x.Name,revision=x.Revision,saved_at=x.UpdatedAt})};break;
      case "create":var targetProject=SceneProject(store,input);data=new{id=targetProject.HasValue?store.CreateForProject(targetProject.Value,Field(input,"name")):store.Create(Field(input,"name"))};break;
@@ -102,7 +113,8 @@ public static class LocalBridge {
    string message;
    if(action=="customer_delete"&&status==409)message="客户资料已变化或已移出，请刷新后重试。";
    else if(action=="customer_restore"&&status==409)message="客户资料已变化，或手机号已被其他客户使用；原资料仍在已移出列表中。";
-   else if(productAction&&status==409)message=action=="product_create"?"商品 SKU 已存在，请换一个 SKU。":"商品 SKU 冲突或资料已变化，你的修改已保留，请刷新后重试。";
+   else if(action=="product_delete"&&status==409)message="商品资料已变化或已移出，请刷新后重试。";
+   else if(productAction&&status==409)message=action=="product_create"||action=="product_create_model"?"商品 SKU 已存在，请换一个 SKU。":"商品 SKU 冲突或资料已变化，你的修改已保留，请刷新后重试。";
    else if(action=="model_asset"&&status==404)message="本机模型文件已丢失、损坏或无权访问，请重新导入。";
    else if(productAction&&status==404)message="商品不存在，可能已被其他操作移除。";
    else if(productAction&&status==422)message="商品资料不合法，请检查价格、尺寸和属性后重试。";

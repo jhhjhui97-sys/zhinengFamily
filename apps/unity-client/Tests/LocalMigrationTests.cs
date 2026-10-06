@@ -39,7 +39,7 @@ public static class LocalMigrationTests {
    using(var store=new LocalSceneStore(path,identity.WorkspaceId,identity.ActorId,validator))
     Check(store.Current(document).Revision==2&&store.Versions(document).Count==2,"scene history changed during migration");
    using(var db=new SqliteConnection(path)) {
-    Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==7,"migration did not advance format");
+    Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==8,"migration did not advance format");
     Check(db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name='local_projects'").Count==1,"project table missing");
     db.Query("SELECT deleted_at FROM local_customers LIMIT 1");
    }
@@ -47,6 +47,7 @@ public static class LocalMigrationTests {
    Check(Directory.GetFiles(directory,"migration-legacy.sqlite.pre-v3-*.bak").Length==1,"direct v1 to v3 upgrade lacked intermediate backup");
    Check(Directory.GetFiles(directory,"migration-legacy.sqlite.pre-v5-*.bak").Length==1,"v1 to v5 upgrade lacked original backup");
    Check(Directory.GetFiles(directory,"migration-legacy.sqlite.pre-v7-*.bak").Length==1,"v1 to v7 upgrade lacked original backup");
+   Check(Directory.GetFiles(directory,"migration-legacy.sqlite.pre-v8-*.bak").Length==1,"v1 to v8 upgrade lacked original backup");
    using(var old=new SqliteConnection(Backups(path)[0])) {
     Check((long)old.Query("PRAGMA user_version")[0]["user_version"]==1,"backup was upgraded in place");
     Check((long)old.Query("SELECT COUNT(*) n FROM scene_versions WHERE document_id=?",document.ToString("D"))[0]["n"]==2,"backup lost scene history");
@@ -91,10 +92,46 @@ public static class LocalMigrationTests {
    string[] backups=Directory.GetFiles(directory,"migration-v1-v4-failure.sqlite.pre-v4-*.bak");Check(backups.Length==1,"original pre-v4 backup missing");
    using(var db=new SqliteConnection(backups[0])) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==1,"pre-v4 backup was not original v1");
   });
-  Test("fresh database starts at v7 without a recovery backup",()=>{
+  Test("v7 products migrate with a restorable backup and tolerate an existing tombstone column",()=>{
+   string path=Path.Combine(directory,"migration-v7-products.sqlite");Guid workspace=Guid.NewGuid(),actor=Guid.NewGuid(),product;
+   using(var store=new LocalSceneStore(path,workspace,actor,validator)) product=store.CreateLocalProduct("sofa","品牌","原有沙发","S1","100.00",2400,950,850).Id;
+   using(var db=new SqliteConnection(path)) {
+    bool column=false;foreach(var item in db.Query("PRAGMA table_info(local_products)")) if((string)item["name"]=="deleted_at")column=true;
+    db.Execute("DROP INDEX IF EXISTS local_products_active");
+    if(column)db.Execute("ALTER TABLE local_products DROP COLUMN deleted_at");
+    db.Execute("PRAGMA user_version=7");
+   }
+   using(var store=new LocalSceneStore(path,workspace,actor,validator)) Check(store.LocalProduct(product).Sku=="S1"&&store.LocalProducts().Total==1,"v7 product lost");
+   string[] backups=Directory.GetFiles(directory,"migration-v7-products.sqlite.pre-v8-*.bak");Check(backups.Length==1,"v7 recovery backup missing");
+   using(var db=new SqliteConnection(backups[0])) {
+    Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==7,"v7 backup upgraded in place");
+    Check((long)db.Query("SELECT COUNT(*) n FROM local_products WHERE id=?",product.ToString("D"))[0]["n"]==1,"v7 backup lost product");
+   }
+   string restored=Path.Combine(directory,"migration-v7-restored.sqlite");File.Copy(backups[0],restored);
+   using(var store=new LocalSceneStore(restored,workspace,actor,validator)) Check(store.LocalProduct(product).Sku=="S1","v7 backup failed to restore");
+   Check(LocalIdentity.Open(path).WorkspaceId==workspace,"v8 identity refused the workspace");
+   using(var db=new SqliteConnection(path)) db.Execute("PRAGMA user_version=7");
+   using(var store=new LocalSceneStore(path,workspace,actor,validator)) Check(store.LocalProducts().Total==1,"existing tombstone column broke a simulated downgrade");
+  });
+  Test("failed v8 migration rolls back the tombstone column and retains its original backup",()=>{
+   string path=Path.Combine(directory,"migration-v8-failure.sqlite");
+   using(var db=new SqliteConnection(path)) {
+    db.Execute("CREATE TABLE local_products(broken INTEGER)");db.Execute("INSERT INTO local_products VALUES(42)");
+    db.Execute("PRAGMA user_version=7");
+   }
+   bool failed=false;try {using(var ignored=new LocalSceneStore(path,Guid.NewGuid(),Guid.NewGuid(),validator)) {}}catch {failed=true;}
+   Check(failed,"broken v8 migration accepted");
+   using(var db=new SqliteConnection(path)) {
+    Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==7,"failed v8 migration advanced format");
+    Check((long)db.Query("SELECT broken FROM local_products")[0]["broken"]==42,"failed migration lost original data");
+    foreach(var item in db.Query("PRAGMA table_info(local_products)")) Check((string)item["name"]!="deleted_at","failed v8 migration left a partial tombstone column");
+   }
+   Check(Directory.GetFiles(directory,"migration-v8-failure.sqlite.pre-v8-*.bak").Length==1,"failed v8 migration lacked backup");
+  });
+  Test("fresh database starts at v8 without a recovery backup",()=>{
    string path=Path.Combine(directory,"migration-fresh.sqlite"); Guid workspace=Guid.NewGuid(),actor=Guid.NewGuid();
    using(var store=new LocalSceneStore(path,workspace,actor,validator)) Check(store.Documents().Total==0,"fresh library not empty");
-   using(var db=new SqliteConnection(path)) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==7,"fresh schema not v7");
+   using(var db=new SqliteConnection(path)) Check((long)db.Query("PRAGMA user_version")[0]["user_version"]==8,"fresh schema not v8");
    Check(Backups(path).Length==0,"fresh database has unnecessary backup");
   });
   Console.WriteLine("Local migration: "+passed+" passed");
