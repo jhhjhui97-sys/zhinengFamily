@@ -228,6 +228,9 @@ test(
     await page
       .getByRole("button", { name: "编辑 尺寸商品椅", exact: true })
       .click();
+    await page.waitForFunction(
+      () => document.activeElement === document.querySelector("#product-name"),
+    );
     assert.equal(
       await page
         .locator("#product-name")
