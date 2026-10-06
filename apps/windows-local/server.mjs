@@ -37,48 +37,73 @@ function finite(value) {
   return true;
 }
 function bridge(config, body) {
+  const started = Date.now();
+  const reportFailure = (details) => {
+    try {
+      config.onBridgeFailure?.({
+        ...details,
+        elapsed_ms: Date.now() - started,
+      });
+    } catch {}
+  };
   return new Promise((resolveReply) => {
-    const child = execFile(
-      config.bridgePath,
-      [
-        join(config.dataDirectory, "scenes.sqlite"),
-        join(config.protocolDirectory, "scene.schema.json"),
-        join(config.protocolDirectory, "two-bedroom.json"),
-        join(config.publicDirectory, "catalog.json"),
-      ],
-      {
-        encoding: "utf8",
-        windowsHide: true,
-        timeout: 15000,
-        maxBuffer: 32 * 1024 * 1024,
-      },
-      (error, stdout) => {
-        if (error) {
-          resolveReply({
-            status: 503,
-            error: "本地资料服务暂时无法使用，请检查安装后重试。",
-          });
-          return;
-        }
-        try {
-          const result = JSON.parse(stdout.replace(/^\uFEFF/, ""));
-          if (
-            !Number.isInteger(result.status) ||
-            result.status < 200 ||
-            result.status > 599
-          )
-            throw Error();
-          resolveReply(result);
-        } catch {
-          resolveReply({
-            status: 503,
-            error: "本地资料服务暂时无法使用，请重试。",
-          });
-        }
-      },
-    );
-    child.stdin.on("error", () => {});
-    child.stdin.end(body);
+    const processFailed = (error) => {
+      reportFailure({
+        reason: "process",
+        code: error.code ?? null,
+        signal: error.signal ?? null,
+        killed: Boolean(error.killed),
+      });
+      resolveReply({
+        status: 503,
+        error: "本地资料服务暂时无法使用，请检查安装后重试。",
+      });
+    };
+    try {
+      const child = execFile(
+        config.bridgePath,
+        [
+          join(config.dataDirectory, "scenes.sqlite"),
+          join(config.protocolDirectory, "scene.schema.json"),
+          join(config.protocolDirectory, "two-bedroom.json"),
+          join(config.publicDirectory, "catalog.json"),
+        ],
+        {
+          encoding: "utf8",
+          windowsHide: true,
+          timeout: 15000,
+          maxBuffer: 32 * 1024 * 1024,
+        },
+        (error, stdout) => {
+          if (error) {
+            processFailed(error);
+            return;
+          }
+          try {
+            const result = JSON.parse(stdout.replace(/^\uFEFF/, ""));
+            if (
+              !Number.isInteger(result.status) ||
+              result.status < 200 ||
+              result.status > 599
+            )
+              throw Error();
+            if (result.status >= 500)
+              reportFailure({ reason: "service", status: result.status });
+            resolveReply(result);
+          } catch {
+            reportFailure({ reason: "response" });
+            resolveReply({
+              status: 503,
+              error: "本地资料服务暂时无法使用，请重试。",
+            });
+          }
+        },
+      );
+      child.stdin.on("error", () => {});
+      child.stdin.end(body);
+    } catch (error) {
+      processFailed(error);
+    }
   });
 }
 export function createLocalServer(options) {

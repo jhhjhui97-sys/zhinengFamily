@@ -15,10 +15,16 @@ const { createLocalServer } = await import(
 const root = resolve(import.meta.dirname, "../../..");
 async function setup(
   t,
-  { trackFrames = false, failFirstCatalog = false } = {},
+  {
+    trackFrames = false,
+    failFirstCatalog = false,
+    traceLifecycle = false,
+  } = {},
 ) {
   const data = await mkdtemp(join(tmpdir(), "family-browser-"));
   const config = {
+    onBridgeFailure: (failure) =>
+      t.diagnostic(`Local bridge failure: ${JSON.stringify(failure)}`),
     bridgePath: process.env.FAMILY_BUNDLE
       ? join(process.env.FAMILY_BUNDLE, "runtime/bridge/LocalBridge.exe")
       : join(root, ".local/windows-bridge/LocalBridge.exe"),
@@ -36,8 +42,31 @@ async function setup(
   let server = createLocalServer(config);
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   let url = `http://127.0.0.1:${server.address().port}`;
-  let browser;
+  let browser, page;
   t.after(async () => {
+    if (traceLifecycle && page && !page.isClosed()) {
+      let snapshotTimeout;
+      try {
+        const state = await Promise.race([
+          page.evaluate(() => ({
+            message: document.querySelector("#message")?.textContent,
+            revision: document.querySelector("#revision")?.textContent,
+            stats: document.querySelector("#scene-stats")?.textContent,
+            render: document.querySelector("#render-status")?.textContent,
+            canvas: { ...document.querySelector("canvas")?.dataset },
+            saveDisabled: document.querySelector("#save")?.disabled,
+          })),
+          new Promise((resolve) => {
+            snapshotTimeout = setTimeout(() => resolve("unresponsive"), 3000);
+          }),
+        ]);
+        t.diagnostic(`Final browser state: ${JSON.stringify(state)}`);
+      } catch (error) {
+        t.diagnostic(`Browser state unavailable: ${error.message}`);
+      } finally {
+        clearTimeout(snapshotTimeout);
+      }
+    }
     await browser?.close();
     await new Promise((r) => server.close(r));
   });
@@ -77,11 +106,30 @@ async function setup(
       return route.continue();
     });
   }
-  const page = await context.newPage();
+  page = await context.newPage();
   const errors = [];
+  page.on("response", (response) => {
+    if (response.status() < 500) return;
+    const request = response.request();
+    let action;
+    try {
+      action = JSON.parse(request.postData() ?? "{}").action;
+    } catch {}
+    t.diagnostic(
+      `HTTP ${response.status()} ${new URL(response.url()).pathname} action=${action ?? "none"}`,
+    );
+  });
+  page.on("requestfailed", (request) =>
+    t.diagnostic(
+      `Request failed: ${new URL(request.url()).pathname} ${request.failure()?.errorText}`,
+    ),
+  );
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => {
-    if (m.type() === "error") errors.push(m.text());
+    if (m.type() === "error") {
+      errors.push(m.text());
+      t.diagnostic(`Browser console error: ${m.text()} ${m.location().url}`);
+    }
   });
   await page.goto(url);
   await page
@@ -514,8 +562,9 @@ test(
   "DXF import previews two project rooms and a separate wall layer, then saves locally",
   { timeout: 120000 },
   async (t) => {
-    const { page, errors, restart } = await setup(t);
+    const { page, errors, restart } = await setup(t, { traceLifecycle: true });
     await localDxfProject(page, "DXF 本地方案");
+    t.diagnostic("DXF: project created");
     await page
       .getByRole("button", { name: "导入 DXF 户型", exact: true })
       .click();
@@ -532,6 +581,7 @@ test(
     await page.locator("#dxf-room-layer").selectOption("ROOM");
     await page.locator("#dxf-wall-layer").selectOption("WALL");
     await page.locator("#dxf-preview polygon").first().waitFor();
+    t.diagnostic("DXF: preview loaded");
     assert.equal(await page.locator("#dxf-preview polygon").count(), 2);
     await page.locator("#dxf-confirm-units").check();
     await page
@@ -541,13 +591,17 @@ test(
       .locator("#scene-stats")
       .filter({ hasText: "2 个房间 · 1 段墙体" })
       .waitFor();
+    t.diagnostic("DXF: draft generated");
     await page.getByRole("button", { name: "保存新版本", exact: true }).click();
     await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    t.diagnostic("DXF: version saved");
     await page
       .locator('canvas[data-room-material-loaded="true"]')
       .waitFor({ timeout: 90000 });
+    t.diagnostic("DXF: materials loaded");
     assert.equal(errors.length, 0, errors.join("\n"));
     await restart();
+    t.diagnostic("DXF: service restarted");
     await page.getByRole("button", { name: "DXF 客户", exact: true }).click();
     await page
       .getByRole("button", { name: "DXF 房屋项目", exact: true })
