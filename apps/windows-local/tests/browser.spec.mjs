@@ -88,6 +88,11 @@ async function setup(
     .locator("#customer-count")
     .filter({ hasText: /共 \d+ 位客户/ })
     .waitFor();
+  // The initial count is a static placeholder. Wait for startup reads to finish
+  // before direct API setup can create a second connection to a fresh database.
+  await page.waitForFunction(
+    () => !document.querySelector("#customer-create").disabled,
+  );
   const restart = async () => {
     await new Promise((r) => server.close(r));
     server = createLocalServer(config);
@@ -209,8 +214,12 @@ test(
     await page.getByRole("button", { name: "生成报价", exact: true }).click();
     await page
       .locator("#quote-total")
-      .filter({ hasText: "¥1,200.00" })
+      .filter({ hasText: "合计 ¥1,200" })
       .waitFor();
+    assert.equal(
+      await page.locator("#quote-total").textContent(),
+      "合计 ¥1,200",
+    );
     await page
       .locator("#quote-lines")
       .filter({ hasText: "DIM-CHAIR-1" })
@@ -275,7 +284,10 @@ test(
       await page.locator("#quote-lines").textContent(),
       /尺寸商品椅.*DIM-CHAIR-1/s,
     );
-    assert.match(await page.locator("#quote-total").textContent(), /1,200\.00/);
+    assert.equal(
+      await page.locator("#quote-total").textContent(),
+      "合计 ¥1,200",
+    );
     await page.locator("#furniture-select").selectOption(placed.id);
     page.once("dialog", (dialog) => dialog.dismiss());
     await page
@@ -723,6 +735,10 @@ test(
       .click();
     await page
       .locator("#product-detail")
+      .filter({ hasText: "SOFA-001" })
+      .waitFor();
+    await page
+      .locator("#products-items")
       .filter({ hasText: "SOFA-001" })
       .waitFor();
     assert.match(
