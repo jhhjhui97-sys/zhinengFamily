@@ -7,6 +7,7 @@ import {
 } from "./scene-tools.mjs";
 import { mountFurnitureGestures } from "./furniture-gestures.mjs";
 import { mountProducts } from "./products.mjs";
+import { createCatalogRefresh } from "./catalog-refresh.mjs";
 import { mountQuotes } from "./quotes.mjs";
 import { mountOrders } from "./orders.mjs";
 import { mountDxfImport } from "./dxf-import.mjs";
@@ -116,6 +117,7 @@ async function api(action, fields = {}) {
   if (!response.ok) throw Error(body.error ?? "操作失败，请重试。");
   return body.data;
 }
+const refreshCatalog = createCatalogRefresh(() => api("catalog"), applyCatalog);
 const productsView = mountProducts({ api, onChanged: loadCatalog });
 const dxfImport = mountDxfImport({
   getActive: () => (selectedProject ? active : null),
@@ -233,9 +235,12 @@ function refreshDraft() {
   if (draft) view.show(draft);
   else view.clear();
 }
-async function loadCatalog() {
+function loadCatalog() {
+  return refreshCatalog();
+}
+function applyCatalog(products) {
   const selected = $("catalog-select").value;
-  catalogItems = await api("catalog");
+  catalogItems = products;
   view.configureCatalog(catalogItems);
   $("catalog-select").replaceChildren();
   for (const product of catalogItems) {
