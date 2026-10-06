@@ -667,6 +667,23 @@ a {
 #order-print-view {
   display: none;
 }
+.inline-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.inline-check input {
+  width: auto;
+}
+#finish-panel summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+#finish-panel input[type="color"] {
+  height: 34px;
+  padding: 3px;
+}
 @media print {
   @page {
     size: A4;

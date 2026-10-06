@@ -72,7 +72,13 @@ export class RoomTextureCache {
   }
 }
 
-export function tileWallGeometry(geometry, width, height, depth) {
+export function tileWallGeometry(
+  geometry,
+  width,
+  height,
+  depth,
+  offsets = null,
+) {
   const faces = [
     [depth, height],
     [depth, height],
@@ -84,9 +90,22 @@ export function tileWallGeometry(geometry, width, height, depth) {
   const uv = geometry.getAttribute("uv");
   for (let face = 0; face < faces.length; face++) {
     const [u, v] = faces[face];
+    // The back face runs in reverse. Its global -x phase preserves that
+    // orientation while matching adjacent wall pieces across door/window cuts.
+    const offsetU =
+      face === 4
+        ? (offsets?.x ?? 0)
+        : face === 5 && offsets
+          ? -(offsets.x ?? 0) - width
+          : 0;
+    const offsetV = face >= 4 ? (offsets?.y ?? 0) : 0;
     for (let vertex = 0; vertex < 4; vertex++) {
       const index = face * 4 + vertex;
-      uv.setXY(index, uv.getX(index) * u, uv.getY(index) * v);
+      uv.setXY(
+        index,
+        uv.getX(index) * u + offsetU,
+        uv.getY(index) * v + offsetV,
+      );
     }
   }
   uv.needsUpdate = true;

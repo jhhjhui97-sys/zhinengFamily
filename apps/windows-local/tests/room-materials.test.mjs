@@ -17,6 +17,49 @@ test("wall plaster UVs keep a one-metre texture scale across wall lengths", () =
   geometry.dispose();
 });
 
+test("wall finishes keep their global horizontal phase on both sides across a door opening", () => {
+  const left = new THREE.BoxGeometry(1, 2.8, 0.2);
+  const right = new THREE.BoxGeometry(2.1, 2.8, 0.2);
+  tileWallGeometry(left, 1, 2.8, 0.2, { x: 0, y: 0 });
+  tileWallGeometry(right, 2.1, 2.8, 0.2, { x: 1.9, y: 0 });
+  const a = left.getAttribute("uv"),
+    b = right.getAttribute("uv");
+  assert.equal(a.getX(16), 0);
+  assert.equal(a.getX(17), 1);
+  assert.ok(Math.abs(b.getX(16) - 1.9) < 1e-6);
+  assert.equal(b.getX(17), 4);
+  assert.equal(a.getX(20), -1);
+  assert.equal(a.getX(21), 0);
+  assert.equal(b.getX(20), -4);
+  assert.ok(Math.abs(b.getX(21) + 1.9) < 1e-6);
+  left.dispose();
+  right.dispose();
+});
+
+test("window header and sill pieces retain physical horizontal and vertical texture coordinates", () => {
+  const side = new THREE.BoxGeometry(1, 2.8, 0.2);
+  const header = new THREE.BoxGeometry(0.9, 0.6, 0.2);
+  const sill = new THREE.BoxGeometry(0.9, 0.8, 0.2);
+  tileWallGeometry(side, 1, 2.8, 0.2, { x: 0, y: 0 });
+  tileWallGeometry(header, 0.9, 0.6, 0.2, { x: 1, y: 2.2 });
+  tileWallGeometry(sill, 0.9, 0.8, 0.2, { x: 1, y: 0 });
+  const a = side.getAttribute("uv"),
+    b = header.getAttribute("uv"),
+    c = sill.getAttribute("uv");
+  assert.equal(b.getX(16), a.getX(17));
+  assert.equal(b.getX(21), a.getX(20));
+  assert.equal(c.getX(16), b.getX(16));
+  assert.equal(c.getX(21), b.getX(21));
+  assert.ok(Math.abs(b.getY(16) - 2.8) < 1e-6);
+  assert.ok(Math.abs(b.getY(18) - 2.2) < 1e-6);
+  assert.ok(Math.abs(b.getY(22) - 2.2) < 1e-6);
+  assert.equal(c.getY(18), 0);
+  assert.ok(Math.abs(c.getY(16) - 0.8) < 1e-6);
+  side.dispose();
+  header.dispose();
+  sill.dispose();
+});
+
 test("textures finishing after renderer disposal are released", async () => {
   let finishLoad;
   const disposed = [];

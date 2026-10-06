@@ -5,6 +5,8 @@ import { mkdtemp, mkdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { dracoFixture } from "./glb-fixtures.mjs";
+import { televisionFixture } from "./tv-fixture.mjs";
 const { createLocalServer } = await import(
   process.env.FAMILY_BUNDLE
     ? pathToFileURL(
@@ -176,6 +178,73 @@ async function fillProduct(page, overrides = {}) {
   for (const [key, value] of Object.entries(values))
     await page.locator(`#product-${key}`).fill(value);
 }
+const draftScene = async (page) =>
+  JSON.parse(await page.locator("#scene-json").inputValue());
+async function furnitureEvidence(page, id) {
+  await page.waitForFunction(
+    (id) => {
+      const canvas = document.querySelector("#viewport canvas");
+      return (
+        canvas?.dataset.modelLoaded === "true" &&
+        JSON.parse(canvas.dataset.furnitureGeometry ?? "[]").some(
+          (item) => item.id === id,
+        )
+      );
+    },
+    id,
+    { timeout: 90000 },
+  );
+  return page
+    .locator("#viewport canvas")
+    .evaluate(
+      (canvas, id) =>
+        JSON.parse(canvas.dataset.furnitureGeometry).find(
+          (item) => item.id === id,
+        ),
+      id,
+    );
+}
+async function fillFurniturePose(page, pose) {
+  for (const [key, value] of Object.entries(pose))
+    await page.locator(`#furniture-${key}`).fill(String(value));
+  await page.locator("#apply-position").click();
+  await page
+    .locator("#message")
+    .filter({ hasText: "家具位置已更新" })
+    .waitFor();
+  await page.waitForFunction(
+    () => !document.querySelector("#apply-position").disabled,
+  );
+}
+async function saveSceneVersion(page, revision) {
+  await page.locator("#save").click();
+  await page
+    .locator("#revision")
+    .filter({ hasText: `当前 v${revision}` })
+    .waitFor();
+  await page.waitForFunction(() => !document.querySelector("#save").disabled);
+}
+async function renderedFinish(page, roomId, surface, color) {
+  await page.waitForFunction(
+    ({ roomId, surface, color }) => {
+      const canvas = document.querySelector("#viewport canvas");
+      return (
+        canvas?.dataset.modelLoaded === "true" &&
+        JSON.parse(canvas.dataset.surfaceFinishes ?? "[]").some(
+          (item) =>
+            item.roomId === roomId &&
+            item.surface === surface &&
+            item.color === color,
+        )
+      );
+    },
+    { roomId, surface, color },
+    { timeout: 90000 },
+  );
+  return page
+    .locator("#viewport canvas")
+    .evaluate((canvas) => JSON.parse(canvas.dataset.surfaceFinishes));
+}
 
 const dxfRoom = (x1, y1, x2, y2) =>
   `0\nLWPOLYLINE\n8\nROOM\n90\n4\n70\n1\n10\n${x1}\n20\n${y1}\n10\n${x2}\n20\n${y1}\n10\n${x2}\n20\n${y2}\n10\n${x1}\n20\n${y2}\n`;
@@ -201,6 +270,416 @@ async function localDxfProject(page, sceneName) {
   await page.locator("#project-name").fill(sceneName);
   await page.getByRole("button", { name: "新建方案", exact: true }).click();
 }
+
+test(
+  "plain model creation renders anonymous textured TV and offline Draco, while explicit model replacement preserves history",
+  { timeout: 240000 },
+  async (t) => {
+    const { page, errors, restart } = await setup(t, { traceLifecycle: true });
+    const externalRequests = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (url.protocol.startsWith("http") && url.hostname !== "127.0.0.1")
+        externalRequests.push(url.href);
+    });
+    const call = async (body) => {
+      const origin = new URL(page.url()).origin;
+      const response = await page.request.post(`${origin}/api/local`, {
+        headers: { origin },
+        data: body,
+      });
+      const result = await response.json();
+      assert.equal(response.status(), 200, JSON.stringify(result));
+      return result.data;
+    };
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await fillProduct(page, {
+      category: "television",
+      name: "匿名电视",
+      sku: "TV-ANONYMOUS",
+      width: "1200",
+      depth: "300",
+      height: "800",
+    });
+    const tv = televisionFixture().bytes;
+    await page.locator("#product-model-file").setInputFiles({
+      name: "anonymous-tv.glb",
+      mimeType: "model/gltf-binary",
+      buffer: tv,
+    });
+    await page.locator("#product-create").click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "模型已导入，并新建在售商品" })
+      .waitFor();
+    const tvProduct = (
+      await call({ action: "products", search: "TV-ANONYMOUS" })
+    ).items[0];
+    assert.ok(
+      tvProduct.active_asset_id,
+      "plain product creation must attach the selected model",
+    );
+    await fillProduct(page, {
+      name: "离线压缩模型",
+      sku: "DRACO-OFFLINE",
+      width: "400",
+      depth: "400",
+      height: "400",
+    });
+    await page.locator("#product-model-file").setInputFiles({
+      name: "compressed.glb",
+      mimeType: "model/gltf-binary",
+      buffer: dracoFixture().bytes,
+    });
+    await page.locator("#product-create").click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "模型已导入，并新建在售商品" })
+      .waitFor();
+    const compressed = (
+      await call({ action: "products", search: "DRACO-OFFLINE" })
+    ).items[0];
+    assert.ok(compressed.active_asset_id);
+    await fillProduct(page, {
+      category: "television",
+      name: "后导入电视",
+      sku: "TV-LATER",
+      width: "1200",
+      depth: "300",
+      height: "800",
+    });
+    await page.locator("#product-create").click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "商品已保存在本机" })
+      .waitFor();
+    const later = (await call({ action: "products", search: "TV-LATER" }))
+      .items[0];
+    assert.equal(later.active_asset_id, null);
+    await page.getByRole("button", { name: "设计工作台", exact: true }).click();
+    await project(page, true);
+    for (const product of [tvProduct, compressed, later]) {
+      await page.locator("#catalog-select").selectOption(product.id);
+      await page.locator("#add-furniture").click();
+      await page
+        .locator("#message")
+        .filter({ hasText: `${product.name}已放入场景` })
+        .waitFor();
+    }
+    const original = await draftScene(page);
+    const tvInstance = original.furniture_instances.find(
+      (item) => item.product_id === tvProduct.id,
+    );
+    const dracoInstance = original.furniture_instances.find(
+      (item) => item.product_id === compressed.id,
+    );
+    const laterInstance = original.furniture_instances.find(
+      (item) => item.product_id === later.id,
+    );
+    assert.deepEqual(await furnitureEvidence(page, tvInstance.id), {
+      id: tvInstance.id,
+      meshes: 6,
+      vertices: 124,
+      indices: 186,
+      texturedMeshes: 1,
+      boundsMm: [1200, 800, 300],
+    });
+    assert.deepEqual(await furnitureEvidence(page, dracoInstance.id), {
+      id: dracoInstance.id,
+      meshes: 1,
+      vertices: 4,
+      indices: 12,
+      texturedMeshes: 0,
+      boundsMm: [400, 400, 400],
+    });
+    assert.equal(laterInstance.asset_id, null);
+    await saveSceneVersion(page, 1);
+    await page.getByRole("button", { name: "商品管理", exact: true }).click();
+    await page
+      .getByRole("button", { name: "编辑 后导入电视", exact: true })
+      .click();
+    await page.waitForFunction(
+      () => document.activeElement === document.querySelector("#product-name"),
+    );
+    await page.locator("#product-model-file").setInputFiles({
+      name: "anonymous-tv.glb",
+      mimeType: "model/gltf-binary",
+      buffer: tv,
+    });
+    await page.locator("#product-model-upload").click();
+    await page
+      .locator("#product-message")
+      .filter({ hasText: "模型已导入本机，并关联当前商品" })
+      .waitFor();
+    const attached = await call({ action: "product", id: later.id });
+    assert.ok(attached.active_asset_id);
+    assert.deepEqual(
+      await draftScene(page),
+      original,
+      "a catalogue model update must not rewrite a saved scene",
+    );
+    await page.getByRole("button", { name: "设计工作台", exact: true }).click();
+    await page.locator("#furniture-select").selectOption(laterInstance.id);
+    await page.locator("#furniture-current-model").click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "已切换到商品当前模型" })
+      .waitFor();
+    const replacement = (await draftScene(page)).furniture_instances.find(
+      (item) => item.id === laterInstance.id,
+    );
+    assert.equal(replacement.asset_id, attached.active_asset_id);
+    assert.equal(replacement.metadata.model_kind, "glb");
+    assert.deepEqual(replacement.position, laterInstance.position);
+    assert.equal(replacement.width_mm, 1200);
+    assert.equal(replacement.depth_mm, 300);
+    assert.equal(replacement.height_mm, 800);
+    assert.deepEqual(await furnitureEvidence(page, laterInstance.id), {
+      id: laterInstance.id,
+      meshes: 6,
+      vertices: 124,
+      indices: 186,
+      texturedMeshes: 1,
+      boundsMm: [1200, 800, 300],
+    });
+    await page.locator("#viewport canvas").scrollIntoViewIfNeeded();
+    await mkdir(join(root, ".local/windows-evidence"), { recursive: true });
+    await page.screenshot({
+      path: join(root, ".local/windows-evidence/imported-tv-draco.png"),
+    });
+    await saveSceneVersion(page, 2);
+    await page.getByRole("button", { name: "查看 v1", exact: true }).click();
+    await page
+      .locator("#history-json")
+      .filter({ hasText: original.scene_id })
+      .waitFor();
+    const old = JSON.parse(await page.locator("#history-json").textContent());
+    assert.equal(
+      old.furniture_instances.find((item) => item.id === laterInstance.id)
+        .asset_id,
+      null,
+    );
+    assert.equal(
+      old.furniture_instances.find((item) => item.id === laterInstance.id)
+        .metadata.model_kind,
+      "dimensions",
+    );
+    await restart();
+    await page.getByRole("button", { name: /张先生 · 龙湖小区120㎡/ }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v2" }).waitFor();
+    assert.equal((await furnitureEvidence(page, dracoInstance.id)).vertices, 4);
+    assert.equal(
+      (await furnitureEvidence(page, laterInstance.id)).texturedMeshes,
+      1,
+    );
+    assert.deepEqual(externalRequests, []);
+    assert.deepEqual(errors, []);
+  },
+);
+
+test(
+  "XYZ fields and Shift middle height work with side contact, stacking and penetration rejection",
+  { timeout: 180000 },
+  async (t) => {
+    const { page, errors, restart } = await setup(t, { traceLifecycle: true });
+    await project(page, true);
+    const sofa = (await draftScene(page)).furniture_instances[0];
+    assert.equal(await page.locator("#furniture-snap").isChecked(), true);
+    await fillFurniturePose(page, { x: 3500, y: 1800, z: 600, rotation: 90 });
+    const raised = (await draftScene(page)).furniture_instances[0];
+    assert.deepEqual(raised.position, { x: 3500, y: 1800, z: 600 });
+    await furnitureEvidence(page, sofa.id);
+    await page.locator("#viewport canvas").scrollIntoViewIfNeeded();
+    const canvas = await page.locator("#viewport canvas").boundingBox();
+    const x = canvas.x + canvas.width / 2,
+      y = canvas.y + canvas.height / 2;
+    await page.mouse.move(x, y);
+    await page.keyboard.down("Shift");
+    await page.mouse.down({ button: "middle" });
+    await page.mouse.move(x, y - 35, { steps: 5 });
+    await page.mouse.up({ button: "middle" });
+    await page.keyboard.up("Shift");
+    await page.waitForFunction(
+      (id) =>
+        JSON.parse(
+          document.querySelector("#scene-json").value,
+        ).furniture_instances.find((item) => item.id === id).position.z > 600,
+      sofa.id,
+    );
+    const shifted = (await draftScene(page)).furniture_instances.find(
+      (item) => item.id === sofa.id,
+    );
+    assert.equal(shifted.position.x, 3500);
+    assert.equal(shifted.position.y, 1800);
+    assert.equal(shifted.rotation_deg, 90);
+    assert.equal(
+      Number(await page.locator("#furniture-z").inputValue()),
+      shifted.position.z,
+    );
+    await fillFurniturePose(page, { x: 4000, y: 2000, z: 0, rotation: 90 });
+    await page
+      .locator("#catalog-select")
+      .selectOption("40000000-0000-4000-8000-000000000003");
+    await page.locator("#add-furniture").click();
+    await page.locator("#message").filter({ hasText: "已放入场景" }).waitFor();
+    const chair = (await draftScene(page)).furniture_instances.find(
+      (item) => item.id !== sofa.id,
+    );
+    await fillFurniturePose(page, { x: 4900, y: 2000, z: 0, rotation: 0 });
+    assert.equal(
+      (await draftScene(page)).furniture_instances.find(
+        (item) => item.id === chair.id,
+      ).position.x,
+      4875,
+    );
+    await fillFurniturePose(page, { x: 4000, y: 2000, z: 825, rotation: 0 });
+    assert.deepEqual(
+      (await draftScene(page)).furniture_instances.find(
+        (item) => item.id === chair.id,
+      ).position,
+      { x: 4000, y: 2000, z: 850 },
+    );
+    const touching = await draftScene(page);
+    await page.locator("#furniture-snap").setChecked(false);
+    await page.locator("#furniture-z").fill("849");
+    await page.locator("#apply-position").click();
+    await page.locator("#message.error").filter({ hasText: "碰撞" }).waitFor();
+    assert.deepEqual(await draftScene(page), touching);
+    await page.locator("#furniture-snap").setChecked(true);
+    await fillFurniturePose(page, { z: 825 });
+    await saveSceneVersion(page, 1);
+    await restart();
+    await page.getByRole("button", { name: /张先生 · 龙湖小区120㎡/ }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v1" }).waitFor();
+    assert.deepEqual(
+      (await draftScene(page)).furniture_instances.find(
+        (item) => item.id === chair.id,
+      ).position,
+      { x: 4000, y: 2000, z: 850 },
+    );
+    await furnitureEvidence(page, chair.id);
+    assert.deepEqual(errors, []);
+  },
+);
+
+test(
+  "floor and whole-room wall finishes render locally, save process layers and restore immutable history",
+  { timeout: 180000 },
+  async (t) => {
+    const { page, errors, restart } = await setup(t, { traceLifecycle: true });
+    await project(page, true);
+    const original = await draftScene(page),
+      roomId = original.rooms[0].id;
+    await page.locator("#finish-panel > summary").click();
+    await page.locator("#finish-room").selectOption(roomId);
+    await page.locator("#finish-preset").selectOption("floor-wood");
+    await page.locator("#finish-layout").selectOption("herringbone");
+    await page.locator("#finish-color").fill("#123456");
+    await page.locator("#finish-accent").fill("#654321");
+    await page.locator("#finish-width").fill("120");
+    await page.locator("#finish-height").fill("600");
+    await page.locator("#finish-panel details > summary").click();
+    await page.locator("#finish-substrate").fill("水泥砂浆找平后铺设");
+    await page
+      .locator("#finish-layers")
+      .fill("找平层|20|水泥砂浆\n地板|12|实木饰面");
+    await page.locator("#finish-note").fill("门口留伸缩缝");
+    await page.locator("#finish-apply").click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "装修已应用到草稿" })
+      .waitFor();
+    const floorEvidence = await renderedFinish(
+      page,
+      roomId,
+      "floor",
+      "#123456",
+    );
+    const renderedFloor = floorEvidence.find(
+      (item) => item.roomId === roomId && item.surface === "floor",
+    );
+    assert.equal(renderedFloor.pattern, "wood");
+    assert.ok(renderedFloor.mapWidth >= 8);
+    await page.locator("#finish-surface").selectOption("wall");
+    await page.locator("#finish-preset").selectOption("wall-tile");
+    await page.locator("#finish-color").fill("#abc123");
+    await page.locator("#finish-layout").selectOption("staggered");
+    await page.locator("#finish-apply").click();
+    await page
+      .locator("#message")
+      .filter({ hasText: "装修已应用到草稿" })
+      .waitFor();
+    const wallEvidence = await renderedFinish(page, roomId, "wall", "#abc123");
+    assert.ok(
+      wallEvidence.some(
+        (item) =>
+          item.roomId === roomId &&
+          item.surface === "wall" &&
+          item.wallId &&
+          item.pattern === "tile" &&
+          item.color === "#abc123",
+      ),
+    );
+    const decorated = await draftScene(page),
+      record = decorated.rooms.find((room) => room.id === roomId).metadata
+        .surface_finishes;
+    assert.equal(record.floor.layout, "herringbone");
+    assert.deepEqual(record.floor.layers, [
+      { name: "找平层", thickness_mm: 20, note: "水泥砂浆" },
+      { name: "地板", thickness_mm: 12, note: "实木饰面" },
+    ]);
+    assert.equal(record.floor.process_note, "门口留伸缩缝");
+    assert.equal(record.walls.color, "#abc123");
+    assert.deepEqual(decorated.walls, original.walls);
+    assert.deepEqual(decorated.doors, original.doors);
+    assert.deepEqual(decorated.windows, original.windows);
+    assert.ok(
+      decorated.rooms.slice(1).every((room) => !room.metadata.surface_finishes),
+    );
+    await page.locator("#viewport canvas").scrollIntoViewIfNeeded();
+    await mkdir(join(root, ".local/windows-evidence"), { recursive: true });
+    await page.screenshot({
+      path: join(root, ".local/windows-evidence/custom-room-finishes.png"),
+    });
+    await saveSceneVersion(page, 1);
+    await page.locator("#finish-surface").selectOption("floor");
+    await page.locator("#finish-clear").click();
+    await page.locator("#message").filter({ hasText: "装修已清除" }).waitFor();
+    await saveSceneVersion(page, 2);
+    await restart();
+    await page.getByRole("button", { name: /张先生 · 龙湖小区120㎡/ }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v2" }).waitFor();
+    const current = (await draftScene(page)).rooms.find(
+      (room) => room.id === roomId,
+    ).metadata.surface_finishes;
+    assert.equal(current.floor, undefined);
+    assert.equal(current.walls.color, "#abc123");
+    await page.getByRole("button", { name: "查看 v1", exact: true }).click();
+    await page
+      .locator("#history-json")
+      .filter({ hasText: original.scene_id })
+      .waitFor();
+    const history = JSON.parse(
+      await page.locator("#history-json").textContent(),
+    );
+    assert.deepEqual(
+      history.rooms.find((room) => room.id === roomId).metadata
+        .surface_finishes,
+      record,
+    );
+    await page.getByRole("button", { name: "恢复此版本", exact: true }).click();
+    await page.getByRole("button", { name: "确认恢复", exact: true }).click();
+    await page.locator("#revision").filter({ hasText: "当前 v3" }).waitFor();
+    assert.deepEqual(
+      (await draftScene(page)).rooms.find((room) => room.id === roomId).metadata
+        .surface_finishes,
+      record,
+    );
+    await renderedFinish(page, roomId, "floor", "#123456");
+    await renderedFinish(page, roomId, "wall", "#abc123");
+    assert.deepEqual(errors, []);
+  },
+);
 test(
   "dimensions-only products refresh immediately, preserve saved scenes and quotes, and furniture deletion saves a new version",
   { timeout: 180000 },

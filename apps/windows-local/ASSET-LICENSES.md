@@ -23,3 +23,16 @@ GLB size: 10131180 bytes. SHA256: ef8da8b144e650c277ac953e6d9e50ac1689ff1ee88c2c
 The four assets are explicitly marked as demo models. They do not imply that a merchant stocks or sells the depicted products. All models are redistributed unmodified; the renderer scales instances to demonstration dimensions in SceneModel.
 Room surface textures: Wood Floor by Dimitrios Savva and White Plaster 02 by Rob Tuytel, from Poly Haven, CC0 1.0. Bundled 1K JPG diffuse, OpenGL normal and roughness maps for the floor, and normal and roughness maps for the wall, are documented with SHA256 in `public/assets/room/README.md`. Source: https://polyhaven.com/a/wood_floor and https://polyhaven.com/a/white_plaster_02. These textures do not represent a merchant's sellable materials.
 Three.js0.180.0: MIT, license included by npm/package delivery.
+
+
+## Bundled local GLB decoders
+
+The application uses the unmodified decoder resources distributed with the pinned Three.js 0.180.0 npm package. They load from the application's loopback server and require no online CDN. The portable bundle carries the license texts below in `licenses/`.
+
+- Draco geometry decoder: Apache-2.0, Google / Draco contributors. `Draco-LICENSE.txt`; source: https://github.com/google/draco. Files: `examples/jsm/libs/draco/gltf/draco_decoder.js`, `draco_wasm_wrapper.js`, `draco_decoder.wasm`.
+- Basis Universal KTX2 texture transcoder: Apache-2.0, Binomial LLC. `BasisUniversal-LICENSE.txt`; source: https://github.com/BinomialLLC/basis_universal. Files: `examples/jsm/libs/basis/basis_transcoder.js`, `basis_transcoder.wasm`.
+- Meshoptimizer 0.22 decoder: MIT, Copyright (c) 2016-2024 Arseny Kapoulkine. `Meshoptimizer-LICENSE.txt`; source: https://github.com/zeux/meshoptimizer/tree/v0.22. File: `examples/jsm/libs/meshopt_decoder.module.js`, including its embedded WASM.
+- KTX-Parse: MIT, Copyright (c) 2020 Don McCurdy. `KtxParse-LICENSE.txt`; source: https://github.com/donmccurdy/KTX-Parse. File: `examples/jsm/libs/ktx-parse.module.js`.
+- ZSTD decoder: MIT wrapper by Don McCurdy and BSD-3-Clause Zstandard code by Yann Collet / Facebook. `Zstddec-LICENSE.txt`; source: https://github.com/donmccurdy/zstddec-wasm. File: `examples/jsm/libs/zstddec.module.js`, including its embedded WASM.
+
+The small Draco regression fixture is an original four-vertex tetrahedron created for this repository with the bundled encoder. It contains no third-party product model or customer artwork. Its encoding settings and vertices are documented in `tests/glb-fixtures.mjs`.

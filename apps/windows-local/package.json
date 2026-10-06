@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --test --test-concurrency=1 tests/*.test.mjs tests/browser.spec.mjs",
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check glb.mjs && node --check dxf-analyze.mjs && node --check dxf-worker.mjs && node --check public/app.mjs && node --check public/catalog-refresh.mjs && node --check public/dxf-import.mjs && node --check public/dxf-scene.mjs && node --check public/products.mjs && node --check public/quotes.mjs && node --check public/orders.mjs && node --check public/money.mjs && node --check public/renderer.mjs && node --check public/room-materials.mjs && node --check public/furniture-gestures.mjs && node --check public/photo-model.mjs",
+    "check": "node --check server.mjs && node --check glb.mjs && node --check dxf-analyze.mjs && node --check dxf-worker.mjs && node --check public/app.mjs && node --check public/catalog-refresh.mjs && node --check public/dxf-import.mjs && node --check public/dxf-scene.mjs && node --check public/products.mjs && node --check public/quotes.mjs && node --check public/orders.mjs && node --check public/money.mjs && node --check public/renderer.mjs && node --check public/room-materials.mjs && node --check public/furniture-gestures.mjs && node --check public/photo-model.mjs && node --check public/furniture-assets.mjs && node --check public/model-loader.mjs && node --check public/model-fitting.mjs && node --check public/finish-catalog.mjs && node --check public/finish-tools.mjs && node --check public/finish-materials.mjs && node --check public/finish-editor.mjs",
     "format:check": "prettier --check public/*.mjs public/*.html public/*.css tests/*.mjs server.mjs glb.mjs dxf-analyze.mjs dxf-worker.mjs package.json"
   },
   "dependencies": {

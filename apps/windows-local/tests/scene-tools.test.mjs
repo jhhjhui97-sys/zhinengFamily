@@ -126,6 +126,33 @@ test("furniture edit validates finite bounds and retains metadata without source
   assert.equal(fixture.furniture_instances[0].position.x, 1000);
   assert.equal(updated.furniture_instances[0].metadata.keep, "是");
 });
+test("furniture edit raises its base in millimetres and keeps height on later planar edits", () => {
+  const raised = editFurniture(fixture, "one", {
+    x: 1000,
+    y: 2000,
+    z: 700,
+    rotation: 0,
+  });
+  assert.equal(raised.furniture_instances[0].position.z, 700);
+  assert.equal(fixture.furniture_instances[0].position.z, 0);
+  const moved = editFurniture(raised, "one", {
+    x: 1300,
+    y: 2000,
+    rotation: 30,
+  });
+  assert.equal(moved.furniture_instances[0].position.z, 700);
+  for (const z of [-1, NaN, Infinity, 1000001])
+    assert.throws(
+      () =>
+        editFurniture(fixture, "one", {
+          x: 1000,
+          y: 2000,
+          z,
+          rotation: 0,
+        }),
+      /高度|位置/,
+    );
+});
 test("invalid furniture edits reject NaN Infinity negative limits and missing id", () => {
   for (const x of [NaN, Infinity, -1e8])
     assert.throws(() =>
@@ -134,6 +161,252 @@ test("invalid furniture edits reject NaN Infinity negative limits and missing id
   assert.throws(() =>
     editFurniture(fixture, "missing", { x: 0, y: 0, rotation: 0 }),
   );
+});
+const stackedScene = {
+  floors: [{ id: "floor", elevation_mm: 500, height_mm: 2800 }],
+  rooms: [
+    {
+      id: "room",
+      floor_id: "floor",
+      boundary: [
+        { x: 0, y: 0 },
+        { x: 6000, y: 0 },
+        { x: 6000, y: 6000 },
+        { x: 0, y: 6000 },
+      ],
+    },
+  ],
+  furniture_instances: [
+    {
+      id: "table",
+      room_id: "room",
+      floor_id: "floor",
+      position: { x: 2000, y: 2000, z: 0 },
+      width_mm: 1200,
+      depth_mm: 800,
+      height_mm: 800,
+      rotation_deg: 0,
+    },
+    {
+      id: "screen",
+      room_id: "room",
+      floor_id: "floor",
+      position: { x: 4000, y: 2000, z: 0 },
+      width_mm: 400,
+      depth_mm: 300,
+      height_mm: 500,
+      rotation_deg: 0,
+    },
+  ],
+};
+test("manual placement permits touching faces and stacked furniture but rejects penetration", () => {
+  const onTop = editFurniture(stackedScene, "screen", {
+    x: 2000,
+    y: 2000,
+    z: 800,
+    rotation: 0,
+  });
+  assert.deepEqual(onTop.furniture_instances[1].position, {
+    x: 2000,
+    y: 2000,
+    z: 800,
+  });
+  const side = editFurniture(stackedScene, "screen", {
+    x: 2800,
+    y: 2000,
+    z: 0,
+    rotation: 0,
+  });
+  assert.equal(side.furniture_instances[1].position.x, 2800);
+  assert.throws(
+    () =>
+      editFurniture(stackedScene, "screen", {
+        x: 2000,
+        y: 2000,
+        z: 799,
+        rotation: 0,
+      }),
+    /碰撞/,
+  );
+  assert.throws(
+    () =>
+      editFurniture(stackedScene, "screen", {
+        x: 2799,
+        y: 2000,
+        z: 0,
+        rotation: 0,
+      }),
+    /碰撞/,
+  );
+  assert.equal(stackedScene.furniture_instances[1].position.z, 0);
+});
+test("furniture may touch floor wall and ceiling surfaces without crossing them", () => {
+  const touching = editFurniture(stackedScene, "screen", {
+    x: 5800,
+    y: 2000,
+    z: 2300,
+    rotation: 0,
+  });
+  assert.equal(touching.furniture_instances[1].position.z, 2300);
+  assert.throws(
+    () =>
+      editFurniture(stackedScene, "screen", {
+        x: 5800,
+        y: 2000,
+        z: 2301,
+        rotation: 0,
+      }),
+    /高度/,
+  );
+  assert.throws(
+    () =>
+      editFurniture(stackedScene, "screen", {
+        x: 5801,
+        y: 2000,
+        z: 2300,
+        rotation: 0,
+      }),
+    /房间/,
+  );
+});
+test("nearby parallel object side faces snap from either gap or small penetration", () => {
+  const before = structuredClone(stackedScene);
+  for (const x of [2827, 2773]) {
+    const result = sceneTools.snapFurniturePose(
+      stackedScene,
+      "screen",
+      { x, y: 2000, z: 0, rotation: 0 },
+      { mode: "move" },
+    );
+    assert.equal(result.snapped, true);
+    assert.deepEqual(result.pose, { x: 2800, y: 2000, z: 0, rotation: 0 });
+    assert.equal(result.contact.kind, "furniture-side");
+    assert.equal(result.contact.id, "table");
+  }
+  const far = sceneTools.snapFurniturePose(
+    stackedScene,
+    "screen",
+    { x: 2860, y: 2000, z: 0, rotation: 0 },
+    { mode: "move" },
+  );
+  assert.equal(far.snapped, false);
+  assert.equal(far.pose.x, 2860);
+  assert.deepEqual(stackedScene, before);
+});
+test("vertical proximity snaps the lower face onto a support top or down to the floor", () => {
+  for (const z of [825, 775]) {
+    const result = sceneTools.snapFurniturePose(
+      stackedScene,
+      "screen",
+      { x: 2000, y: 2000, z, rotation: 45 },
+      { mode: "height" },
+    );
+    assert.equal(result.snapped, true);
+    assert.deepEqual(result.pose, { x: 2000, y: 2000, z: 800, rotation: 45 });
+    assert.equal(result.contact.kind, "furniture-top");
+  }
+  const floor = sceneTools.snapFurniturePose(
+    stackedScene,
+    "screen",
+    { x: 4000, y: 2000, z: 27, rotation: 0 },
+    { mode: "height" },
+  );
+  assert.equal(floor.pose.z, 0);
+  assert.equal(floor.contact.kind, "floor");
+  const ceiling = sceneTools.snapFurniturePose(
+    stackedScene,
+    "screen",
+    { x: 4000, y: 2000, z: 2280, rotation: 0 },
+    { mode: "height" },
+  );
+  assert.equal(ceiling.pose.z, 2300);
+  assert.equal(ceiling.contact.kind, "ceiling");
+});
+test("snapping checks height and full placement before accepting a nearby surface", () => {
+  const wall = sceneTools.snapFurniturePose(
+    stackedScene,
+    "screen",
+    { x: 5780, y: 2000, z: 0, rotation: 0 },
+    { mode: "move" },
+  );
+  assert.equal(wall.snapped, true);
+  assert.equal(wall.pose.x, 5800);
+  assert.equal(wall.contact.kind, "wall");
+  const separated = sceneTools.snapFurniturePose(
+    stackedScene,
+    "screen",
+    { x: 2820, y: 2000, z: 1000, rotation: 0 },
+    { mode: "move" },
+  );
+  assert.equal(separated.snapped, false);
+  const blocked = structuredClone(stackedScene);
+  blocked.furniture_instances.push({
+    ...blocked.furniture_instances[1],
+    id: "obstacle",
+    position: { x: 2850, y: 2000, z: 0 },
+  });
+  const result = sceneTools.snapFurniturePose(
+    blocked,
+    "screen",
+    { x: 2820, y: 2000, z: 0, rotation: 0 },
+    { mode: "move" },
+  );
+  assert.equal(result.snapped, false);
+  assert.throws(() => editFurniture(blocked, "screen", result.pose), /碰撞/);
+});
+test("face snapping follows rotated parallel furniture without inventing contact for skew faces", () => {
+  const scene = structuredClone(stackedScene);
+  scene.furniture_instances[0].rotation_deg = 30;
+  const pose = { x: 2710.1408311032397, y: 2410, z: 0, rotation: 30 };
+  const result = sceneTools.snapFurniturePose(scene, "screen", pose, {
+    mode: "move",
+  });
+  assert.equal(result.snapped, true);
+  assert.ok(Math.abs(result.pose.x - 2692.820323027551) < 1e-9);
+  assert.ok(Math.abs(result.pose.y - 2400) < 1e-9);
+  assert.equal(result.pose.rotation, 30);
+  const skew = sceneTools.snapFurniturePose(
+    scene,
+    "screen",
+    { ...pose, rotation: 15 },
+    { mode: "move" },
+  );
+  assert.equal(skew.snapped, false);
+});
+test("wall snapping uses the inward normal for clockwise room boundaries", () => {
+  const scene = structuredClone(stackedScene);
+  scene.rooms[0].boundary = [
+    { x: 0, y: 0 },
+    { x: 0, y: 4000 },
+    { x: 4000, y: 4000 },
+    { x: 4000, y: 0 },
+  ];
+  scene.furniture_instances = [
+    { ...scene.furniture_instances[1], width_mm: 500 },
+  ];
+  const result = sceneTools.snapFurniturePose(
+    scene,
+    "screen",
+    { x: 270, y: 2000, z: 0, rotation: 0 },
+    { mode: "move" },
+  );
+  assert.equal(result.snapped, true);
+  assert.deepEqual(result.pose, { x: 250, y: 2000, z: 0, rotation: 0 });
+  assert.equal(result.contact.kind, "wall");
+});
+test("adding furniture rejects a product taller than the floor without changing the scene", () => {
+  const before = structuredClone(stackedScene);
+  assert.throws(
+    () =>
+      addFurniture(
+        stackedScene,
+        { id: "tall", width_mm: 400, depth_mm: 400, height_mm: 2801 },
+        "room",
+        "tall-one",
+      ),
+    /高度/,
+  );
+  assert.deepEqual(stackedScene, before);
 });
 test("furniture movement and rotation stay in its room without overlapping another item", () => {
   const scene = {

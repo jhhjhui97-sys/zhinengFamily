@@ -1,10 +1,11 @@
 import http from "node:http";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { createLocalServer } from "../server.mjs";
+import { triangleFixture, encodeGlb } from "./glb-fixtures.mjs";
 const root = resolve(import.meta.dirname, "../../..");
 async function setup(t, extra = {}) {
   const dir = await mkdtemp(join(tmpdir(), "family-server-"));
@@ -57,6 +58,77 @@ test("bundled PBR material images are served only as local image resources", asy
   assert.equal(response.headers.get("content-type"), "image/jpeg");
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
+});
+
+test("local decoder WASM is served with the correct MIME and permits isolated offline decoding", async (t) => {
+  const s = await setup(t, {
+    vendorDirectory: join(root, "apps/windows-local/node_modules/three"),
+  });
+  const file = "/vendor/three/examples/jsm/libs/draco/gltf/draco_decoder.wasm";
+  const response = await fetch(s.url + file);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "application/wasm");
+  const bytes = Buffer.from(await response.arrayBuffer());
+  assert.deepEqual(bytes.subarray(0, 4), Buffer.from([0, 97, 115, 109]));
+  assert.deepEqual(
+    bytes,
+    await readFile(
+      join(
+        root,
+        "apps/windows-local/node_modules/three/examples/jsm/libs/draco/gltf/draco_decoder.wasm",
+      ),
+    ),
+  );
+  const csp = response.headers.get("content-security-policy");
+  const directives = Object.fromEntries(
+    csp.split(";").map((s) => {
+      const [name, ...values] = s.trim().split(/\s+/);
+      return [name, values];
+    }),
+  );
+  assert.ok(directives["script-src"].includes("'wasm-unsafe-eval'"));
+  assert.ok(!directives["script-src"].includes("'unsafe-eval'"));
+  assert.ok(directives["connect-src"].includes("data:"));
+  assert.deepEqual(directives["worker-src"], ["'self'", "blob:"]);
+  assert.ok(
+    !directives["connect-src"].some(
+      (value) => value === "*" || value.startsWith("https:"),
+    ),
+  );
+});
+
+test("model staging reports the invalid GLB extension without exposing unrelated internal failures", async (t) => {
+  const s = await setup(t);
+  const fixture = triangleFixture();
+  fixture.document.extensionsRequired = ["FUTURE_unknown_compression"];
+  const response = await fetch(s.url + "/api/model-files", {
+    method: "POST",
+    headers: {
+      origin: s.url,
+      cookie: s.cookie,
+      "content-type": "model/gltf-binary",
+    },
+    body: encodeGlb(fixture.document, fixture.binary),
+  });
+  assert.equal(response.status, 422);
+  assert.match((await response.json()).error, /FUTURE_unknown_compression/);
+  const directory = await mkdtemp(join(tmpdir(), "family-bad-storage-"));
+  const badPath = join(directory, "PRIVATE-STORAGE.txt");
+  await writeFile(badPath, "not a directory");
+  const bad = await setup(t, { dataDirectory: badPath });
+  const failed = await fetch(bad.url + "/api/model-files", {
+    method: "POST",
+    headers: {
+      origin: bad.url,
+      cookie: bad.cookie,
+      "content-type": "model/gltf-binary",
+    },
+    body: triangleFixture().bytes,
+  });
+  assert.equal(failed.status, 422);
+  const error = (await failed.json()).error;
+  assert.match(error, /GLB|模型/);
+  assert.doesNotMatch(error, /PRIVATE-STORAGE|ENOTDIR|EACCES|[A-Z]:\\/);
 });
 test("same origin API uses real SQLite library", async (t) => {
   const s = await setup(t);

@@ -4,7 +4,10 @@ import {
   editFurniture,
   removeFurniture,
   nearestWallGapMm,
+  snapFurniturePose,
 } from "./scene-tools.mjs";
+import { replaceFurnitureAsset } from "./furniture-assets.mjs";
+import { mountFinishEditor } from "./finish-editor.mjs";
 import { mountFurnitureGestures } from "./furniture-gestures.mjs";
 import { mountProducts } from "./products.mjs";
 import { createCatalogRefresh } from "./catalog-refresh.mjs";
@@ -46,13 +49,15 @@ function pendingFurniture() {
   return (
     draft &&
     furnitureFieldsBaseline &&
-    ["furniture-x", "furniture-y", "furniture-rotation"].some(
+    ["furniture-x", "furniture-y", "furniture-z", "furniture-rotation"].some(
       (id) => $(id).value !== furnitureFieldsBaseline[id],
     )
   );
 }
 function sceneUnsaved() {
-  return Boolean(dirty() || pendingJson() || pendingFurniture());
+  return Boolean(
+    dirty() || pendingJson() || pendingFurniture() || finishes.pending(),
+  );
 }
 function hasUnsavedChanges({ customer = true, project = true } = {}) {
   return (
@@ -119,13 +124,25 @@ async function api(action, fields = {}) {
 }
 const refreshCatalog = createCatalogRefresh(() => api("catalog"), applyCatalog);
 const productsView = mountProducts({ api, onChanged: loadCatalog });
+const finishes = mountFinishEditor({
+  getScene: () => draft,
+  canEdit: () => !pendingJson() && !pendingFurniture(),
+  apply: async (scene) => {
+    const validated = await api("validate", { scene });
+    draft = validated.scene;
+    refreshDraft({ resetFinishes: true });
+  },
+  notify: message,
+  run,
+  onPending: refreshRevision,
+});
 const dxfImport = mountDxfImport({
   getActive: () => (selectedProject ? active : null),
   hasUnsavedChanges,
   setDraft: async (scene) => {
     const validated = await api("validate", { scene });
     draft = validated.scene;
-    refreshDraft();
+    refreshDraft({ resetFinishes: true });
   },
   notify: message,
   run,
@@ -188,21 +205,35 @@ function fields() {
   );
   $("furniture-x").value = item?.position.x ?? "";
   $("furniture-y").value = item?.position.y ?? "";
+  $("furniture-z").value = item?.position.z ?? "";
   $("furniture-rotation").value = item?.rotation_deg ?? "";
   $("dimensions").textContent = item
     ? `${item.width_mm} × ${item.depth_mm} × ${item.height_mm} mm`
     : "暂无家具";
   furnitureFieldsBaseline = Object.fromEntries(
-    ["furniture-x", "furniture-y", "furniture-rotation"].map((id) => [
-      id,
-      $(id).value,
-    ]),
+    ["furniture-x", "furniture-y", "furniture-z", "furniture-rotation"].map(
+      (id) => [id, $(id).value],
+    ),
   );
   furnitureFieldsBaseline.selection = $("furniture-select").value;
   view.selectFurniture(item?.id ?? null);
+  furnitureModelNote(item);
   refreshRevision();
 }
-function refreshDraft() {
+function furnitureModelNote(
+  item = draft?.furniture_instances.find(
+    (x) => x.id === $("furniture-select").value,
+  ),
+) {
+  const currentProduct = catalogItems.find(
+    (product) => product.id === item?.product_id.replace(/^urn:uuid:/i, ""),
+  );
+  $("furniture-model-note").textContent =
+    item && !item.asset_id && currentProduct?.asset_id
+      ? "这件家具使用之前的尺寸模型，商品已有新模型，可点下方按钮切换。"
+      : "切换模型仅修改当前草稿，之前保存的版本保留原模型。";
+}
+function refreshDraft({ resetFinishes = false } = {}) {
   const selected = $("furniture-select").value;
   const selectedRoom = $("room-select").value;
   $("empty-view").hidden = Boolean(draft);
@@ -228,11 +259,20 @@ function refreshDraft() {
   if (!$("room-select").value && $("room-select").options.length)
     $("room-select").selectedIndex = 0;
   fields();
+  finishes.refresh({ force: resetFinishes });
   refreshRevision();
   $("scene-stats").textContent = draft
     ? `${draft.rooms.length} 个房间 · ${draft.walls.length} 段墙体 · ${draft.furniture_instances.length} 件家具 · 真实毫米比例`
     : "毫米为单位 · 真实比例";
-  if (draft) view.show(draft);
+  if (draft)
+    view.show(draft).catch(() => {
+      $("render-status").textContent =
+        "场景显示失败，请检查模型或装修资料后重试。";
+      message(
+        "场景显示失败；保存资料仍在本机，请检查模型或装修资料后重试。",
+        true,
+      );
+    });
   else view.clear();
 }
 function loadCatalog() {
@@ -251,6 +291,7 @@ function applyCatalog(products) {
   }
   if (selected && catalogItems.some((product) => product.id === selected))
     $("catalog-select").value = selected;
+  furnitureModelNote();
 }
 function customerForm() {
   return Object.fromEntries(
@@ -407,7 +448,7 @@ async function library() {
       $("history-json").textContent = "";
       $("history-json-panel").open = false;
       $("project-title").textContent = item.name;
-      refreshDraft();
+      refreshDraft({ resetFinishes: true });
       await versions();
       message("已打开本地方案。");
     });
@@ -440,7 +481,7 @@ function adopt(version) {
   history = null;
   $("history-json").textContent = "";
   $("history-json-panel").open = false;
-  refreshDraft();
+  refreshDraft({ resetFinishes: true });
 }
 $("customer-create").onclick = () =>
   run(async () => {
@@ -614,7 +655,7 @@ $("sample").onclick = () =>
     }
     if (!discard()) return;
     draft = (await api("sample", { ...sceneScope(), id: active.id })).scene;
-    refreshDraft();
+    refreshDraft({ resetFinishes: true });
     message("示例已载入，尚未保存。");
   });
 $("save").onclick = () =>
@@ -623,7 +664,7 @@ $("save").onclick = () =>
       message("请先载入或编辑场景。", true);
       return;
     }
-    if (pendingJson() || pendingFurniture()) {
+    if (pendingJson() || pendingFurniture() || finishes.pending()) {
       message("请先应用输入框中的修改，再保存新版本。", true);
       return;
     }
@@ -648,7 +689,7 @@ $("add-furniture").onclick = () =>
       message("请先载入场景，再放入家具。", true);
       return;
     }
-    if (pendingJson() || pendingFurniture()) {
+    if (pendingJson() || pendingFurniture() || finishes.pending()) {
       message("请先应用输入框中的修改，再放入家具。", true);
       return;
     }
@@ -670,26 +711,28 @@ $("apply-position").onclick = () =>
       message("请先载入场景。", true);
       return;
     }
-    if (pendingJson()) {
+    if (pendingJson() || finishes.pending()) {
       message("请先应用高级场景 JSON，再调整家具位置。", true);
       return;
     }
     const x = Number($("furniture-x").value),
       y = Number($("furniture-y").value),
+      z = Number($("furniture-z").value),
       rotation = Number($("furniture-rotation").value);
     if (
       [
         $("furniture-x").value,
         $("furniture-y").value,
+        $("furniture-z").value,
         $("furniture-rotation").value,
       ].some((x) => x.trim() === "")
     )
       throw Error("请填写完整的位置与角度。");
-    const candidate = editFurniture(draft, $("furniture-select").value, {
-      x,
-      y,
-      rotation,
-    });
+    const id = $("furniture-select").value;
+    let pose = { x, y, z, rotation };
+    if ($("furniture-snap").checked)
+      pose = snapFurniturePose(draft, id, pose).pose;
+    const candidate = editFurniture(draft, id, pose);
     await api("validate", { scene: candidate });
     draft = candidate;
     refreshDraft();
@@ -698,7 +741,7 @@ $("apply-position").onclick = () =>
 $("remove-furniture").onclick = () =>
   run(async () => {
     if (!draft) throw Error("请先载入场景。");
-    if (pendingJson() || pendingFurniture())
+    if (pendingJson() || pendingFurniture() || finishes.pending())
       throw Error("请先应用输入框中的修改，再删除家具。");
     const id = $("furniture-select").value;
     const item = draft.furniture_instances.find(
@@ -724,13 +767,37 @@ $("furniture-select").onchange = () => {
   }
   fields();
 };
+$("furniture-current-model").onclick = () =>
+  run(async () => {
+    if (!draft) throw Error("请先载入场景。");
+    if (pendingJson() || pendingFurniture() || finishes.pending())
+      throw Error("请先应用输入框中的修改，再切换模型。");
+    const id = $("furniture-select").value;
+    const item = draft.furniture_instances.find(
+      (furniture) => furniture.id === id,
+    );
+    const product = catalogItems.find(
+      (value) => value.id === item?.product_id.replace(/^urn:uuid:/i, ""),
+    );
+    const candidate = replaceFurnitureAsset(draft, id, product);
+    const validated = await api("validate", { scene: candidate });
+    draft = validated.scene;
+    refreshDraft();
+    message("已切换到商品当前模型，请保存新版本；之前保存的版本保留原模型。");
+  });
 mountFurnitureGestures({
   canvas: $("viewport").querySelector("canvas"),
   renderer: view,
   getScene: () => draft,
   getSelectedId: () => $("furniture-select").value,
   canEdit: () =>
-    Boolean(draft && !busy && !pendingJson() && !pendingFurniture()),
+    Boolean(
+      draft &&
+        !busy &&
+        !pendingJson() &&
+        !pendingFurniture() &&
+        !finishes.pending(),
+    ),
   onSelect: (id) => {
     if (pendingFurniture()) return;
     $("furniture-select").value = id;
@@ -756,10 +823,12 @@ mountFurnitureGestures({
     $("gesture-hint").classList.toggle("error", error);
   },
   wallGap: nearestWallGapMm,
+  snapPose: snapFurniturePose,
+  isSnappingEnabled: () => $("furniture-snap").checked,
 });
 $("apply-json").onclick = () =>
   run(async () => {
-    if (pendingFurniture()) {
+    if (pendingFurniture() || finishes.pending()) {
       message("请先更新家具位置，再应用高级场景 JSON。", true);
       return;
     }
@@ -846,6 +915,7 @@ for (const id of [
   "scene-json",
   "furniture-x",
   "furniture-y",
+  "furniture-z",
   "furniture-rotation",
 ])
   $(id).addEventListener("input", refreshRevision);

@@ -239,6 +239,47 @@ test("model import creates a distinct product from the current form while retain
   assert.equal(ui.catalog().length, 2);
   assert.equal(ui.get("product-model-file").value, "");
 });
+test("plain product creation imports its selected model before creating the product", async (t) => {
+  const ui = fixture(t);
+  ui.fill();
+  ui.get("product-model-file").files = [{ size: 150 }];
+  await ui.click("product-create");
+  assert.equal(ui.products.size, 1);
+  assert.equal(ui.uploads(), 1);
+  assert.equal(ui.products.get("product-1").active_asset_id, "asset-new");
+  assert.equal(ui.products.get("product-1").byte_count, 150);
+  assert.equal(ui.catalog()[0].active_asset_id, "asset-new");
+});
+test("plain product creation with invalid form or model leaves no half-created product", async (t) => {
+  const ui = fixture(t);
+  const file = { size: 150, invalid: true };
+  ui.get("product-model-file").files = [file];
+  ui.fill({ ...fields, width: "0" });
+  await ui.click("product-create");
+  assert.equal(ui.products.size, 0);
+  assert.equal(ui.uploads(), 0);
+  ui.fill();
+  await ui.click("product-create");
+  assert.equal(ui.products.size, 0);
+  assert.equal(ui.get("product-model-file").files[0], file);
+  assert.equal(ui.get("product-name").value, fields.name);
+  assert.match(ui.get("product-message").textContent, /GLB/);
+});
+test("incomplete staging result leaves the model and product details for retry", async (t) => {
+  const ui = fixture(t);
+  ui.fill();
+  const file = { size: 150 };
+  ui.get("product-model-file").files = [file];
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ data: { sha256: "a".repeat(64), byte_count: 149 } }),
+  });
+  await ui.click("product-create");
+  assert.equal(ui.products.size, 0);
+  assert.equal(ui.get("product-model-file").files[0], file);
+  assert.equal(ui.get("product-name").value, fields.name);
+  assert.match(ui.get("product-message").textContent, /文件资料不完整/);
+});
 test("invalid details and failed model staging keep the selected file and create no product", async (t) => {
   const ui = fixture(t);
   ui.fill({ ...fields, width: "0" });

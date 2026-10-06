@@ -195,13 +195,15 @@
           </div>
           <div class="render-note" id="render-status">家具模型尚未加载</div>
           <div id="gesture-hint" role="status" aria-live="polite">
-            点击选中家具；按住中键移动，按住右键旋转。拖动时显示与墙面的距离。
+            点击选中家具；中键平面移动，Shift + 中键上下移动，右键旋转；Alt
+            暂时关闭贴合。
           </div>
         </div>
         <div class="scene-footer">
           <span id="scene-stats">毫米为单位 · 真实比例</span
           ><span
-            >左键空白处旋转视角 · 滚轮缩放 · 中键移动家具 · 右键旋转家具</span
+            >左键空白处旋转视角 · 滚轮缩放 · 中键移动 · Shift + 中键升降 ·
+            右键旋转</span
           >
         </div>
         <details id="advanced">
@@ -236,6 +238,12 @@
             >Y 位置 / mm<input id="furniture-y" type="number" step="50"
           /></label>
         </div>
+        <label for="furniture-z">离地高度 / mm</label>
+        <input id="furniture-z" type="number" min="0" step="50" />
+        <label class="inline-check"
+          ><input id="furniture-snap" type="checkbox" checked />靠近 50 mm
+          自动贴合墙面 / 家具面</label
+        >
         <label for="furniture-rotation">旋转角度 / °</label
         ><input id="furniture-rotation" type="number" step="15" /><button
           id="apply-position"
@@ -243,10 +251,120 @@
           更新家具位置
         </button>
         <button id="remove-furniture">删除当前家具</button>
+        <button id="furniture-current-model">使用商品当前模型</button>
+        <p id="furniture-model-note" class="muted"></p>
         <p class="muted">
-          可在左侧 3D
-          场景直接选中家具，中键拖动位置、右键拖动旋转；也可输入毫米坐标。调整后请保存新版本。
+          可在左侧 3D 场景直接选中家具，中键平面移动、Shift +
+          中键升降、右键旋转；按住 Alt
+          暂时关闭贴合。贴合按商品尺寸计算，可叠放，不允许实体穿透。调整后请保存新版本。
         </p>
+        <hr />
+        <details id="finish-panel" hidden>
+          <summary>墙面与地面装修</summary>
+          <label for="finish-room">装修房间</label
+          ><select id="finish-room"></select>
+          <label for="finish-surface">装修表面</label
+          ><select id="finish-surface">
+            <option value="floor">房间地面</option>
+            <option value="wall">整房墙面</option>
+            <option value="single">单面墙（朝向当前房间）</option>
+          </select>
+          <div id="finish-wall-row" hidden>
+            <label for="finish-wall">选择墙面</label
+            ><select id="finish-wall"></select>
+          </div>
+          <p id="finish-outline-note" class="muted"></p>
+          <label for="finish-preset">材料与工艺类型</label
+          ><select id="finish-preset"></select>
+          <label for="finish-name">装修名称</label
+          ><input id="finish-name" maxlength="100" />
+          <label for="finish-category">自定义工艺分类</label
+          ><input id="finish-category" maxlength="100" />
+          <label for="finish-pattern">表面纹理</label
+          ><select id="finish-pattern"></select>
+          <div class="number-row">
+            <label>主色<input id="finish-color" type="color" /></label
+            ><label>辅色<input id="finish-accent" type="color" /></label>
+          </div>
+          <label for="finish-layout">铺设方式</label
+          ><select id="finish-layout"></select>
+          <div class="number-row">
+            <label
+              >规格宽 / mm<input
+                id="finish-width"
+                type="number"
+                min="1"
+                max="10000" /></label
+            ><label
+              >规格长 / mm<input
+                id="finish-height"
+                type="number"
+                min="1"
+                max="10000"
+            /></label>
+          </div>
+          <div class="number-row">
+            <label
+              >缝宽 / mm<input
+                id="finish-grout"
+                type="number"
+                min="0"
+                step="any" /></label
+            ><label
+              >铺设方向 / °<input id="finish-angle" type="number" step="15"
+            /></label>
+          </div>
+          <label for="finish-groutcolor">缝色</label
+          ><input id="finish-groutcolor" type="color" />
+          <label for="finish-roughness">表面粗糙度（0 光滑 — 1 粗糙）</label
+          ><input
+            id="finish-roughness"
+            type="number"
+            min="0"
+            max="1"
+            step="0.05"
+          />
+          <div class="number-row">
+            <label
+              >金属度 / 0–1<input
+                id="finish-metalness"
+                type="number"
+                min="0"
+                max="1"
+                step="0.01" /></label
+            ><label
+              >不透明度 / 0–1<input
+                id="finish-opacity"
+                type="number"
+                min="0"
+                max="1"
+                step="0.01"
+            /></label>
+          </div>
+          <details>
+            <summary>基层与工艺记录</summary>
+            <p class="muted">
+              下列厚度、基层、层次仅作方案记录，本版不改变房间净尺寸或家具高度。
+            </p>
+            <label for="finish-thickness">饰面厚度 / mm</label
+            ><input id="finish-thickness" type="number" min="0" step="any" />
+            <label for="finish-substrate">基层处理</label
+            ><textarea id="finish-substrate" maxlength="2000"></textarea>
+            <label for="finish-layers">工艺层次（每行：名称|厚度mm|说明）</label
+            ><textarea
+              id="finish-layers"
+              placeholder="找平层|20|水泥砂浆&#10;饰面|10|瓷砖"
+            ></textarea>
+            <label for="finish-note">工艺说明 / 特殊做法</label
+            ><textarea id="finish-note" maxlength="4000"></textarea>
+          </details>
+          <button id="finish-apply">应用装修到草稿</button
+          ><button id="finish-clear">恢复默认表面</button
+          ><button id="finish-discard">放弃装修输入</button>
+          <p class="muted">
+            包含常见材料及铺法，自定义名称、分类、基层和层次可记录其他工艺。纹理为本地示意，实际材料请核对样板；镜面为近似反射。
+          </p>
+        </details>
         <hr />
         <div class="section-title">版本历史</div>
         <div id="history-items"></div>
@@ -461,7 +579,7 @@
             <button id="product-model-create">导入模型并新建商品</button>
             <p>
               填写上方商品资料并选择
-              GLB，可导入模型并新建商品；导入当前商品模型会替换当前商品的模型。
+              GLB，点“新建在售商品”会一起保存模型；导入当前商品模型会替换商品模型。已摆入的旧尺寸模型可在工作台点“使用商品当前模型”切换。
             </p>
           </div>
           <div class="product-model-import">
