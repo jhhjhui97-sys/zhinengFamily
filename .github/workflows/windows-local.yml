@@ -54,3 +54,4 @@ jobs:
         with:
           name: zhineng-family-windows-local
           path: .local/windows-portable/智能家居本地版
+          include-hidden-files: true

@@ -10,6 +10,9 @@ export function createFinishMaterial(finish, resources) {
     THREE.RGBAFormat,
   );
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(
     1000 / pixels.repeat_width_mm,
