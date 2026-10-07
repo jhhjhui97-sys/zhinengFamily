@@ -2010,12 +2010,22 @@ test(
       mimeType: "model/gltf-binary",
       buffer: Buffer.from("not-a-glb"),
     });
+    const invalidUpload = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname ===
+          `/api/product-models/${product.id}` &&
+        response.request().method() === "POST",
+    );
     await page
       .getByRole("button", { name: "导入当前商品 3D 模型", exact: true })
       .click();
+    const invalidResponse = await invalidUpload;
+    assert.equal(invalidResponse.status(), 422);
+    const invalidBody = await invalidResponse.json();
+    assert.match(invalidBody.error, /GLB/);
     await page
-      .locator("#product-message")
-      .filter({ hasText: /GLB.*不完整|GLB.*格式/ })
+      .locator("#product-message.error")
+      .filter({ hasText: invalidBody.error })
       .waitFor();
     assert.equal(
       (await call({ action: "product", id: product.id })).active_asset_id,

@@ -23,24 +23,31 @@
 ### Task 1: 三向几何与吸附
 Files: public/scene-tools.mjs, furniture-gestures.mjs, corresponding tests; parent renderer heightPoint/previewPose, app/index inputs.
 Interfaces: editFurniture(scene,id,{x,y,z?,rotation}); snapFurniturePose(scene,id,pose,{thresholdMm:50})->{pose,snapped,contact}; renderer.heightPoint(clientX,clientY,floorElevationMm,anchorPosition)->z.
-- [ ] 失败测试：保持z、高度拖动、贴墙、平行面、顶底叠放、穿透/房高。
-- [ ] 实现实际OBB+Z检查和吸附；集成XYZ输入、Shift高度、Alt自由。
-- [ ] 纯逻辑与真实浏览器通过后提交模块。
+- [x] 失败测试：保持z、高度拖动、贴墙、平行面、顶底叠放、穿透/房高。
+- [x] 实现实际OBB+Z检查和吸附；集成XYZ输入、Shift高度、Alt自由。
+- [x] 纯逻辑与真实浏览器通过后提交模块。
 
 ### Task 2: 模型可靠导入和实例升级
 Files: glb.mjs, public/model-loader.mjs, products.mjs, renderer.mjs, server.mjs, new furniture-assets.mjs; GLB/model/UI tests.
 Interfaces: createFurnitureLoader(renderer)->{loadAsync,dispose}; replaceFurnitureAsset(scene,id,product)->SceneModel clone.
-- [ ] 回归失败：普通新建选GLB不能忽略、旧尺寸实例可升级且旧版本不变、空模型拒绝。
-- [ ] 精准GLB检查、本地压缩decoder、wasm MIME/CSP；整合原子新建与显式升级。
-- [ ] 实际电视与匿名多mesh/屏幕fixture验证上传和渲染；检查decoder许可及完整打包后提交。
+- [x] 回归失败：普通新建选GLB不能忽略、旧尺寸实例可升级且旧版本不变、空模型拒绝。
+- [x] 精准GLB检查、本地压缩decoder、wasm MIME/CSP；整合原子新建与显式升级。
+- [x] 实际电视与匿名多mesh/屏幕fixture验证上传和渲染；检查decoder许可及完整打包后提交。
 
 ### Task 3: 装修数据、纹理与编辑
 Files: new public/finish-catalog.mjs, finish-tools.mjs, finish-editor.mjs, finish-materials.mjs; app/renderer/index/style integration; finish tests.
 Interfaces: finishOptions(surface), normalizeFinish(input,surface), setSurfaceFinish(scene,target,input), clearSurfaceFinish(scene,target), finishForSurface, roomWalls, wallFinishSides; finishTextureData->RGBA/repeat dimensions.
-- [ ] 失败测试：目录/自定义、多房间/共享墙两面、纹理规格铺法、工艺层和历史不改源。
-- [ ] 实现数据模块、独立编辑器和材质创建；DXF缺墙边界也可墙面预览。
-- [ ] 保存恢复/重启及实际视觉差异通过后提交。
+- [x] 失败测试：目录/自定义、多房间/共享墙两面、纹理规格铺法、工艺层和历史不改源。
+- [x] 实现数据模块、独立编辑器和材质创建；DXF缺墙边界也可墙面预览。
+- [x] 保存恢复/重启及实际材质差异通过后提交。
 
 ### Task 4: 打包与审查交付
-- [ ] 各模块审查，完整语法/格式、存储与Windows真实客户端验收。
-- [ ] 更新说明、创建可审查PR并附新版便携包，记录最终提交对应结果。
+- [x] 各模块审查，语法/格式、存储与新增Windows真实客户端场景验收。
+- [x] 更新说明并创建可审查PR #15。
+- [ ] 完整Windows回归全绿、视觉证据审查并交付新版便携包，记录最终提交对应结果。
+
+## 当前验证记录
+- Windows Actions run 37464647492：便携包构建、离线核心回归、语法/格式检查通过；真实Edge与SQLite合计177项，176通过。
+- 三个新增场景均通过：带屏幕贴图的多网格电视与离线Draco、三向摆放/吸附/叠放、墙地面装修/历史版本/重启恢复。
+- 唯一失败为旧测试等待旧版GLB错误文案。已改为验证上传HTTP 422及服务端返回的具体文案，保留文件和商品不被破坏的断言；最终完整回归待本次提交后重跑。
+- 本地Basis原始解码器对ETC1S与UASTC样本的CPU回退解码通过；压缩GPU格式的实际显示仍需对应显卡验证。
