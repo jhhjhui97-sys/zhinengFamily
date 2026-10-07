@@ -578,7 +578,17 @@ test(
     await project(page, true);
     const original = await draftScene(page),
       roomId = original.rooms[0].id;
-    await page.locator("#finish-panel > summary").click();
+    const shortcut = page.getByRole("button", {
+      name: "墙地面装修",
+      exact: true,
+    });
+    await shortcut.waitFor({ state: "visible" });
+    await shortcut.click();
+    assert.equal(
+      await page.locator("#finish-panel").evaluate((panel) => panel.open),
+      true,
+    );
+    await page.locator("#finish-room").waitFor({ state: "visible" });
     await page.locator("#finish-room").selectOption(roomId);
     await page.locator("#finish-preset").selectOption("floor-wood");
     await page.locator("#finish-layout").selectOption("herringbone");

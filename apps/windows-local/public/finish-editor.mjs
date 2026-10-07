@@ -212,5 +212,16 @@ export function mountFinishEditor({
     baseline = null;
     refresh({ force: true });
   };
-  return { refresh, pending };
+  const open = () => {
+    if (!getScene()?.rooms?.length) {
+      notify("请先载入户型或打开已有房间的方案，再选择墙面与地面装修。", true);
+      return false;
+    }
+    refresh();
+    $("panel").open = true;
+    $("panel").scrollIntoView({ block: "start" });
+    $("room").focus({ preventScroll: true });
+    return true;
+  };
+  return { refresh, pending, open };
 }

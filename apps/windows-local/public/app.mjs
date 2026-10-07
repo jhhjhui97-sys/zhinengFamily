@@ -894,6 +894,7 @@ $("history-next").onclick = () =>
   });
 $("interior").onclick = () => view.interior();
 $("overview").onclick = () => view.overview();
+$("open-finishes").onclick = () => finishes.open();
 $("capture").onclick = () => {
   if (!draft) {
     message("请先载入场景。", true);

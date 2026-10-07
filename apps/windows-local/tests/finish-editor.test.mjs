@@ -18,6 +18,12 @@ function fixture(t, initialScene) {
       const element = {
         children: [],
         hidden: false,
+        scrollIntoView(options) {
+          this.scrolled = options;
+        },
+        focus() {
+          this.focused = true;
+        },
         get value() {
           return value;
         },
@@ -103,6 +109,27 @@ function fixture(t, initialScene) {
     editable: (value) => (editable = value),
   };
 }
+test("opening finishes reveals the editor without losing an unapplied material choice", (t) => {
+  const ui = fixture(t);
+  ui.get("finish-color").value = "#bb4422";
+  ui.get("finish-color").oninput();
+  const original = structuredClone(ui.scene());
+  assert.equal(ui.editor.open(), true);
+  assert.equal(ui.get("finish-panel").open, true);
+  assert.equal(ui.get("finish-room").focused, true);
+  assert.equal(ui.get("finish-color").value, "#bb4422");
+  assert.equal(ui.editor.pending(), true);
+  assert.deepEqual(ui.scene(), original);
+});
+
+test("opening finishes without a floor plan explains how to start", (t) => {
+  const ui = fixture(t);
+  ui.replaceScene(null);
+  assert.equal(ui.editor.open(), false);
+  assert.match(ui.notice(), /载入户型/);
+  assert.equal(Boolean(ui.get("finish-panel").open), false);
+});
+
 test("finish editor applies colour, physical sizes and craft records as a draft", async (t) => {
   const ui = fixture(t);
   ui.get("finish-color").value = "#bb4422";
