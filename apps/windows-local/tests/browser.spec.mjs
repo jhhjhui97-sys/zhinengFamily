@@ -144,6 +144,14 @@ async function setup(
     () => !document.querySelector("#customer-create").disabled,
   );
   const restart = async () => {
+    // Finish pending local reads and unload the old document before changing its
+    // allowed origin. Otherwise late requests from it are mistaken for external
+    // traffic and aborted by the offline guard during the port switch.
+    await page.waitForFunction(
+      () => !document.querySelector("#customer-create").disabled,
+    );
+    await page.waitForLoadState("networkidle");
+    await page.goto("about:blank");
     await new Promise((r) => server.close(r));
     server = createLocalServer(config);
     await new Promise((r) => server.listen(0, "127.0.0.1", r));
