@@ -44,10 +44,12 @@ Interfaces: finishOptions(surface), normalizeFinish(input,surface), setSurfaceFi
 ### Task 4: 打包与审查交付
 - [x] 各模块审查，语法/格式、存储与新增Windows真实客户端场景验收。
 - [x] 更新说明并创建可审查PR #15。
-- [ ] 完整Windows回归全绿、视觉证据审查并交付新版便携包，记录最终提交对应结果。
+- [x] 完整Windows回归全绿、视觉证据审查并交付新版便携包，记录最终提交对应结果。
 
 ## 当前验证记录
 - Windows Actions run 37464647492：便携包构建、离线核心回归、语法/格式检查通过；真实Edge与SQLite合计177项，176通过。
 - 三个新增场景均通过：带屏幕贴图的多网格电视与离线Draco、三向摆放/吸附/叠放、墙地面装修/历史版本/重启恢复。
-- 唯一失败为旧测试等待旧版GLB错误文案。已改为验证上传HTTP 422及服务端返回的具体文案，保留文件和商品不被破坏的断言；最终完整回归待本次提交后重跑。
+- 旧GLB文案断言已改为验证上传HTTP 422及服务端具体文案，保留文件和商品不被破坏的断言。重启辅助函数先等待操作及请求结束、卸载旧页，再切换服务端口；保留全部错误检查。
 - 本地Basis原始解码器对ETC1S与UASTC样本的CPU回退解码通过；压缩GPU格式的实际显示仍需对应显卡验证。
+- 最终代码提交 `bc6b746c6d22ca57ee6dfb4eebe57eb979a84b6f` 的 Windows Actions [37600600446](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/37600600446) 全绿：177通过、0失败/取消/跳过；Scene consumer core和Phase 1 backend亦通过。
+- 下载后的正式候选包179个清单文件全部SHA256匹配；截图确认真实模型贴图与墙地面装修显示，线性过滤及mipmap消除明显斜视锯齿。交付ZIP SHA256：`38074df36635511edcf48239140f88f494a15ef4692182c5560c0cf89d8836c2`。

@@ -1,5 +1,17 @@
 # Windows 本地版验证记录
 
+## 三向摆放、可靠模型与装修（2026-10-07，已验收并交付）
+
+本轮完成中键平移、Shift+中键升降、右键旋转和50 mm尺寸面贴合；普通商品新建可一起导入GLB，旧尺寸实例可显式切换商品当前模型；墙面与地面各21项选项（含自定义），支持单墙朝向、铺法与工艺记录。保存、历史恢复和重启保持模型及装修快照。
+
+- 验证代码提交：`bc6b746c6d22ca57ee6dfb4eebe57eb979a84b6f`。干净PR合并测试提交与包内manifest的sourceRevision均为 `634d1bf1b614c183b9950d79ae79de5176c84528`。
+- [Windows Local 37600600446](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/37600600446) 构建、完整离线核心回归、语法/格式及真实SQLite/Edge全部通过，客户端177通过、0失败/取消/跳过。[Scene consumer core](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/37600600422) 和 [Phase 1 backend](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/37600600411) 同一代码提交亦通过。
+- 原用户 `TV-75-stand.glb` 通过本机结构解析和上传验证，6个网格与嵌入屏幕图片保持有效；没有上传用户原文件。CI用原创匿名电视验证实际渲染（6网格、124顶点、186索引、1贴图），另用实际Draco与Meshopt压缩几何验证本地解码。ETC1S和UASTC的原Basis解码器CPU回退另行本机验证；压缩GPU纹理格式仍需对应显卡验证。
+- 新增实际窗口流程全部通过：普通新建模型、尺寸实例升级与历史不变；XYZ、贴合、叠放、非法穿透与重启；墙地面材料、规格、方向、工艺层、保存/恢复。保留原客户、商品、报价、订单和DXF测试。重启测试等待操作与网络结束、卸载旧页后再切换端口，不清空或过滤错误。
+- 已下载并查看[真实截图证据](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/37600600446/artifacts/11472843185)，含 `imported-tv-draco.png` 与 `custom-room-finishes.png`。对斜视锯齿使用线性过滤和mipmap修正；截图确认实际模型及纹理生效。
+- [便携软件ZIP](https://github.com/jhhjhui97-sys/zhinengFamily/actions/runs/37600600446/artifacts/11472718619) 为60,600,873字节，SHA256为 `38074df36635511edcf48239140f88f494a15ef4692182c5560c0cf89d8836c2`。下载ZIP校验匹配，179个清单文件逐一校验匹配，sourceDirty=false，启动程序和本地解码资源完整。
+- 贴合依据商品尺寸包围体，不求复杂网格曲面交点。装修为材料示意，厚度/基层/工艺层次仅记录，不改变净尺寸、不提供施工验算。支持自定义补充，有限预设不声称穷尽所有工艺。
+
 ## 商品与场景操作修复（2026-10-06）
 
 商品页新增明确的编辑/删除入口；所有有效商品立即进入工作台，没有 GLB 时用真实尺寸盒摆放并参与报价。家具可从当前草稿删除后保存新版本。GLB 导入有独立的新建商品入口，模型先校验暂存，再由 SQLite 事务一起保存商品和资产。v8 删除商品保留历史资产、场景、报价、订单与 SKU。
