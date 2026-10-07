@@ -11,7 +11,7 @@ import {
 import { join, resolve, sep, extname } from "node:path";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { validateGlb } from "./glb.mjs";
+import { validateGlb, GlbValidationError } from "./glb.mjs";
 import { analyzeDxf, MAX_DXF_BYTES } from "./dxf-analyze.mjs";
 const here = import.meta.dirname;
 const BODY_LIMIT = 1024 * 1024;
@@ -26,6 +26,7 @@ const types = {
   ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".glb": "model/gltf-binary",
+  ".wasm": "application/wasm",
   ".md": "text/plain; charset=utf-8",
   ".svg": "image/svg+xml",
   ".jpg": "image/jpeg",
@@ -267,9 +268,12 @@ export function createLocalServer(options) {
           }),
         );
         return reply(result.status, result);
-      } catch {
+      } catch (error) {
         return reply(422, {
-          error: "GLB 文件不完整、格式不受支持或引用了外部资源，请检查后重试。",
+          error:
+            error instanceof GlbValidationError
+              ? error.message
+              : "GLB 模型无法保存，请检查本机存储空间后重试。",
         });
       } finally {
         clearTimeout(uploadTimeout);
@@ -369,7 +373,7 @@ export function createLocalServer(options) {
         "cache-control": "no-store",
         "x-content-type-options": "nosniff",
         "referrer-policy": "no-referrer",
-        "content-security-policy": `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' blob:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'`,
+        "content-security-policy": `default-src 'self'; script-src 'self' 'nonce-${nonce}' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' blob: data:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'`,
       };
       if (pathname === "/") {
         content = Buffer.from(

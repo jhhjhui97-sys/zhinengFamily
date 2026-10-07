@@ -285,15 +285,7 @@ export function mountProducts({ api, onChanged = async () => {} }) {
       if (!selected) throw Error("请先选择要删除的商品。");
       await deleteProduct(selected);
     });
-  $("product-create").onclick = () =>
-    operate(async () => {
-      const product = await api("product_create", validate(form()));
-      detail(product);
-      await refreshAfterMutation(
-        "商品已保存在本机。",
-        "商品已保存，但列表刷新失败，请重试搜索。",
-      );
-    });
+  $("product-create").onclick = () => operate(() => createFromForm(false));
   $("product-update").onclick = () =>
     operate(async () => {
       if (!selected) throw Error("请先选择要编辑的商品。");
@@ -336,43 +328,52 @@ export function mountProducts({ api, onChanged = async () => {} }) {
     if (file.size > 30 * 1024 * 1024) throw Error("模型文件不能超过 30 MiB。");
     return file;
   }
-  $("product-model-create").onclick = () =>
-    operate(async () => {
-      const values = validate(form());
-      const file = modelFile();
-      let response;
-      try {
-        response = await fetch("/api/model-files", {
-          method: "POST",
-          headers: { "content-type": "model/gltf-binary" },
-          body: file,
-        });
-      } catch {
-        throw Error("本地模型服务暂时不可用，请重试；所选文件已保留。");
-      }
-      const body = await response.json().catch(() => null);
-      if (!response.ok)
-        throw Error(body?.error ?? "模型导入失败，请检查文件后重试。");
-      const staged = body?.data;
-      if (
-        !staged ||
-        !/^[0-9a-f]{64}$/i.test(staged.sha256) ||
-        !Number.isSafeInteger(staged.byte_count) ||
-        staged.byte_count !== file.size
-      )
-        throw Error("模型服务返回的文件资料不完整，请重试；所选文件已保留。");
-      const product = await api("product_create_model", {
-        ...values,
-        sha256: staged.sha256,
-        byte_count: staged.byte_count,
+  async function createFromForm(requireModel) {
+    const values = validate(form());
+    const hasModel =
+      requireModel || Boolean($("product-model-file").files?.length);
+    const file = hasModel ? modelFile() : null;
+    const product = file
+      ? await createProductWithModel(values, file)
+      : await api("product_create", values);
+    detail(product);
+    if (file) $("product-model-file").value = "";
+    await refreshAfterMutation(
+      file ? "模型已导入，并新建在售商品。" : "商品已保存在本机。",
+      file
+        ? "商品和模型已保存，但列表刷新失败，请重试搜索。"
+        : "商品已保存，但列表刷新失败，请重试搜索。",
+    );
+  }
+  async function createProductWithModel(values, file) {
+    let response;
+    try {
+      response = await fetch("/api/model-files", {
+        method: "POST",
+        headers: { "content-type": "model/gltf-binary" },
+        body: file,
       });
-      detail(product);
-      $("product-model-file").value = "";
-      await refreshAfterMutation(
-        "模型已导入，并新建在售商品。",
-        "商品和模型已保存，但列表刷新失败，请重试搜索。",
-      );
+    } catch {
+      throw Error("本地模型服务暂时不可用，请重试；所选文件已保留。");
+    }
+    const body = await response.json().catch(() => null);
+    if (!response.ok)
+      throw Error(body?.error ?? "模型导入失败，请检查文件后重试。");
+    const staged = body?.data;
+    if (
+      !staged ||
+      !/^[0-9a-f]{64}$/i.test(staged.sha256) ||
+      !Number.isSafeInteger(staged.byte_count) ||
+      staged.byte_count !== file.size
+    )
+      throw Error("模型服务返回的文件资料不完整，请重试；所选文件已保留。");
+    return api("product_create_model", {
+      ...values,
+      sha256: staged.sha256,
+      byte_count: staged.byte_count,
     });
+  }
+  $("product-model-create").onclick = () => operate(() => createFromForm(true));
   $("product-model-upload").onclick = () =>
     operate(async () => {
       if (!selected) throw Error("请先选择已保存的商品。 ");

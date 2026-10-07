@@ -1,6 +1,13 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { createFurnitureLoader } from "./model-loader.mjs";
+import { fitFurnitureModel } from "./model-fitting.mjs";
+import { createFinishMaterial } from "./finish-materials.mjs";
+import {
+  finishForSurface,
+  wallFinishSides,
+  missingRoomWallEdges,
+} from "./finish-tools.mjs";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { renderPosition, wallSegments } from "./scene-tools.mjs";
 import {
@@ -65,6 +72,7 @@ export class RoomRenderer {
     this.renderSerial = 0;
     this.catalog = new Map();
     this.modelPromises = new Map();
+    this.modelLoader = createFurnitureLoader(this.renderer);
     this.roomTextures = null;
     this.roomTextureCache = new RoomTextureCache(() =>
       loadRoomTextures(this.renderer),
@@ -111,19 +119,7 @@ export class RoomRenderer {
       );
     }
     const source = await this.modelFor(item.product_id, item.asset_id);
-    const model = source.clone(true),
-      bounds = new THREE.Box3().setFromObject(model),
-      size = bounds.getSize(new THREE.Vector3()),
-      center = bounds.getCenter(new THREE.Vector3());
-    model.position.set(-center.x, -bounds.min.y, -center.z);
-    const normalized = new THREE.Group();
-    normalized.add(model);
-    normalized.scale.set(
-      item.width_mm / 1000 / size.x,
-      item.height_mm / 1000 / size.y,
-      item.depth_mm / 1000 / size.z,
-    );
-    return normalized;
+    return fitFurnitureModel(source, item);
   }
   modelFor(productId, assetId = null) {
     const id = productId.replace(/^urn:uuid:/i, "");
@@ -140,7 +136,7 @@ export class RoomRenderer {
       return Promise.reject(Error("模型不在本地目录中"));
     const key = imported ? asset : id;
     if (!this.modelPromises.has(key)) {
-      const promise = new GLTFLoader()
+      const promise = this.modelLoader
         .loadAsync(modelPath)
         .then((g) => g.scene);
       this.modelPromises.set(key, promise);
@@ -168,9 +164,9 @@ export class RoomRenderer {
     this.controls.update();
     this.scheduleFrame();
   }
-  box(w, h, d, material, x, y, z, tiled = false) {
+  box(w, h, d, material, x, y, z, tiled = false, uvOrigin = {}) {
     const geometry = new THREE.BoxGeometry(w, h, d);
-    if (tiled) tileWallGeometry(geometry, w, h, d);
+    if (tiled) tileWallGeometry(geometry, w, h, d, uvOrigin);
     this.resources.push(geometry);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(x, y, z);
@@ -187,6 +183,8 @@ export class RoomRenderer {
     this.resources = [];
     this.renderer.domElement.dataset.modelLoaded = "false";
     this.renderer.domElement.dataset.roomMaterialLoaded = "false";
+    this.renderer.domElement.dataset.furnitureGeometry = "[]";
+    this.renderer.domElement.dataset.surfaceFinishes = "[]";
     this.status.textContent = "家具模型尚未加载";
     this.scheduleFrame();
   }
@@ -222,6 +220,25 @@ export class RoomRenderer {
     );
     return point ? { x: point.x * 1000, y: -point.z * 1000 } : null;
   }
+  heightPoint(clientX, clientY, elevationMm = 0, anchor) {
+    const direction = this.camera.getWorldDirection(new THREE.Vector3());
+    direction.y = 0;
+    if (direction.lengthSq() < 1e-8) return null;
+    direction.normalize();
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
+      direction,
+      new THREE.Vector3(
+        anchor.x / 1000,
+        (elevationMm + anchor.z) / 1000,
+        -anchor.y / 1000,
+      ),
+    );
+    const point = this.pointerRay(clientX, clientY).intersectPlane(
+      plane,
+      new THREE.Vector3(),
+    );
+    return point ? point.y * 1000 - elevationMm : null;
+  }
   removeSelectionHelper() {
     if (!this.selectionHelper) return;
     this.scene.remove(this.selectionHelper);
@@ -244,6 +261,8 @@ export class RoomRenderer {
     if (!placed) return;
     placed.position.x = pose.x / 1000;
     placed.position.z = -pose.y / 1000;
+    placed.position.y =
+      ((placed.userData.floorElevationMm ?? 0) + (pose.z ?? 0)) / 1000;
     placed.rotation.y = THREE.MathUtils.degToRad(pose.rotation);
     if (this.selectionHelper) this.selectionHelper.update();
     this.scheduleFrame();
@@ -273,6 +292,19 @@ export class RoomRenderer {
       ...(this.roomTextures.floor ?? {}),
     });
     this.resources.push(wallMaterial, floorMaterial);
+    const surfaceEvidence = [];
+    const materialFor = (finish, info, fallback) => {
+      if (!finish) return fallback;
+      const material = createFinishMaterial(finish, this.resources);
+      surfaceEvidence.push({
+        ...info,
+        color: finish.color,
+        pattern: finish.pattern,
+        mapWidth: material.map.image.width,
+        repeat: material.map.repeat.toArray(),
+      });
+      return material;
+    };
     for (const room of document.rooms) {
       const shape = new THREE.Shape();
       room.boundary.forEach((p, i) =>
@@ -283,11 +315,55 @@ export class RoomRenderer {
       shape.closePath();
       const geometry = new THREE.ShapeGeometry(shape);
       this.resources.push(geometry);
-      const floor = new THREE.Mesh(geometry, floorMaterial);
+      const floor = new THREE.Mesh(
+        geometry,
+        materialFor(
+          finishForSurface(document, { roomId: room.id, surface: "floor" }),
+          { roomId: room.id, surface: "floor" },
+          floorMaterial,
+        ),
+      );
       floor.rotation.x = -Math.PI / 2;
       floor.position.y = (floors.get(room.floor_id) ?? 0) / 1000;
       floor.receiveShadow = true;
       this.content.add(floor);
+      const finish = finishForSurface(document, {
+        roomId: room.id,
+        surface: "wall",
+      });
+      if (finish) {
+        const previewMaterial = materialFor(
+          finish,
+          { roomId: room.id, surface: "wall", outline: true },
+          wallMaterial,
+        );
+        const height =
+          document.floors.find((f) => f.id === room.floor_id)?.height_mm ??
+          2800;
+        for (const edge of missingRoomWallEdges(document, room.id)) {
+          const width = Math.hypot(
+              edge.end.x - edge.start.x,
+              edge.end.y - edge.start.y,
+            ),
+            angle = Math.atan2(
+              edge.end.y - edge.start.y,
+              edge.end.x - edge.start.x,
+            );
+          const mesh = this.box(
+            width / 1000,
+            height / 1000,
+            0.01,
+            previewMaterial,
+            (edge.start.x + edge.end.x) / 2000,
+            (floors.get(room.floor_id) ?? 0) / 1000 + height / 2000,
+            -(edge.start.y + edge.end.y) / 2000,
+            true,
+          );
+          mesh.rotation.y = angle;
+          mesh.userData.outlinePreview = true;
+          this.content.add(mesh);
+        }
+      }
     }
     for (const wall of document.walls) {
       const total = Math.hypot(
@@ -299,6 +375,26 @@ export class RoomRenderer {
           wall.end.x - wall.start.x,
         ),
         elevation = (floors.get(wall.floor_id) ?? 0) / 1000;
+      const sides = wallFinishSides(document, wall.id);
+      const sideMaterial = (side) =>
+        materialFor(
+          sides[side]?.finish,
+          {
+            roomId: sides[side]?.roomId,
+            surface: "wall",
+            wallId: wall.id,
+            side,
+          },
+          wallMaterial,
+        );
+      const wallMaterials = [
+        wallMaterial,
+        wallMaterial,
+        wallMaterial,
+        wallMaterial,
+        sideMaterial("right"),
+        sideMaterial("left"),
+      ];
       for (const piece of wallSegments(wall, [
         ...document.doors,
         ...document.windows,
@@ -308,11 +404,12 @@ export class RoomRenderer {
             (piece.end - piece.start) / 1000,
             (piece.top - piece.bottom) / 1000,
             wall.thickness_mm / 1000,
-            wallMaterial,
+            wallMaterials,
             (wall.start.x + Math.cos(angle) * mid) / 1000,
             elevation + (piece.top + piece.bottom) / 2000,
             -(wall.start.y + Math.sin(angle) * mid) / 1000,
             true,
+            { x: piece.start / 1000, y: piece.bottom / 1000 },
           );
         mesh.rotation.y = angle;
         this.content.add(mesh);
@@ -354,6 +451,8 @@ export class RoomRenderer {
     this.scheduleFrame();
     let failed = 0,
       dimensions = 0;
+    const failedNames = [];
+    const geometryEvidence = [];
     for (const item of document.furniture_instances) {
       try {
         const model = await this.furnitureModel(item);
@@ -366,29 +465,59 @@ export class RoomRenderer {
         );
         placed.rotation.y = THREE.MathUtils.degToRad(item.rotation_deg);
         placed.userData.furnitureId = item.id;
+        placed.userData.floorElevationMm = floors.get(item.floor_id) ?? 0;
+        const evidence = {
+          id: item.id,
+          meshes: 0,
+          vertices: 0,
+          indices: 0,
+          texturedMeshes: 0,
+        };
         placed.traverse((o) => {
           if (o.isMesh) {
             o.castShadow = true;
             o.receiveShadow = true;
+            evidence.meshes++;
+            evidence.vertices +=
+              o.geometry.getAttribute("position")?.count ?? 0;
+            evidence.indices += o.geometry.index?.count ?? 0;
+            if (
+              (Array.isArray(o.material) ? o.material : [o.material]).some(
+                (m) => m.map,
+              )
+            )
+              evidence.texturedMeshes++;
           }
         });
+        const bounds = new THREE.Box3()
+          .setFromObject(model)
+          .getSize(new THREE.Vector3());
+        evidence.boundsMm = bounds
+          .toArray()
+          .map((value) => Math.round(value * 1000));
+        geometryEvidence.push(evidence);
         this.content.add(placed);
         this.furniture.set(item.id, placed);
         if (this.selectedFurnitureId === item.id) this.selectFurniture(item.id);
         this.scheduleFrame();
       } catch {
         failed++;
+        failedNames.push(item.metadata?.name ?? "未命名家具");
       }
     }
     if (serial !== this.renderSerial) return;
     if (failed) {
       this.renderer.domElement.dataset.modelLoaded = "partial";
-      this.status.textContent = `${failed} 件家具模型未能加载；请检查安装文件，已保存场景不受影响。`;
+      this.status.textContent = `${failed} 件家具模型未能加载（${failedNames.slice(0, 3).join("、")}）；请检查本地模型文件或重新导入，已保存场景不受影响。`;
     } else {
       this.renderer.domElement.dataset.modelLoaded = "true";
       this.status.textContent = `${document.furniture_instances.length} 件家具模型 · 本地渲染`;
     }
     this.renderer.domElement.dataset.dimensionModels = String(dimensions);
+    this.renderer.domElement.dataset.furnitureGeometry =
+      JSON.stringify(geometryEvidence);
+    this.renderer.domElement.dataset.surfaceFinishes =
+      JSON.stringify(surfaceEvidence);
     if (dimensions) this.status.textContent += ` · ${dimensions} 件尺寸模型`;
     if (!this.roomTextures.complete)
       this.status.textContent +=
@@ -407,6 +536,7 @@ export class RoomRenderer {
     this.removeSelectionHelper();
     this.controls.removeEventListener("change", this.onControlsChange);
     this.controls.dispose();
+    this.modelLoader.dispose();
     this.renderer.dispose();
     this.environment.dispose();
     for (const r of this.resources) r.dispose();

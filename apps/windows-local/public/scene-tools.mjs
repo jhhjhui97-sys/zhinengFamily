@@ -1,12 +1,17 @@
 export function renderPosition(point, elevation = 0) {
   return [point.x / 1000, ((point.z ?? 0) + elevation) / 1000, -point.y / 1000];
 }
-export function editFurniture(scene, id, { x, y, rotation }) {
+export function editFurniture(scene, id, { x, y, z, rotation }) {
+  const original = scene.furniture_instances.find((item) => item.id === id);
+  if (!original) throw Error("找不到家具");
+  z ??= original.position.z ?? 0;
   if (
-    ![x, y, rotation].every(Number.isFinite) ||
+    ![x, y, z, rotation].every(Number.isFinite) ||
     Math.abs(x) > 1000000 ||
     Math.abs(y) > 1000000 ||
-    Math.abs(rotation) > 36000
+    Math.abs(rotation) > 36000 ||
+    z < 0 ||
+    z > 1000000
   )
     throw Error("位置或角度不合法");
   const copy = structuredClone(scene),
@@ -14,6 +19,7 @@ export function editFurniture(scene, id, { x, y, rotation }) {
   if (!item) throw Error("找不到家具");
   item.position.x = x;
   item.position.y = y;
+  item.position.z = z;
   item.rotation_deg = ((rotation % 360) + 360) % 360;
   validateFurniturePlacement(copy, item);
   return copy;
@@ -45,7 +51,8 @@ function footprint(item) {
       ((sy * item.depth_mm) / 2) * depth.y,
   }));
 }
-function overlap(a, b, clearance = 100) {
+const placementTolerance = 0.001;
+function overlap(a, b, clearance = 0) {
   const axes = [a, b].flatMap((points) =>
     [0, 1].map((i) => {
       const start = points[i],
@@ -58,14 +65,36 @@ function overlap(a, b, clearance = 100) {
       points.map((p) => p.x * axis.x + p.y * axis.y);
     const pa = projection(a),
       pb = projection(b);
-    const margin = clearance * Math.hypot(axis.x, axis.y);
+    const margin =
+      (clearance - placementTolerance) * Math.hypot(axis.x, axis.y);
     return (
       Math.max(...pa) + margin > Math.min(...pb) &&
       Math.max(...pb) + margin > Math.min(...pa)
     );
   });
 }
+function heightsOverlap(a, b) {
+  const aBottom = a.position.z ?? 0,
+    bBottom = b.position.z ?? 0;
+  return (
+    Math.min(
+      aBottom + (a.height_mm ?? Infinity),
+      bBottom + (b.height_mm ?? Infinity),
+    ) -
+      Math.max(aBottom, bBottom) >
+    placementTolerance
+  );
+}
 function validateFurniturePlacement(scene, item) {
+  const floor = scene.floors?.find((value) => value.id === item.floor_id);
+  if (
+    (item.position.z ?? 0) < 0 ||
+    (Number.isFinite(floor?.height_mm) &&
+      Number.isFinite(item.height_mm) &&
+      (item.position.z ?? 0) + item.height_mm >
+        floor.height_mm + placementTolerance)
+  )
+    throw Error("家具高度不能低于地面或超出楼层高度。");
   const room = scene.rooms?.find((value) => value.id === item.room_id);
   if (!room) return;
   const corners = footprint(item);
@@ -87,10 +116,170 @@ function validateFurniturePlacement(scene, item) {
       (other) =>
         other.id !== item.id &&
         other.room_id === item.room_id &&
+        heightsOverlap(item, other) &&
         overlap(corners, footprint(other)),
     )
   )
     throw Error("家具与其他家具碰撞，请调整位置。");
+}
+function projectionRange(points, axis) {
+  const values = points.map((point) => point.x * axis.x + point.y * axis.y);
+  return { min: Math.min(...values), max: Math.max(...values) };
+}
+function rangesOverlap(a, b) {
+  return Math.min(a.max, b.max) - Math.max(a.min, b.min) > placementTolerance;
+}
+function furnitureAxes(item) {
+  const angle = ((item.rotation_deg ?? 0) * Math.PI) / 180;
+  return [
+    { x: Math.cos(angle), y: Math.sin(angle) },
+    { x: -Math.sin(angle), y: Math.cos(angle) },
+  ];
+}
+function parallelFace(item, normal) {
+  return furnitureAxes(item).some(
+    (axis) =>
+      Math.abs(Math.abs(axis.x * normal.x + axis.y * normal.y) - 1) < 1e-8,
+  );
+}
+export function snapFurniturePose(
+  scene,
+  id,
+  input,
+  { thresholdMm = 50, mode = "all" } = {},
+) {
+  const original = scene.furniture_instances.find((item) => item.id === id);
+  if (!original) throw Error("找不到家具");
+  const pose = { ...input, z: input.z ?? original.position.z ?? 0 };
+  if (
+    ![pose.x, pose.y, pose.z, pose.rotation, thresholdMm].every(
+      Number.isFinite,
+    ) ||
+    thresholdMm < 0 ||
+    thresholdMm > 1000
+  )
+    throw Error("位置或吸附距离不合法。");
+  const item = {
+    ...original,
+    position: { x: pose.x, y: pose.y, z: pose.z },
+    rotation_deg: pose.rotation,
+  };
+  const corners = footprint(item),
+    candidates = [];
+  const add = (delta, normal, contact) => {
+    const distance = Math.abs(delta);
+    if (distance <= placementTolerance || distance > thresholdMm) return;
+    const adjusted = normal
+      ? { ...pose, x: pose.x + normal.x * delta, y: pose.y + normal.y * delta }
+      : { ...pose, z: pose.z + delta };
+    candidates.push({ pose: adjusted, contact, distance });
+  };
+  if (mode !== "move" && mode !== "rotate") {
+    add(-pose.z, null, { kind: "floor", id: item.floor_id });
+    const floor = scene.floors?.find((value) => value.id === item.floor_id);
+    if (Number.isFinite(floor?.height_mm) && Number.isFinite(item.height_mm))
+      add(floor.height_mm - item.height_mm - pose.z, null, {
+        kind: "ceiling",
+        id: item.floor_id,
+      });
+  }
+  if (mode !== "height" && mode !== "rotate") {
+    const room = scene.rooms?.find((value) => value.id === item.room_id);
+    const orientation =
+      Math.sign(
+        (room?.boundary ?? []).reduce((area, point, index, boundary) => {
+          const next = boundary[(index + 1) % boundary.length];
+          return area + point.x * next.y - next.x * point.y;
+        }, 0),
+      ) || 1;
+    for (let i = 0; i < (room?.boundary.length ?? 0); i++) {
+      const a = room.boundary[i],
+        b = room.boundary[(i + 1) % room.boundary.length];
+      const length = Math.hypot(b.x - a.x, b.y - a.y);
+      if (!length) continue;
+      const normal = {
+        x: (-orientation * (b.y - a.y)) / length,
+        y: (orientation * (b.x - a.x)) / length,
+      };
+      if (!parallelFace(item, normal)) continue;
+      const tangent = { x: -normal.y, y: normal.x };
+      if (
+        !rangesOverlap(
+          projectionRange(corners, tangent),
+          projectionRange([a, b], tangent),
+        )
+      )
+        continue;
+      const wall = a.x * normal.x + a.y * normal.y;
+      add(wall - projectionRange(corners, normal).min, normal, {
+        kind: "wall",
+        id: room.id,
+        edge: i,
+      });
+    }
+  }
+  for (const other of scene.furniture_instances) {
+    if (
+      other.id === id ||
+      other.floor_id !== item.floor_id ||
+      other.room_id !== item.room_id
+    )
+      continue;
+    const otherCorners = footprint(other);
+    if (
+      mode !== "move" &&
+      mode !== "rotate" &&
+      overlap(corners, otherCorners)
+    ) {
+      if (Number.isFinite(other.height_mm))
+        add((other.position.z ?? 0) + other.height_mm - pose.z, null, {
+          kind: "furniture-top",
+          id: other.id,
+        });
+      if (Number.isFinite(item.height_mm))
+        add((other.position.z ?? 0) - item.height_mm - pose.z, null, {
+          kind: "furniture-bottom",
+          id: other.id,
+        });
+    }
+    if (mode === "height" || mode === "rotate" || !heightsOverlap(item, other))
+      continue;
+    for (const normal of furnitureAxes(other)) {
+      if (!parallelFace(item, normal)) continue;
+      const tangent = { x: -normal.y, y: normal.x };
+      if (
+        !rangesOverlap(
+          projectionRange(corners, tangent),
+          projectionRange(otherCorners, tangent),
+        )
+      )
+        continue;
+      const moving = projectionRange(corners, normal),
+        fixed = projectionRange(otherCorners, normal);
+      add(fixed.min - moving.max, normal, {
+        kind: "furniture-side",
+        id: other.id,
+      });
+      add(fixed.max - moving.min, normal, {
+        kind: "furniture-side",
+        id: other.id,
+      });
+    }
+  }
+  candidates.sort((a, b) => a.distance - b.distance);
+  for (const candidate of candidates) {
+    try {
+      editFurniture(scene, id, candidate.pose);
+      return {
+        pose: candidate.pose,
+        snapped: true,
+        contact: candidate.contact,
+      };
+    } catch {
+      /* A nearby surface must not introduce another collision. */
+    }
+  }
+  return { pose, snapped: false, contact: null };
 }
 export function nearestWallGapMm(scene, id, pose = null) {
   const original = scene.furniture_instances.find((value) => value.id === id);
@@ -129,6 +318,19 @@ function insidePolygon(point, boundary) {
   for (let i = 0, j = boundary.length - 1; i < boundary.length; j = i++) {
     const a = boundary[i],
       b = boundary[j];
+    const dx = b.x - a.x,
+      dy = b.y - a.y,
+      length = Math.hypot(dx, dy);
+    if (
+      length &&
+      Math.abs(dx * (point.y - a.y) - dy * (point.x - a.x)) / length <=
+        placementTolerance &&
+      point.x >= Math.min(a.x, b.x) - placementTolerance &&
+      point.x <= Math.max(a.x, b.x) + placementTolerance &&
+      point.y >= Math.min(a.y, b.y) - placementTolerance &&
+      point.y <= Math.max(a.y, b.y) + placementTolerance
+    )
+      return true;
     if (
       a.y > point.y !== b.y > point.y &&
       point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x
@@ -172,6 +374,10 @@ function availableCoordinates(start, end) {
   );
 }
 function collides(center, product, item) {
+  if (
+    !heightsOverlap({ position: { z: 0 }, height_mm: product.height_mm }, item)
+  )
+    return false;
   const radians = ((item.rotation_deg ?? 0) * Math.PI) / 180;
   const halfWidth =
     (Math.abs(Math.cos(radians)) * item.width_mm +
@@ -269,6 +475,7 @@ export function addFurniture(scene, product, roomId, instanceId) {
     height_mm: product.height_mm,
     rotation_deg: 0,
   });
+  validateFurniturePlacement(copy, copy.furniture_instances.at(-1));
   return copy;
 }
 export function wallSegments(wall, openings) {

@@ -334,14 +334,22 @@ canvas {
   position: absolute;
   top: 15px;
   left: 15px;
+  right: 15px;
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
+  pointer-events: none;
 }
 .view-tools button {
+  pointer-events: auto;
   background: #ffffffe3;
   font-size: 12px;
   border: 0;
   box-shadow: 0 2px 8px #0001;
+}
+#open-finishes {
+  background: #365e50;
+  color: white;
 }
 .render-note {
   position: absolute;
@@ -666,6 +674,23 @@ a {
 #quote-print-view,
 #order-print-view {
   display: none;
+}
+.inline-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.inline-check input {
+  width: auto;
+}
+#finish-panel summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+#finish-panel input[type="color"] {
+  height: 34px;
+  padding: 3px;
 }
 @media print {
   @page {
